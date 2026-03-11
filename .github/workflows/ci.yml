@@ -40,13 +40,13 @@ jobs:
 
       - name: Markdown format
         run: >-
-          uv run rumdl fmt README.md TODO.md idea.md docs exemples/README.md
-          --check --diff --disable MD013
+          uv run rumdl fmt README.md AGENTS.md TODO.md docs exemples/README.md
+          --check --diff
 
       - name: Markdown lint
         run: >-
-          uv run rumdl check README.md TODO.md idea.md docs exemples/README.md
-          --output-format github --disable MD013
+          uv run rumdl check README.md AGENTS.md TODO.md docs exemples/README.md
+          --output-format github
 
       - name: Pytest with coverage
         run: uv run pytest --cov=pjx --cov=exemples --cov-report=term-missing:skip-covered --cov-report=xml

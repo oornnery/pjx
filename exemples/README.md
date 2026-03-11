@@ -1,7 +1,8 @@
 # PJX Examples
 
 Estes arquivos mostram o caminho atual da API publica do PJX com base no
-[idea.md](/home/oornnery/proj/pjx/idea.md).
+[README.md](/home/oornnery/proj/pjx/README.md) e na documentacao em
+[docs/](/home/oornnery/proj/pjx/docs/).
 
 Eles sao executaveis e servem como exemplo de DX alvo.
 

@@ -8,3 +8,14 @@ wheels/
 
 # Virtual environments
 .venv
+
+.coverage
+coverage.xml
+htmlcov/
+*.log
+.pytest_cache/
+.ruff_cache/
+.rumdl_cache/
+.agents/
+.idea.*
+.vscode/
