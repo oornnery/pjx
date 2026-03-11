@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "pjx"
 version = "0.0.1"
@@ -5,14 +9,34 @@ description = "Server-first component framework prototype for Python"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.135.1",
     "jinja2>=3.1.6",
     "markupsafe>=3.0.2",
+    "python-multipart>=0.0.22",
+    "rich>=14.1.0",
     "starlette>=0.47.3",
+    "typer>=0.17.4",
     "uvicorn>=0.35.0",
 ]
+
+[project.scripts]
+pjx = "pjx.cli:main"
+
+[project.optional-dependencies]
+minijinja = []
+tailwind = []
 
 [dependency-groups]
 dev = [
     "httpx>=0.28.1",
     "pytest>=8.4.1",
 ]
+
+[tool.setuptools.package-data]
+pjx = ["static/js/*.js"]
+
+[tool.setuptools.packages.find]
+include = ["pjx*"]
+
+[tool.fastapi]
+entrypoint = "exemples.main:app"
