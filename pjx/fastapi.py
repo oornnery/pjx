@@ -112,11 +112,15 @@ class PJXRouter:
             include_in_schema=include_in_schema,
         )
 
-    def register_directive(self, name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
+    def register_directive(
+        self, name: str, fn: Callable[..., Any]
+    ) -> Callable[..., Any]:
         self._pending_directives.append(_PendingDirective(name=name, fn=fn))
         return fn
 
-    def directive(self, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def directive(
+        self, name: str
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             return self.register_directive(name, fn)
 
@@ -186,8 +190,14 @@ class PJX:
         self.css = css
         self.renderer = renderer
         self.static_url = static_url.rstrip("/") or "/static"
-        self.framework_static_url = framework_static_url.rstrip("/") or DEFAULT_FRAMEWORK_STATIC_URL
-        self.static_dir = self.root / static_dir if not Path(static_dir).is_absolute() else Path(static_dir)
+        self.framework_static_url = (
+            framework_static_url.rstrip("/") or DEFAULT_FRAMEWORK_STATIC_URL
+        )
+        self.static_dir = (
+            self.root / static_dir
+            if not Path(static_dir).is_absolute()
+            else Path(static_dir)
+        )
         self.catalog = Catalog(
             root=str(self.templates_root),
             aliases=dict(resolved_aliases),
@@ -264,11 +274,15 @@ class PJX:
             include_in_schema=include_in_schema,
         )
 
-    def register_directive(self, name: str, fn: Callable[..., Any]) -> Callable[..., Any]:
+    def register_directive(
+        self, name: str, fn: Callable[..., Any]
+    ) -> Callable[..., Any]:
         self.catalog.register_directive(name, fn)
         return fn
 
-    def directive(self, name: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    def directive(
+        self, name: str
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
         def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
             self.catalog.register_directive(name, fn)
             return fn
@@ -283,7 +297,9 @@ class PJX:
             self._included_routers.add(router_id)
 
             for pending_directive in router.directives:
-                self.catalog.register_directive(pending_directive.name, pending_directive.fn)
+                self.catalog.register_directive(
+                    pending_directive.name, pending_directive.fn
+                )
 
             for route in router.routes:
                 self._pending_routes.append(route)
@@ -306,7 +322,9 @@ class PJX:
         return self
 
     def tailwind_content_globs(self) -> tuple[str, ...]:
-        template_globs = {str(mount.path / "**/*.jinja") for mount in self.catalog.template_mounts}
+        template_globs = {
+            str(mount.path / "**/*.jinja") for mount in self.catalog.template_mounts
+        }
         return (
             str(self.root / "**/*.pjx"),
             *sorted(template_globs),
@@ -339,11 +357,23 @@ class PJX:
         assets: list[AssetImport] = []
         browser_set = set(self.browser)
         if "htmx" in browser_set:
-            assets.append(AssetImport(kind="js", path=f"{self.framework_static_url}/js/htmx.min.js"))
+            assets.append(
+                AssetImport(
+                    kind="js", path=f"{self.framework_static_url}/js/htmx.min.js"
+                )
+            )
         if "alpine" in browser_set:
-            assets.append(AssetImport(kind="js", path=f"{self.framework_static_url}/js/alpine.min.js"))
+            assets.append(
+                AssetImport(
+                    kind="js", path=f"{self.framework_static_url}/js/alpine.min.js"
+                )
+            )
         if browser_set:
-            assets.append(AssetImport(kind="js", path=f"{self.framework_static_url}/js/pjx-browser.js"))
+            assets.append(
+                AssetImport(
+                    kind="js", path=f"{self.framework_static_url}/js/pjx-browser.js"
+                )
+            )
         return tuple(assets)
 
     def _queue_route(
@@ -379,10 +409,14 @@ class PJX:
 
     def _mount_static(self, app: FastAPI) -> None:
         if self.static_dir.exists() and not _has_mount(app, self.static_url):
-            app.mount(self.static_url, StaticFiles(directory=self.static_dir), name="static")
+            app.mount(
+                self.static_url, StaticFiles(directory=self.static_dir), name="static"
+            )
 
     def _mount_framework_static(self, app: FastAPI) -> None:
-        if PACKAGE_STATIC_ROOT.exists() and not _has_mount(app, self.framework_static_url):
+        if PACKAGE_STATIC_ROOT.exists() and not _has_mount(
+            app, self.framework_static_url
+        ):
             app.mount(
                 self.framework_static_url,
                 StaticFiles(directory=PACKAGE_STATIC_ROOT),
@@ -512,7 +546,9 @@ def _extract_request(args: tuple[Any, ...], kwargs: dict[str, Any]) -> Request |
 
 
 def _has_mount(app: FastAPI, path: str) -> bool:
-    return any(isinstance(route, Mount) and route.path == path for route in app.router.routes)
+    return any(
+        isinstance(route, Mount) and route.path == path for route in app.router.routes
+    )
 
 
 def _normalize_prefix(prefix: str) -> str:
@@ -551,7 +587,10 @@ def _resolve_template_mount(root: Path, candidate: TemplateMountInput) -> Templa
         template_root = candidate.path
         if not template_root.is_absolute():
             template_root = root / template_root
-        return TemplateMount(path=template_root, prefix=_normalize_template_mount_prefix(candidate.prefix))
+        return TemplateMount(
+            path=template_root,
+            prefix=_normalize_template_mount_prefix(candidate.prefix),
+        )
 
     if isinstance(candidate, Mapping):
         mapping = cast(TemplateMountMapping, candidate)
@@ -562,7 +601,9 @@ def _resolve_template_mount(root: Path, candidate: TemplateMountInput) -> Templa
         template_root = Path(raw_path)
         if not template_root.is_absolute():
             template_root = root / template_root
-        return TemplateMount(path=template_root, prefix=_normalize_template_mount_prefix(raw_prefix))
+        return TemplateMount(
+            path=template_root, prefix=_normalize_template_mount_prefix(raw_prefix)
+        )
 
     template_root = Path(candidate)
     if not template_root.is_absolute():

@@ -570,7 +570,7 @@ def get_patterns_context() -> dict[str, object]:
                 "icon": "workflow",
                 "kind": "slots",
                 "description": "O componente expone um contrato e o consumidor decide a marcação final.",
-                "code": '{% slot item(value, index) %}\\n  <li>{{ index + 1 }}. {{ value.name }}</li>\\n{% endslot %}',
+                "code": "{% slot item(value, index) %}\\n  <li>{{ index + 1 }}. {{ value.name }}</li>\\n{% endslot %}",
             },
             {
                 "title": "Attrs passthrough",
@@ -583,7 +583,9 @@ def get_patterns_context() -> dict[str, object]:
     }
 
 
-def get_forms_context(*, errors: dict[str, str] | None = None, submitted: bool = False) -> dict[str, object]:
+def get_forms_context(
+    *, errors: dict[str, str] | None = None, submitted: bool = False
+) -> dict[str, object]:
     current_errors = errors or {}
     current_values = (
         dict(last_form_submission)
@@ -595,7 +597,9 @@ def get_forms_context(*, errors: dict[str, str] | None = None, submitted: bool =
         "form": dict(form_demo_state),
         "errors": current_errors,
         "submitted": submitted,
-        "submitted_payload": dict(last_form_submission) if last_form_submission is not None else None,
+        "submitted_payload": dict(last_form_submission)
+        if last_form_submission is not None
+        else None,
         "primitives": [
             {
                 "name": "Field",
@@ -670,7 +674,9 @@ def get_forms_context(*, errors: dict[str, str] | None = None, submitted: bool =
                 "Tooltip e hover states complementam a leitura sem exigir mais screens.",
             ],
         },
-        "validation_rules": _form_validation_rules(current_values, current_errors, submitted),
+        "validation_rules": _form_validation_rules(
+            current_values, current_errors, submitted
+        ),
         "form_status": _form_status(current_errors, submitted),
     }
 
@@ -745,7 +751,9 @@ def _validate_form_payload(values: FormValues) -> dict[str, str]:
         errors["email"] = "Informe um email valido para continuarmos."
 
     if len(values["message"]) < 24:
-        errors["message"] = "Explique um pouco mais o projeto para o payload ficar util."
+        errors["message"] = (
+            "Explique um pouco mais o projeto para o payload ficar util."
+        )
 
     return errors
 
@@ -821,7 +829,13 @@ def _rule_entry(
     else:
         status = "draft"
 
-    icon = "shield-check" if status == "ready" else "circle-alert" if field in errors else "list"
+    icon = (
+        "shield-check"
+        if status == "ready"
+        else "circle-alert"
+        if field in errors
+        else "list"
+    )
     return {
         "label": label,
         "detail": detail,

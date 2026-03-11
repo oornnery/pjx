@@ -19,7 +19,9 @@ def test_cli_check_supports_import_target_and_json_output() -> None:
     assert payload["errors"] == 0
     assert payload["files_checked"] >= 1
     assert payload["routes_checked"] >= 1
-    assert any(path.endswith("exemples/templates") for path in payload["template_roots"])
+    assert any(
+        path.endswith("exemples/templates") for path in payload["template_roots"]
+    )
 
 
 def test_cli_check_renders_numbered_validation_codes(tmp_path: Path) -> None:
@@ -41,10 +43,10 @@ def test_cli_check_renders_numbered_validation_codes(tmp_path: Path) -> None:
 def test_cli_format_can_check_and_write_template_file(tmp_path: Path) -> None:
     template_path = tmp_path / "Demo.jinja"
     template_path.write_text(
-        '{% component Demo %}\n'
-        '{% props title: str, count: int = 0 %}\n'
-        '<section>{{ title }}</section>\n'
-        '{% endcomponent %}\n'
+        "{% component Demo %}\n"
+        "{% props title: str, count: int = 0 %}\n"
+        "<section>{{ title }}</section>\n"
+        "{% endcomponent %}\n"
     )
 
     check_result = runner.invoke(app, ["format", str(template_path), "--check"])

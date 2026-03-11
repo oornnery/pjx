@@ -10,6 +10,7 @@ from exemples.data import (
     get_status_context,
     list_notifications,
 )
+
 router = APIRouter(prefix="/api")
 
 

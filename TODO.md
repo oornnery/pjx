@@ -170,7 +170,6 @@ Meta:
 Meta:
 
 * reduzir ainda mais o boilerplate do projeto host
-
 * [ ] helper de projeto novo
 * [ ] scaffold de `templates/components/layouts/pages`
 * [ ] presets de browser integrations
@@ -182,7 +181,6 @@ Meta:
 Meta:
 
 * usar o demo como prova real do framework
-
 * [ ] Tabs
 * [ ] Dialog/Sheet
 * [ ] Combobox
@@ -195,7 +193,6 @@ Meta:
 Meta:
 
 * fazer a documentacao acompanhar o framework
-
 * [ ] documentar todos os codigos do `check`
 * [ ] cookbook com exemplos pequenos
 * [ ] docs de extensao de directives

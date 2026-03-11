@@ -14,8 +14,8 @@ def test_example_app_end_to_end() -> None:
     assert status_code == 200
     assert "PJX Showcase" in body
     assert "Server-first UI for Python" in body
-    assert '/_pjx/js/htmx.min.js' in body
-    assert '/_pjx/js/alpine.min.js' in body
+    assert "/_pjx/js/htmx.min.js" in body
+    assert "/_pjx/js/alpine.min.js" in body
     assert "app-theme-select" in body
     assert "pjx-theme" in body
     assert "themePreference" in body
@@ -135,6 +135,8 @@ async def _request(
     transport = ASGITransport(app=app)
 
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.request(method, path, content=body, headers=dict(encoded_headers))
+        response = await client.request(
+            method, path, content=body, headers=dict(encoded_headers)
+        )
 
     return response.status_code, response.text

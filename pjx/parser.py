@@ -52,7 +52,9 @@ def parse_component_source(source: str, path: Path) -> SourceFileNode:
                 position = _handle_top_level_set(inner, prop_aliases, next_position)
             case "component":
                 if component is not None:
-                    raise ValueError(f"{path}: multiple component declarations are not supported")
+                    raise ValueError(
+                        f"{path}: multiple component declarations are not supported"
+                    )
                 component, position = _handle_top_level_component(
                     source,
                     next_position,
@@ -183,7 +185,9 @@ def _handle_inject(source: str, next_position: int) -> tuple[InjectDirectiveNode
     return InjectDirectiveNode(names=_parse_name_list(source)), next_position
 
 
-def _handle_provide(source: str, next_position: int) -> tuple[ProvideDirectiveNode, int]:
+def _handle_provide(
+    source: str, next_position: int
+) -> tuple[ProvideDirectiveNode, int]:
     return ProvideDirectiveNode(names=_parse_name_list(source)), next_position
 
 
@@ -235,10 +239,14 @@ def _parse_name_list(source: str) -> tuple[str, ...]:
 
 
 def _parse_slot_signature(source: str) -> tuple[str, tuple[str, ...]]:
-    match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*?)\))?$", source.strip(), re.DOTALL)
+    match = re.match(
+        r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*?)\))?$", source.strip(), re.DOTALL
+    )
     if not match:
         raise ValueError(f"Invalid slot signature: {source!r}")
-    params = tuple(item.strip() for item in (match.group(2) or "").split(",") if item.strip())
+    params = tuple(
+        item.strip() for item in (match.group(2) or "").split(",") if item.strip()
+    )
     return match.group(1), params
 
 
@@ -250,7 +258,9 @@ def _parse_signal(source: str) -> tuple[str, str]:
 
 
 def _parse_props_alias(tag_body: str) -> PropsAliasNode:
-    match = re.match(r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\{.*\})", tag_body, re.DOTALL)
+    match = re.match(
+        r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\{.*\})", tag_body, re.DOTALL
+    )
     if not match:
         raise ValueError(f"Invalid props alias declaration: {tag_body!r}")
     name = match.group(1)
@@ -293,7 +303,9 @@ def _parse_inline_props(source: str) -> list[PropDeclNode]:
         if not _IDENTIFIER_RE.fullmatch(prop_name):
             raise ValueError(f"Invalid prop name: {prop_name!r}")
         type_expr, default_expr = _parse_type_and_default(remainder.strip())
-        specs.append(PropDeclNode(name=prop_name, type_expr=type_expr, default_expr=default_expr))
+        specs.append(
+            PropDeclNode(name=prop_name, type_expr=type_expr, default_expr=default_expr)
+        )
     return specs
 
 
@@ -352,7 +364,9 @@ def _parse_import(source: str) -> ImportNode:
     if asset_match:
         return ImportNode(kind=asset_match.group(1), path=asset_match.group(2))
 
-    component_match = re.match(r'["\']([^"\']+)["\']\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$', source)
+    component_match = re.match(
+        r'["\']([^"\']+)["\']\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$', source
+    )
     if component_match:
         return ImportNode(
             kind="component",
@@ -382,7 +396,7 @@ def _read_block(source: str, position: int, end_tag: str) -> tuple[str, int]:
     match = pattern.search(source, position)
     if not match:
         raise ValueError(f"Missing closing block for {end_tag}")
-    return source[position:match.start()], match.end()
+    return source[position : match.start()], match.end()
 
 
 def _extract_tag_body(raw_tag: str) -> str:

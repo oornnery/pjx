@@ -8,7 +8,9 @@ from typing import Any
 from markupsafe import Markup, escape
 
 
-DirectiveFn = Callable[["Element", Any, "DirectiveContext"], "Element | list[Element] | None"]
+DirectiveFn = Callable[
+    ["Element", Any, "DirectiveContext"], "Element | list[Element] | None"
+]
 
 
 @dataclass(slots=True)
@@ -143,7 +145,9 @@ class AttrBag:
         if not blocked:
             return self
         remaining = [
-            token for token in _class_tokens(self.attrs.get("class")) if token not in blocked
+            token
+            for token in _class_tokens(self.attrs.get("class"))
+            if token not in blocked
         ]
         if remaining:
             self.attrs["class"] = " ".join(remaining)

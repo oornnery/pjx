@@ -53,7 +53,9 @@ class AssetsView:
         return Markup(render_js_assets(self._render_state.assets))
 
     def collect_css(self) -> list[str]:
-        return [asset.path for asset in self._render_state.assets if asset.kind == "css"]
+        return [
+            asset.path for asset in self._render_state.assets if asset.kind == "css"
+        ]
 
     def collect_js(self) -> list[str]:
         return [asset.path for asset in self._render_state.assets if asset.kind == "js"]

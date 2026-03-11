@@ -17,7 +17,9 @@ def test_pjx_exposes_integration_config() -> None:
     assert integrations["renderer"] == "jinja2"
     assert integrations["browser"] == ["htmx", "alpine"]
     assert integrations["css"] == "tailwind"
-    assert any(path.endswith("/exemples/templates") for path in integrations["templates"])
+    assert any(
+        path.endswith("/exemples/templates") for path in integrations["templates"]
+    )
     assert integrations["template_mounts"][0]["alias"] == "@"
     assert integrations["framework_static_url"] == "/_pjx"
 
@@ -41,14 +43,10 @@ def test_pjx_supports_prefixed_template_mounts(tmp_path: Path) -> None:
     root_templates.mkdir(parents=True)
     admin_templates.mkdir(parents=True)
     (root_templates / "Home.jinja").write_text(
-        "{% component Home %}\n"
-        "<section>root</section>\n"
-        "{% endcomponent %}\n"
+        "{% component Home %}\n<section>root</section>\n{% endcomponent %}\n"
     )
     (admin_templates / "Home.jinja").write_text(
-        "{% component AdminHome %}\n"
-        "<section>admin</section>\n"
-        "{% endcomponent %}\n"
+        "{% component AdminHome %}\n<section>admin</section>\n{% endcomponent %}\n"
     )
 
     mounted = PJX(
@@ -59,7 +57,10 @@ def test_pjx_supports_prefixed_template_mounts(tmp_path: Path) -> None:
         ],
     )
 
-    assert mounted.catalog.resolve_path("@admin/pages/Home.jinja") == admin_templates / "Home.jinja"
+    assert (
+        mounted.catalog.resolve_path("@admin/pages/Home.jinja")
+        == admin_templates / "Home.jinja"
+    )
     assert "@admin/pages/Home.jinja" in mounted.catalog.list_components()
     assert "pages/Home.jinja" in mounted.catalog.list_components()
     assert any(
@@ -95,7 +96,7 @@ def test_pjx_can_mount_into_existing_fastapi_app() -> None:
     assert status_code == 200
     assert "PJX Showcase" in body
     assert "Server-first UI for Python" in body
-    assert '/_pjx/js/htmx.min.js' in body
+    assert "/_pjx/js/htmx.min.js" in body
     assert embedded.catalog.directives["example"] is example_directive
 
 

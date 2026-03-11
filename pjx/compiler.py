@@ -122,7 +122,9 @@ def _compile_component_directives(
             provide_names.extend(directive.names)
             continue
         if isinstance(directive, ComputedDirectiveNode):
-            preamble_chunks.append(f"{{% set {directive.name} %}}{directive.body}{{% endset %}}\n")
+            preamble_chunks.append(
+                f"{{% set {directive.name} %}}{directive.body}{{% endset %}}\n"
+            )
             continue
         if isinstance(directive, SlotDirectiveNode):
             if directive.name in slot_names:
@@ -137,7 +139,14 @@ def _compile_component_directives(
             action_names.append(directive.name)
             continue
 
-    return props, inject_names, provide_names, slot_specs, action_names, "".join(preamble_chunks)
+    return (
+        props,
+        inject_names,
+        provide_names,
+        slot_specs,
+        action_names,
+        "".join(preamble_chunks),
+    )
 
 
 def _emit_nodes(nodes: list[Any], ctx: TransformContext) -> str:
@@ -257,9 +266,17 @@ def _emit_html_element(node: ElementNode, ctx: TransformContext) -> str:
 
     attrs_expr = _attrs_dict_expr(node.attrs)
     if _optional_attr(node.attrs, "jx-text") is not None:
-        node_children = [RawNode(f"{{{{ {_lookup_attr(node.attrs, 'jx-text', force_expression=True)} }}}}")]
+        node_children = [
+            RawNode(
+                f"{{{{ {_lookup_attr(node.attrs, 'jx-text', force_expression=True)} }}}}"
+            )
+        ]
     elif _optional_attr(node.attrs, "jx-html") is not None:
-        node_children = [RawNode(f"{{{{ {_lookup_attr(node.attrs, 'jx-html', force_expression=True)}|safe }}}}")]
+        node_children = [
+            RawNode(
+                f"{{{{ {_lookup_attr(node.attrs, 'jx-html', force_expression=True)}|safe }}}}"
+            )
+        ]
     else:
         node_children = node.children
 
@@ -278,12 +295,20 @@ def _needs_raw_tag_passthrough(node: ElementNode) -> bool:
 def _attrs_dict_expr(attrs: list[tuple[str, str | None]]) -> str:
     items: list[str] = []
     for key, value in attrs:
-        force_expression = key in {"when", "each"} or key.startswith("jx-bind:") or key in {"jx-class", "jx-show", "jx-text", "jx-html"}
-        items.append(f"{key!r}: {attr_value_to_expr(value, force_expression=force_expression)}")
+        force_expression = (
+            key in {"when", "each"}
+            or key.startswith("jx-bind:")
+            or key in {"jx-class", "jx-show", "jx-text", "jx-html"}
+        )
+        items.append(
+            f"{key!r}: {attr_value_to_expr(value, force_expression=force_expression)}"
+        )
     return "{" + ", ".join(items) + "}"
 
 
-def _lookup_attr(attrs: list[tuple[str, str | None]], name: str, *, force_expression: bool) -> str:
+def _lookup_attr(
+    attrs: list[tuple[str, str | None]], name: str, *, force_expression: bool
+) -> str:
     for key, value in attrs:
         if key == name:
             return attr_value_to_expr(value, force_expression=force_expression)

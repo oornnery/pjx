@@ -42,7 +42,10 @@ def test_parse_component_source_builds_structural_ast() -> None:
         ImportNode(kind="component", path="components/ui/Button.jinja", alias="Button"),
     )
     assert parsed.prop_aliases[0].name == "DemoProps"
-    assert tuple(prop.name for prop in parsed.prop_aliases[0].props) == ("title", "count")
+    assert tuple(prop.name for prop in parsed.prop_aliases[0].props) == (
+        "title",
+        "count",
+    )
     assert parsed.component.name == "Demo"
     assert parsed.component.modifiers == ("async",)
     assert isinstance(parsed.component.directives[0], PropsDirectiveNode)
@@ -77,7 +80,10 @@ def test_compile_component_file_uses_ast_directives() -> None:
     assert "header" in compiled.slot_specs
     assert "{% set total = count %}" in compiled.jinja_source
     assert "{% set label %}{{ title }}{% endset %}" in compiled.jinja_source
-    assert '<section data-total="{{ total }}">{{ label }}</section>' in compiled.jinja_source
+    assert (
+        '<section data-total="{{ total }}">{{ label }}</section>'
+        in compiled.jinja_source
+    )
 
 
 def test_parse_component_source_rejects_trailing_top_level_content() -> None:
@@ -88,7 +94,9 @@ def test_parse_component_source_rejects_trailing_top_level_content() -> None:
 <div>extra</div>
 """
 
-    with pytest.raises(ValueError, match="unexpected content after component declaration"):
+    with pytest.raises(
+        ValueError, match="unexpected content after component declaration"
+    ):
         parse_component_source(source, Path("Demo.jinja"))
 
 

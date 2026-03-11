@@ -185,7 +185,11 @@ def check_project(target: str | None) -> CheckReport:
         routes_checked=len(route_results),
         errors=errors,
         warnings=warnings,
-        validation_map=dict(sorted(validation_map.items(), key=lambda item: _validation_sort_key(item[0]))),
+        validation_map=dict(
+            sorted(
+                validation_map.items(), key=lambda item: _validation_sort_key(item[0])
+            )
+        ),
         templates=template_results,
         routes=route_results,
     )
@@ -202,7 +206,11 @@ def format_project(target: str | None, *, check: bool = False) -> list[FormatRes
         changed = formatted != source
         if changed and not check:
             file_path.write_text(formatted)
-        results.append(FormatResult(path=_display_path(file_path, project.catalog), changed=changed))
+        results.append(
+            FormatResult(
+                path=_display_path(file_path, project.catalog), changed=changed
+            )
+        )
 
     return results
 
@@ -217,7 +225,9 @@ def format_template_source(source: str, path: Path) -> str:
         blocks.extend(_format_props_alias(item) for item in parsed.prop_aliases)
 
     component_lines: list[str] = []
-    component_header = " ".join(("component", parsed.component.name, *parsed.component.modifiers)).strip()
+    component_header = " ".join(
+        ("component", parsed.component.name, *parsed.component.modifiers)
+    ).strip()
     component_lines.append(f"{{% {component_header} %}}")
 
     if parsed.component.directives:
@@ -296,7 +306,9 @@ def render_check_report(report: CheckReport, *, output_format: str = "text") -> 
             for issue in item.issues:
                 related = f" [{issue.related_path}]" if issue.related_path else ""
                 label = _validation_label(issue.number, issue.code)
-                lines.append(f"    {issue.severity.upper()} {label}{related}: {issue.message}")
+                lines.append(
+                    f"    {issue.severity.upper()} {label}{related}: {issue.message}"
+                )
 
     route_with_issues = [item for item in report.routes if item.issues]
     if route_with_issues:
@@ -307,7 +319,9 @@ def render_check_report(report: CheckReport, *, output_format: str = "text") -> 
             for issue in item.issues:
                 related = f" [{issue.related_path}]" if issue.related_path else ""
                 label = _validation_label(issue.number, issue.code)
-                lines.append(f"    {issue.severity.upper()} {label}{related}: {issue.message}")
+                lines.append(
+                    f"    {issue.severity.upper()} {label}{related}: {issue.message}"
+                )
 
     return "\n".join(lines)
 
@@ -364,12 +378,25 @@ def _load_from_path(path: Path) -> LoadedProject:
     resolved = path.resolve()
     if resolved.is_file():
         template_root = _discover_template_root(resolved.parent)
-        catalog = Catalog(root=str(template_root), aliases={"@": str(template_root)}, auto_reload=False)
-        return LoadedProject(root=template_root.parent if template_root.name == "templates" else template_root, catalog=catalog, pjx=None, files=(resolved,))
+        catalog = Catalog(
+            root=str(template_root),
+            aliases={"@": str(template_root)},
+            auto_reload=False,
+        )
+        return LoadedProject(
+            root=template_root.parent
+            if template_root.name == "templates"
+            else template_root,
+            catalog=catalog,
+            pjx=None,
+            files=(resolved,),
+        )
 
     project_root = resolved
     template_root = _discover_template_root(project_root)
-    catalog = Catalog(root=str(template_root), aliases={"@": str(template_root)}, auto_reload=False)
+    catalog = Catalog(
+        root=str(template_root), aliases={"@": str(template_root)}, auto_reload=False
+    )
     return LoadedProject(root=project_root, catalog=catalog, pjx=None)
 
 
@@ -395,7 +422,9 @@ def _collect_template_files(project: LoadedProject) -> list[Path]:
     return sorted(files.values())
 
 
-def _check_template_file(project: LoadedProject, file_path: Path) -> TemplateCheckResult:
+def _check_template_file(
+    project: LoadedProject, file_path: Path
+) -> TemplateCheckResult:
     result = TemplateCheckResult(path=_display_path(file_path, project.catalog))
     source = file_path.read_text()
 
@@ -670,7 +699,9 @@ def _matches_component_stem(stem: str, component_name: str) -> bool:
     if normalized_stem == normalized_component:
         return True
     for suffix in ("page", "layout", "component"):
-        if normalized_component.endswith(suffix) and normalized_stem == normalized_component.removesuffix(suffix):
+        if normalized_component.endswith(
+            suffix
+        ) and normalized_stem == normalized_component.removesuffix(suffix):
             return True
     return False
 

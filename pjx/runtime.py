@@ -53,7 +53,10 @@ class Runtime:
         source_mtime_ns = source_path.stat().st_mtime_ns
         cached = self._template_cache.get(cache_key)
         if cached is not None:
-            if not self.catalog.auto_reload or cached.source_mtime_ns == source_mtime_ns:
+            if (
+                not self.catalog.auto_reload
+                or cached.source_mtime_ns == source_mtime_ns
+            ):
                 return cached
         component = compile_component_file(source_path.read_text(), source_path)
         template = self.environment.from_string(component.jinja_source)
@@ -84,7 +87,9 @@ class Runtime:
         instance = self.get_component_instance(template_path)
         state = context.get("__pjx_render_state")
         if state is None:
-            state = RenderState(catalog=self.catalog, request=request, partial=partial, target=target)
+            state = RenderState(
+                catalog=self.catalog, request=request, partial=partial, target=target
+            )
             context = dict(context)
             context["__pjx_render_state"] = state
         context["assets"] = AssetsView(state)
@@ -123,7 +128,9 @@ class Runtime:
         render_state.register_assets(component.assets)
         for template_path in component.component_imports.values():
             child_instance = self.get_component_instance(template_path)
-            self._collect_template_assets(child_instance.component, render_state, seen=seen)
+            self._collect_template_assets(
+                child_instance.component, render_state, seen=seen
+            )
 
     def _render_component_instance(
         self,
@@ -155,7 +162,11 @@ class Runtime:
 
         local_context.update(
             {
-                "attrs": AttrBag(self.catalog.apply_directives_to_attrs(component.component_name, extra_attrs, render_state)),
+                "attrs": AttrBag(
+                    self.catalog.apply_directives_to_attrs(
+                        component.component_name, extra_attrs, render_state
+                    )
+                ),
                 "content": Markup(content or ""),
                 "slot": SlotAccessor(component.slot_specs, slots),
                 "__pjx_provides": local_provides,
@@ -225,9 +236,13 @@ class Runtime:
         return Markup(html_output)
 
     @pass_context
-    def render_attrs(self, jinja_ctx: Any, tag_name: str, attrs: dict[str, Any]) -> Markup:
+    def render_attrs(
+        self, jinja_ctx: Any, tag_name: str, attrs: dict[str, Any]
+    ) -> Markup:
         render_state = _lookup_render_state(jinja_ctx)
-        rendered_attrs = self.catalog.apply_directives_to_attrs(tag_name, attrs, render_state)
+        rendered_attrs = self.catalog.apply_directives_to_attrs(
+            tag_name, attrs, render_state
+        )
         if not rendered_attrs:
             return Markup("")
         chunks: list[str] = []

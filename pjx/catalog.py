@@ -129,7 +129,9 @@ class Catalog:
                 spec.name for spec in component.prop_specs if spec.default_expr is None
             ],
             "optional": [
-                spec.name for spec in component.prop_specs if spec.default_expr is not None
+                spec.name
+                for spec in component.prop_specs
+                if spec.default_expr is not None
             ],
             "props": [
                 {
@@ -228,7 +230,9 @@ class Catalog:
                 element.attrs[f"data-pjx-on-{event_name}"] = value
                 element.attrs.pop(key, None)
 
-    def _apply_custom_directives(self, element: Element, render_state: RenderState) -> None:
+    def _apply_custom_directives(
+        self, element: Element, render_state: RenderState
+    ) -> None:
         for name, fn in self.directives.items():
             if name not in element.attrs:
                 continue

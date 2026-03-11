@@ -22,9 +22,9 @@ def test_render_dashboard_page_smoke() -> None:
     assert "Staff Engineer" in html
     assert 'data-tooltip="Atualiza a lista de alertas"' in html
     assert html.count('<link rel="stylesheet"') == 5
-    assert '/static/css/components/ui/icon.css' in html
-    assert '/_pjx/js/htmx.min.js' in html
-    assert '/_pjx/js/alpine.min.js' in html
+    assert "/static/css/components/ui/icon.css" in html
+    assert "/_pjx/js/htmx.min.js" in html
+    assert "/_pjx/js/alpine.min.js" in html
     assert "status-badge status-ready" in html
     assert "app-theme-select" in html
     assert "pjx-theme" in html
@@ -72,7 +72,9 @@ def test_render_studio_page_smoke() -> None:
                 "lines": ["Linha A", "Linha B"],
             },
             "highlights": [{"label": "Prompt", "value": "Teste"}],
-            "variants": [{"name": "Hero", "status": "ready", "description": "Descricao"}],
+            "variants": [
+                {"name": "Hero", "status": "ready", "description": "Descricao"}
+            ],
         },
     )
 

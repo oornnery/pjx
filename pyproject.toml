@@ -30,6 +30,10 @@ tailwind = []
 dev = [
     "httpx>=0.28.1",
     "pytest>=8.4.1",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.5",
+    "rumdl>=0.1.45",
+    "ty>=0.0.21",
 ]
 
 [tool.setuptools.package-data]

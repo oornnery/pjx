@@ -9,4 +9,3 @@ def directive(name: str) -> Callable[[Callable], Callable]:
         return fn
 
     return decorator
-

@@ -21,7 +21,9 @@ class ElementNode:
 Node = RawNode | ElementNode
 
 
-_SLOT_START_RE = re.compile(r"^\s*\{%\s*slot\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*?)\))?\s*%\}\s*$", re.DOTALL)
+_SLOT_START_RE = re.compile(
+    r"^\s*\{%\s*slot\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*?)\))?\s*%\}\s*$", re.DOTALL
+)
 _SLOT_END_RE = re.compile(r"^\s*\{%\s*endslot\s*%\}\s*$")
 _JINJA_EXPR_RE = re.compile(r"^\s*\{\{\s*(.*?)\s*\}\}\s*$", re.DOTALL)
 
@@ -76,7 +78,9 @@ def parse_markup(source: str) -> list[Node]:
     return root
 
 
-def extract_named_slots(children: list[Node]) -> tuple[list[Node], list[tuple[str, tuple[str, ...], list[Node]]]]:
+def extract_named_slots(
+    children: list[Node],
+) -> tuple[list[Node], list[tuple[str, tuple[str, ...], list[Node]]]]:
     default_children: list[Node] = []
     slots: list[tuple[str, tuple[str, ...], list[Node]]] = []
     index = 0
@@ -95,7 +99,9 @@ def extract_named_slots(children: list[Node]) -> tuple[list[Node], list[tuple[st
                 slot_children: list[Node] = []
                 while index < len(children):
                     candidate = children[index]
-                    if isinstance(candidate, RawNode) and _SLOT_END_RE.match(candidate.source):
+                    if isinstance(candidate, RawNode) and _SLOT_END_RE.match(
+                        candidate.source
+                    ):
                         break
                     slot_children.append(candidate)
                     index += 1
@@ -118,7 +124,9 @@ def attr_value_to_expr(value: str | None, *, force_expression: bool = False) -> 
     return repr(value)
 
 
-def split_children_by_tag(children: list[Node], tag_name: str) -> tuple[list[Node], list[Node] | None]:
+def split_children_by_tag(
+    children: list[Node], tag_name: str
+) -> tuple[list[Node], list[Node] | None]:
     before: list[Node] = []
     after: list[Node] | None = None
     for child in children:
@@ -138,7 +146,9 @@ def _current_children(root: list[Node], stack: list[ElementNode]) -> list[Node]:
     return stack[-1].children
 
 
-def _read_delimited(source: str, start: int, open_delim: str, close_delim: str) -> tuple[str, int]:
+def _read_delimited(
+    source: str, start: int, open_delim: str, close_delim: str
+) -> tuple[str, int]:
     end = source.find(close_delim, start + len(open_delim))
     if end == -1:
         raise ValueError(f"Missing closing delimiter {close_delim!r}")
@@ -170,7 +180,9 @@ def _read_tag(
         pos += 1
 
     name_start = pos
-    while pos < len(source) and (source[pos].isalnum() or source[pos] in {"-", "_", ":"}):
+    while pos < len(source) and (
+        source[pos].isalnum() or source[pos] in {"-", "_", ":"}
+    ):
         pos += 1
     name = source[name_start:pos]
     if not name:
@@ -193,7 +205,11 @@ def _read_tag(
             break
 
         attr_start = pos
-        while pos < len(source) and not source[pos].isspace() and source[pos] not in {"=", ">", "/"}:
+        while (
+            pos < len(source)
+            and not source[pos].isspace()
+            and source[pos] not in {"=", ">", "/"}
+        ):
             pos += 1
         attr_name = source[attr_start:pos]
         attr_value: str | None = None
@@ -214,7 +230,11 @@ def _read_tag(
                 pos += 1
             else:
                 value_start = pos
-                while pos < len(source) and not source[pos].isspace() and source[pos] not in {">", "/"}:
+                while (
+                    pos < len(source)
+                    and not source[pos].isspace()
+                    and source[pos] not in {">", "/"}
+                ):
                     pos += 1
                 attr_value = source[value_start:pos]
         attrs.append((attr_name, attr_value))

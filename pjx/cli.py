@@ -51,7 +51,9 @@ def check_command(
         raise typer.Exit(code=2)
 
     report = check_project(target)
-    console.print(render_check_report(report, output_format=normalized_format), markup=False)
+    console.print(
+        render_check_report(report, output_format=normalized_format), markup=False
+    )
     if report.errors > 0:
         raise typer.Exit(code=1)
     if strict and report.warnings > 0:
@@ -68,7 +70,9 @@ def format_command(
     ] = None,
     check: Annotated[
         bool,
-        typer.Option("--check", help="Report files that would change without writing them"),
+        typer.Option(
+            "--check", help="Report files that would change without writing them"
+        ),
     ] = False,
 ) -> None:
     results = format_project(target, check=check)
