@@ -119,6 +119,34 @@ Camadas:
 * Runtime: render, contexto, cache, async, signals e actions.
 * Integracao web: FastAPI helpers, HTMX helpers, static assets, partial rendering e dev mode.
 
+### 3.1 Recorte de Implementacao P0
+
+Para o P0, a primeira separacao obrigatoria e entre:
+
+* parser estrutural do arquivo
+* parser de markup/component tree
+* backend de render
+
+O parser estrutural precisa entender, no minimo:
+
+* `import`
+* aliases de props por `set ... = { ... }`
+* declaracao `component`
+* preamble do componente com `props`, `inject`, `provide`, `computed`, `slot`, `signal` e `action`
+
+O parser de markup pode continuar separado numa fase inicial, desde que:
+
+* nao seja mais o responsavel por descobrir a estrutura inteira do arquivo
+* receba apenas o corpo ja isolado do componente
+* continue sendo substituivel numa fase posterior
+
+Diretriz de implementacao:
+
+* remover regex global como base estrutural do arquivo
+* representar a estrutura do arquivo em AST propria
+* deixar a compilacao consumir essa AST e produzir a IR/backend atual
+* migrar o parser de markup depois, sem misturar as duas frentes
+
 Decisao central:
 
 * a linguagem PJX precisa ser independente do backend
