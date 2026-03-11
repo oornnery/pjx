@@ -1,27 +1,57 @@
-from exemples.catalog import render_fragment
-from exemples.data import decrement_counter, increment_counter
-from pjx.web import APIRouter, Request
+from __future__ import annotations
 
-router = APIRouter()
+from typing import Annotated, Any
+
+from fastapi import Form
+
+from exemples.data import (
+    decrement_counter,
+    decrement_studio_count,
+    increment_counter,
+    increment_studio_count,
+    submit_forms_demo,
+    update_studio_prompt,
+)
+from pjx import PJXRouter
 
 
-@router.post("/counter/inc")
-async def increment_counter_action(request: Request):
+actions = PJXRouter()
+
+
+@actions.action("/actions/counter/inc", template="pages/signals_counter.jinja", target="counter-value")
+def increment_counter_action() -> dict[str, Any]:
     state = increment_counter()
-    return render_fragment(
-        request,
-        "@/pages/signals_counter.jinja",
-        target="counter-value",
-        initial_count=state["count"],
-    )
+    return {"initial_count": state["count"]}
 
 
-@router.post("/counter/dec")
-async def decrement_counter_action(request: Request):
+@actions.action("/actions/counter/dec", template="pages/signals_counter.jinja", target="counter-value")
+def decrement_counter_action() -> dict[str, Any]:
     state = decrement_counter()
-    return render_fragment(
-        request,
-        "@/pages/signals_counter.jinja",
-        target="counter-value",
-        initial_count=state["count"],
-    )
+    return {"initial_count": state["count"]}
+
+
+@actions.action("/actions/studio/inc", template="pages/studio.jinja", target="studio-shell")
+def studio_count_up() -> dict[str, Any]:
+    return increment_studio_count()
+
+
+@actions.action("/actions/studio/dec", template="pages/studio.jinja", target="studio-shell")
+def studio_count_down() -> dict[str, Any]:
+    return decrement_studio_count()
+
+
+@actions.action("/actions/studio/prompt", template="pages/studio.jinja", target="studio-shell")
+def studio_prompt_submit(prompt: Annotated[str, Form()]) -> dict[str, Any]:
+    return update_studio_prompt(prompt)
+
+
+@actions.action("/actions/forms/submit", template="pages/forms_playground.jinja", target="forms-shell")
+def forms_submit_action(
+    name: Annotated[str, Form()],
+    email: Annotated[str, Form()],
+    message: Annotated[str, Form()],
+) -> dict[str, object]:
+    return submit_forms_demo(name, email, message)
+
+
+__all__ = ["actions"]

@@ -1,0 +1,158 @@
+.modal-root {
+  display: inline-flex;
+}
+
+.modal-trigger-shell {
+  appearance: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.modal-portal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--app-surface-inverse) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.modal-frame {
+  position: relative;
+  min-height: 100vh;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+}
+
+.modal-panel {
+  position: relative;
+  width: min(100%, 560px);
+  border-radius: 20px;
+  border: 1px solid var(--app-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface-panel-strong) 98%, transparent), color-mix(in srgb, var(--app-surface) 96%, transparent));
+  box-shadow: var(--app-shadow-layout);
+  display: grid;
+  gap: 18px;
+}
+
+.modal-panel-sm {
+  max-width: 420px;
+}
+
+.modal-panel-md {
+  max-width: 560px;
+}
+
+.modal-panel-lg {
+  max-width: 760px;
+}
+
+.modal-header,
+.modal-footer {
+  padding: 18px 20px;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  border-bottom: 1px solid var(--app-border-soft);
+}
+
+.modal-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.modal-kicker {
+  margin: 0;
+  color: var(--app-text-subtle);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.modal-header h3 {
+  margin: 0;
+  color: var(--app-text-strong);
+  font-size: 1.12rem;
+  letter-spacing: -0.02em;
+}
+
+.modal-description {
+  margin: 0;
+  color: var(--app-text-muted);
+  line-height: 1.6;
+}
+
+.modal-close {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+  color: var(--app-text-muted);
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.modal-close:hover {
+  background: var(--app-surface-hover);
+  border-color: var(--app-border-strong);
+  color: var(--app-text);
+}
+
+.modal-close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--app-ring-soft);
+}
+
+.modal-body {
+  padding: 0 20px;
+  display: grid;
+  gap: 16px;
+  color: var(--app-text-muted);
+}
+
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid var(--app-border-soft);
+}
+
+@media (max-width: 720px) {
+  .modal-frame {
+    padding: 14px;
+  }
+
+  .modal-header,
+  .modal-footer {
+    padding: 16px;
+  }
+
+  .modal-body {
+    padding: 0 16px;
+  }
+}

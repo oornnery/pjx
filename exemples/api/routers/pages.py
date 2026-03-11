@@ -1,80 +1,67 @@
-from urllib.parse import parse_qs
+from typing import Any
 
-from exemples.catalog import render_page
+from fastapi import Request
+
 from exemples.data import (
-    decrement_studio_count,
     get_counter_context,
+    get_catalog_context,
     get_dashboard_context,
-    get_studio_context,
+    get_data_views_context,
+    get_forms_context,
+    get_patterns_context,
+    get_showcase_context,
     get_status_context,
-    increment_studio_count,
-    update_studio_prompt,
+    get_studio_context,
 )
-from pjx.web import APIRouter, Request
-
-router = APIRouter()
+from pjx import PJXRouter
 
 
-@router.get("/")
-async def dashboard_page(request: Request):
-    return render_page(
-        request,
-        "@/pages/dashboard.jinja",
-        **get_dashboard_context(),
-    )
+pages = PJXRouter()
 
 
-@router.get("/status")
-async def status_overview_page(request: Request):
-    return render_page(
-        request,
-        "@/pages/status_overview.jinja",
-        **get_status_context(),
-    )
+@pages.page("/", template="pages/showcase.jinja")
+def showcase_page() -> dict[str, object]:
+    return get_showcase_context()
 
 
-@router.get("/signals")
-async def signals_counter_page(request: Request):
-    return render_page(
-        request,
-        "@/pages/signals_counter.jinja",
-        **get_counter_context(),
-    )
+@pages.page("/dashboard", template="pages/dashboard.jinja")
+def dashboard_page() -> dict[str, Any]:
+    return get_dashboard_context()
 
 
-@router.get("/studio")
-async def studio_page(request: Request):
-    return render_page(
-        request,
-        "@/pages/studio.jinja",
-        **get_studio_context(),
-    )
+@pages.page("/status", template="pages/status_overview.jinja")
+def status_overview_page() -> dict[str, Any]:
+    return get_status_context()
 
 
-@router.post("/studio/inc")
-async def studio_count_up(request: Request):
-    return render_page(
-        request,
-        "@/pages/studio.jinja",
-        **increment_studio_count(),
-    )
+@pages.page("/signals", template="pages/signals_counter.jinja", target="counter-value")
+def signals_counter_page() -> dict[str, Any]:
+    return get_counter_context()
 
 
-@router.post("/studio/dec")
-async def studio_count_down(request: Request):
-    return render_page(
-        request,
-        "@/pages/studio.jinja",
-        **decrement_studio_count(),
-    )
+@pages.page("/studio", template="pages/studio.jinja", target="studio-shell")
+def studio_page() -> dict[str, Any]:
+    return get_studio_context()
 
 
-@router.post("/studio/prompt")
-async def studio_prompt_submit(request: Request):
-    form_payload = parse_qs((await request.body()).decode())
-    prompt = form_payload.get("prompt", [""])[0]
-    return render_page(
-        request,
-        "@/pages/studio.jinja",
-        **update_studio_prompt(prompt),
-    )
+@pages.page("/patterns", template="pages/patterns.jinja")
+def patterns_page() -> dict[str, object]:
+    return get_patterns_context()
+
+
+@pages.page("/data", template="pages/data_views.jinja")
+def data_views_page() -> dict[str, object]:
+    return get_data_views_context()
+
+
+@pages.page("/forms", template="pages/forms_playground.jinja")
+def forms_playground_page() -> dict[str, object]:
+    return get_forms_context()
+
+
+@pages.page("/catalog", template="pages/catalog.jinja")
+def catalog_page(request: Request) -> dict[str, object]:
+    return get_catalog_context(request.app.state.pjx_catalog)
+
+
+__all__ = ["pages"]

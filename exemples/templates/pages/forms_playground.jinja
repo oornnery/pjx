@@ -1,0 +1,365 @@
+{% import css "/static/css/pages/forms-playground.css" %}
+{% import "layouts/AppLayout.jinja" as AppLayout %}
+{% import "components/ui/Button.jinja" as Button %}
+{% import "components/ui/Card.jinja" as Card %}
+{% import "components/ui/Field.jinja" as Field %}
+{% import "components/ui/Icon.jinja" as Icon %}
+{% import "components/ui/Input.jinja" as Input %}
+{% import "components/ui/List.jinja" as List %}
+{% import "components/ui/Modal.jinja" as Modal %}
+{% import "components/ui/Select.jinja" as Select %}
+{% import "components/ui/StatusBadge.jinja" as StatusBadge %}
+{% import "components/ui/Switch.jinja" as ToggleSwitch %}
+{% import "components/ui/Textarea.jinja" as Textarea %}
+{% import "components/ui/Tooltip.jinja" as Tooltip %}
+{% import "components/ui/Checkbox.jinja" as Checkbox %}
+{% import "components/ui/Accordion.jinja" as Accordion %}
+
+{% component FormsPlaygroundPage %}
+
+  {% props
+    form: dict = {},
+    errors: dict = {},
+    submitted: bool = false,
+    submitted_payload: Optional[dict] = None,
+    primitives: list = [],
+    validation_rules: list = [],
+    form_status: dict = {},
+    interactive_demo: dict = {},
+    validation_modal: dict = {}
+  %}
+
+  <AppLayout title="Forms and Validation" theme="light">
+    <section
+      id="forms-shell"
+      class="forms-shell"
+      jx-bind:data-draft-chars="form.message|length if form.message is defined else 0"
+      x-data="{ draftChars: 0 }"
+      x-init="draftChars = Number($el.dataset.draftChars || 0)"
+    >
+      <div class="forms-grid">
+        <Card title="Primitive library" class="forms-panel">
+          <div class="forms-primitive-grid">
+            <For each="primitives" as="item">
+              <article class="forms-primitive-card">
+                <div class="forms-primitive-head">
+                  <span class="forms-primitive-icon">
+                    <Icon name="{{ item.icon }}" size="{{ 16 }}" />
+                  </span>
+                  <div>
+                    <strong>{{ item.name }}</strong>
+                    <p>{{ item.summary }}</p>
+                  </div>
+                </div>
+
+                <ul class="forms-token-list">
+                  <For each="item.tokens" as="token">
+                    <li>{{ token }}</li>
+                  </For>
+                </ul>
+              </article>
+            </For>
+          </div>
+        </Card>
+
+        <Card title="Server validation" class="forms-panel">
+          <div class="forms-status-row">
+            <StatusBadge status="{{ form_status.status }}" />
+            <p>{{ form_status.summary }}</p>
+          </div>
+
+          <form
+            method="post"
+            action="/actions/forms/submit"
+            class="forms-form"
+            hx-post="/actions/forms/submit"
+            hx-target="#forms-shell"
+            hx-swap="outerHTML"
+          >
+            <Field
+              label="Name"
+              for_id="lead-name"
+              hint="Use o nome da pessoa responsavel pelo projeto."
+              error="{{ errors.get('name') }}"
+              required="{{ true }}"
+            >
+              <Input
+                id="lead-name"
+                name="name"
+                value="{{ form.get('name', '') }}"
+                placeholder="Larissa Moraes"
+                invalid="{{ errors.get('name') is not none }}"
+                autocomplete="name"
+                required
+              />
+            </Field>
+
+            <Field
+              label="Email"
+              for_id="lead-email"
+              hint="Validamos isso no servidor antes de aceitar o submit."
+              error="{{ errors.get('email') }}"
+              required="{{ true }}"
+            >
+              <Input
+                id="lead-email"
+                name="email"
+                type="email"
+                value="{{ form.get('email', '') }}"
+                placeholder="larissa@acme.dev"
+                invalid="{{ errors.get('email') is not none }}"
+                autocomplete="email"
+                required
+              />
+            </Field>
+
+            <Field
+              label="Project brief"
+              for_id="lead-message"
+              hint="Escreva pelo menos 24 caracteres para renderizar um payload mais util."
+              error="{{ errors.get('message') }}"
+              required="{{ true }}"
+            >
+              <Textarea
+                id="lead-message"
+                name="message"
+                value="{{ form.get('message', '') }}"
+                placeholder="Quero uma pagina de onboarding com tabela, validacao e feedback incremental."
+                invalid="{{ errors.get('message') is not none }}"
+                rows="{{ 5 }}"
+                x-on:input="draftChars = $event.target.value.length"
+                required
+              />
+            </Field>
+
+            <div class="forms-helper-row">
+              <p class="forms-helper-copy">
+                O form envia para FastAPI, aplica validacao no servidor e volta so com o fragmento atualizado.
+              </p>
+
+              <span class="forms-counter">
+                <Icon name="terminal" size="{{ 14 }}" />
+                <strong x-text="draftChars"></strong> chars
+              </span>
+            </div>
+
+            <div class="forms-form-actions">
+              <Tooltip text="Dispara validacao no servidor e devolve apenas o fragmento atualizado.">
+                <Button type="submit">
+                  <Icon name="shield-check" size="{{ 16 }}" />
+                  Validar no servidor
+                </Button>
+              </Tooltip>
+
+              <Modal
+                title="Validation modal"
+                description="{{ validation_modal.description }}"
+                trigger_label="Abrir revisao"
+                trigger_variant="outline"
+                size="lg"
+              >
+                <div class="forms-modal-stack">
+                  <div class="forms-status-row forms-status-row-inline">
+                    <StatusBadge status="{{ form_status.status }}" />
+                    <p>{{ form_status.summary }}</p>
+                  </div>
+
+                  <div class="forms-modal-grid">
+                    <div class="forms-modal-section">
+                      <p class="forms-modal-eyebrow">Checklist</p>
+                      <ul class="forms-modal-list">
+                        <For each="validation_modal.checklist" as="item">
+                          <li>
+                            <Icon name="shield-check" size="{{ 14 }}" />
+                            <span>{{ item }}</span>
+                          </li>
+                        </For>
+                      </ul>
+                    </div>
+
+                    <div class="forms-modal-section">
+                      <p class="forms-modal-eyebrow">Live payload</p>
+                      <div class="forms-live-summary">
+                        <div class="forms-preview-item">
+                          <span>Name</span>
+                          <strong>{{ form.get('name', '') or 'pending' }}</strong>
+                        </div>
+                        <div class="forms-preview-item">
+                          <span>Email</span>
+                          <strong>{{ form.get('email', '') or 'pending' }}</strong>
+                        </div>
+                        <div class="forms-preview-item forms-preview-item-wide">
+                          <span>Brief</span>
+                          <p>{{ form.get('message', '') or 'Nenhum texto enviado ainda.' }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="forms-modal-section">
+                    <p class="forms-modal-eyebrow">Review tips</p>
+                    <ul class="forms-modal-list forms-modal-list-muted">
+                      <For each="validation_modal.tips" as="tip">
+                        <li>
+                          <Icon name="info" size="{{ 14 }}" />
+                          <span>{{ tip }}</span>
+                        </li>
+                      </For>
+                    </ul>
+                  </div>
+                </div>
+
+                {% slot footer %}
+                  <Button variant="ghost" type="button" x-on:click="open = false">
+                    Fechar
+                  </Button>
+                  <Button variant="default" type="button" x-on:click="open = false">
+                    Parece bom
+                  </Button>
+                {% endslot %}
+              </Modal>
+            </div>
+          </form>
+        </Card>
+      </div>
+
+      <div class="forms-bottom-grid">
+        <Card title="Interactive controls">
+          <div
+            class="forms-interactive-shell"
+            x-data="{
+              deliveryRegion: 'gru',
+              planTier: 'team',
+              notifyEmail: true,
+              auditTrail: false
+            }"
+          >
+            <div class="forms-interactive-grid">
+              <Field
+                label="Region"
+                for_id="interactive-region"
+                hint="Componente Select com x-model local."
+              >
+                <Select
+                  id="interactive-region"
+                  name="interactive-region"
+                  value="gru"
+                  options="{{ interactive_demo.regions }}"
+                  x-model="deliveryRegion"
+                />
+              </Field>
+
+              <Field
+                label="Plan"
+                for_id="interactive-plan"
+                hint="Pode ser usado em forms reais ou playgrounds locais."
+              >
+                <Select
+                  id="interactive-plan"
+                  name="interactive-plan"
+                  value="team"
+                  options="{{ interactive_demo.plans }}"
+                  x-model="planTier"
+                />
+              </Field>
+            </div>
+
+            <div class="forms-toggle-stack">
+              <Checkbox
+                name="interactive-email"
+                value="email-digest"
+                checked="{{ true }}"
+                x-model="notifyEmail"
+              >
+                Enviar digest de rollout por email
+              </Checkbox>
+
+              <ToggleSwitch
+                name="interactive-audit"
+                value="audit-trail"
+                x-model="auditTrail"
+              >
+                Manter audit trail ativo durante o experimento
+              </ToggleSwitch>
+            </div>
+
+            <Accordion
+              title="Live summary"
+              summary="Os componentes acima estao dirigindo esse resumo via Alpine."
+              open="{{ true }}"
+            >
+              <div class="forms-live-summary">
+                <div class="forms-preview-item">
+                  <span>Region</span>
+                  <strong x-text="deliveryRegion"></strong>
+                </div>
+                <div class="forms-preview-item">
+                  <span>Plan</span>
+                  <strong x-text="planTier"></strong>
+                </div>
+                <div class="forms-preview-item">
+                  <span>Email digest</span>
+                  <strong x-text="notifyEmail ? 'enabled' : 'disabled'"></strong>
+                </div>
+                <div class="forms-preview-item">
+                  <span>Audit trail</span>
+                  <strong x-text="auditTrail ? 'enabled' : 'disabled'"></strong>
+                </div>
+              </div>
+            </Accordion>
+          </div>
+        </Card>
+
+        <Card title="Validation rules">
+          <List items="{{ validation_rules }}">
+            {% slot item(value, index) %}
+              <div class="forms-rule-row">
+                <div class="forms-rule-copy">
+                  <span class="forms-rule-icon">
+                    <Icon name="{{ value.icon }}" size="{{ 15 }}" />
+                  </span>
+                  <div>
+                    <strong>{{ value.label }}</strong>
+                    <p>{{ value.detail }}</p>
+                  </div>
+                </div>
+                <StatusBadge status="{{ value.status }}" />
+              </div>
+            {% endslot %}
+          </List>
+        </Card>
+
+        <Card title="Last accepted payload">
+          <If when="submitted_payload">
+            <div class="forms-preview-grid">
+              <div class="forms-preview-item">
+                <span>Name</span>
+                <strong>{{ submitted_payload.name }}</strong>
+              </div>
+              <div class="forms-preview-item">
+                <span>Email</span>
+                <strong>{{ submitted_payload.email }}</strong>
+              </div>
+              <div class="forms-preview-item forms-preview-item-wide">
+                <span>Brief</span>
+                <p>{{ submitted_payload.message }}</p>
+              </div>
+            </div>
+
+            <Else>
+              <div class="forms-empty">
+                <span class="forms-empty-icon">
+                  <Icon name="mail" size="{{ 18 }}" />
+                </span>
+                <div>
+                  <strong>Nada validado ainda</strong>
+                  <p>Envie um payload valido para ver a representacao final aceita pelo servidor.</p>
+                </div>
+              </div>
+            </Else>
+          </If>
+        </Card>
+      </div>
+    </section>
+  </AppLayout>
+{% endcomponent %}

@@ -1,0 +1,105 @@
+.theme-panel {
+  border-radius: 18px;
+  padding: 20px;
+  border: 1px solid var(--app-border);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 96%, transparent), color-mix(in srgb, var(--app-surface-soft) 94%, transparent));
+  display: grid;
+  gap: 16px;
+  color: var(--app-text);
+}
+
+.theme-panel-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.theme-panel-title-row {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+}
+
+.theme-panel-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--app-accent-soft);
+  color: var(--app-text);
+}
+
+.theme-panel-head h3 {
+  margin: 6px 0 0;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.theme-panel-eyebrow {
+  margin: 0;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--app-text-subtle);
+}
+
+.theme-panel-mode {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface) 72%, transparent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--app-text-muted);
+}
+
+.theme-panel-body {
+  display: grid;
+  gap: 14px;
+  line-height: 1.65;
+  color: var(--app-text-muted);
+}
+
+.theme-panel-calm {
+  border-color: var(--app-border-emphasis);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 98%, transparent), color-mix(in srgb, var(--app-surface-selected) 78%, var(--app-surface) 22%));
+}
+
+.theme-panel-warm {
+  border-color: color-mix(in srgb, var(--app-status-building-border) 90%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 98%, transparent), color-mix(in srgb, var(--app-surface-selected-warm) 78%, var(--app-surface) 22%));
+}
+
+.theme-panel-hot {
+  color: var(--app-text-inverse);
+  border-color: var(--app-border-translucent);
+  background:
+    linear-gradient(180deg, var(--app-hero-gradient-start), var(--app-hero-gradient-mid));
+}
+
+.theme-panel-hot .theme-panel-eyebrow,
+.theme-panel-hot .theme-panel-body {
+  color: var(--app-text-inverse-subtle, var(--app-text-inverse-muted));
+}
+
+.theme-panel-hot .theme-panel-glyph {
+  background: var(--app-surface-overlay);
+  color: var(--app-text-inverse);
+}
+
+.theme-panel-hot .theme-panel-mode {
+  border-color: var(--app-border-overlay);
+  background: var(--app-surface-overlay);
+  color: var(--app-text-inverse-muted);
+}

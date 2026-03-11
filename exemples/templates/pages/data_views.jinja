@@ -1,0 +1,127 @@
+{% import css "/static/css/pages/data-views.css" %}
+{% import "layouts/AppLayout.jinja" as AppLayout %}
+{% import "components/ui/Button.jinja" as Button %}
+{% import "components/ui/Card.jinja" as Card %}
+{% import "components/ui/Icon.jinja" as Icon %}
+{% import "components/ui/List.jinja" as List %}
+{% import "components/ui/StatusBadge.jinja" as StatusBadge %}
+{% import "components/ui/Table.jinja" as Table %}
+
+{% component DataViewsPage %}
+
+  {% props
+    summary: list = [],
+    deployments: list = [],
+    deployment_columns: list = [],
+    activities: list = [],
+    shortcuts: list = [],
+    queues: list = []
+  %}
+
+  <AppLayout title="Data Views" theme="light">
+    <section class="data-shell">
+      <div class="data-summary-grid">
+        <For each="summary" as="item">
+          <Card class="data-summary-card">
+            <div class="data-summary-head">
+              <span class="data-summary-icon">
+                <Icon name="{{ item.icon }}" size="{{ 18 }}" />
+              </span>
+              <div>
+                <p class="data-summary-label">{{ item.label }}</p>
+                <strong class="data-summary-value">{{ item.value }}</strong>
+              </div>
+            </div>
+            <p class="data-summary-note">{{ item.note }}</p>
+          </Card>
+        </For>
+      </div>
+
+      <div class="data-grid">
+        <Card title="Deployments table" class="data-table-card">
+          <Table rows="{{ deployments }}" columns="{{ deployment_columns }}" caption="Tabela com scoped slot para cada linha.">
+            {% slot row(value, index) %}
+              <td class="data-cell-strong">
+                <div class="data-row-title">
+                  <span class="data-row-icon">
+                    <Icon name="{{ value.icon }}" size="{{ 15 }}" />
+                  </span>
+                  <span>{{ value.service }}</span>
+                </div>
+              </td>
+              <td>{{ value.region }}</td>
+              <td>{{ value.updated_at }}</td>
+              <td><StatusBadge status="{{ value.status }}" /></td>
+              <td class="data-cell-actions">
+                <Button size="sm" variant="outline">
+                  <Icon name="arrow-up-right" size="{{ 14 }}" />
+                  Inspect
+                </Button>
+              </td>
+            {% endslot %}
+
+            {% slot empty %}
+              Nenhum deploy registrado.
+            {% endslot %}
+          </Table>
+        </Card>
+
+        <div class="data-side-stack">
+          <Card title="Activity list" class="data-list-card">
+            <List items="{{ activities }}">
+              {% slot item(value, index) %}
+                <div class="data-activity-row">
+                  <span class="data-activity-icon">
+                    <Icon name="{{ value.icon }}" size="{{ 15 }}" />
+                  </span>
+                  <div class="data-activity-copy">
+                    <strong>{{ value.title }}</strong>
+                    <p>{{ value.detail }}</p>
+                  </div>
+                  <span class="data-activity-time">{{ value.time }}</span>
+                </div>
+              {% endslot %}
+            </List>
+          </Card>
+
+          <Card title="Queues and jobs" class="data-list-card">
+            <List items="{{ queues }}">
+              {% slot item(value, index) %}
+                <div class="data-queue-row">
+                  <div>
+                    <strong>{{ value.name }}</strong>
+                    <p>{{ value.detail }}</p>
+                  </div>
+                  <div class="data-queue-meta">
+                    <span>{{ value.size }}</span>
+                    <StatusBadge status="{{ value.status }}" />
+                  </div>
+                </div>
+              {% endslot %}
+            </List>
+          </Card>
+        </div>
+      </div>
+
+      <Card title="Command list">
+        <div class="data-command-list">
+          <For each="shortcuts" as="item">
+            <article class="data-command-card">
+              <div class="data-command-head">
+                <div class="data-row-title">
+                  <span class="data-row-icon">
+                    <Icon name="{{ item.icon }}" size="{{ 15 }}" />
+                  </span>
+                  <strong>{{ item.label }}</strong>
+                </div>
+                <StatusBadge status="{{ item.status }}" />
+              </div>
+              <p>{{ item.description }}</p>
+              <code>{{ item.command }}</code>
+            </article>
+          </For>
+        </div>
+      </Card>
+    </section>
+  </AppLayout>
+{% endcomponent %}

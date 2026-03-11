@@ -1,0 +1,42 @@
+{% import css "/static/css/components/ui/theme-panel.css" %}
+{% import "components/ui/Icon.jinja" as Icon %}
+
+{% component ThemePanel %}
+
+  {% props
+    title: str,
+    eyebrow: str = "Context",
+    icon: str = "sparkles",
+    tone: Literal["calm", "warm", "hot"] = "calm"
+  %}
+
+  {% inject theme %}
+
+  {% computed classes %}
+    {{ "theme-panel theme-panel-" ~ tone }}
+  {% endcomputed %}
+
+  <article
+    {{ attrs.render(class=classes, data_theme=theme or "light") }}
+    x-bind:data-theme="resolvedTheme ? resolvedTheme() : (theme || 'light')"
+  >
+    <header class="theme-panel-head">
+      <div class="theme-panel-title-row">
+        <span class="theme-panel-glyph">
+          <Icon name="{{ icon }}" size="{{ 18 }}" />
+        </span>
+        <div>
+        <p class="theme-panel-eyebrow">{{ eyebrow }}</p>
+        <h3>{{ title }}</h3>
+        </div>
+      </div>
+      <strong class="theme-panel-mode" x-text="resolvedTheme ? resolvedTheme() : (theme || 'light')">
+        {{ theme or "light" }}
+      </strong>
+    </header>
+
+    <div class="theme-panel-body">
+      {{ content }}
+    </div>
+  </article>
+{% endcomponent %}

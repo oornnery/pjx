@@ -1,10 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import re
 from pathlib import Path
 from typing import Any
 
+from .ast import (
+    ActionDirectiveNode,
+    ComputedDirectiveNode,
+    InjectDirectiveNode,
+    PropDeclNode,
+    PropsDirectiveNode,
+    ProvideDirectiveNode,
+    SignalDirectiveNode,
+    SlotDirectiveNode,
+)
 from .markup import (
     ElementNode,
     RawNode,
@@ -14,18 +23,7 @@ from .markup import (
     split_children_by_tag,
 )
 from .models import AssetImport, CompiledComponent, PropSpec, SlotSpec
-
-
-_COMPONENT_RE = re.compile(
-    r"\{%\s*component\s+([A-Za-z_][A-Za-z0-9_]*)\s*([^%]*)%\}(.*)\{%\s*endcomponent\s*%\}",
-    re.DOTALL,
-)
-
-_TAG_RE = re.compile(r"^\s*\{%\s*(.*?)\s*%\}\s*$", re.DOTALL)
-_SIGNAL_RE = re.compile(
-    r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*signal\((.*)\)\s*$",
-    re.DOTALL,
-)
+from .parser import parse_component_source
 
 
 @dataclass(slots=True)
@@ -39,37 +37,20 @@ class TransformContext:
 
 
 def compile_component_file(source: str, path: Path) -> CompiledComponent:
+    parsed = parse_component_source(source, path)
     component_imports: dict[str, str] = {}
     assets: list[AssetImport] = []
-    prop_aliases: dict[str, list[PropSpec]] = {}
-    position = 0
 
-    while True:
-        position = _skip_whitespace(source, position)
-        if not source.startswith("{%", position):
-            break
-        raw_tag, position = _read_tag(source, position)
-        inner = _extract_tag_body(raw_tag)
-        keyword, remainder = _split_keyword(inner)
-        if keyword == "import":
-            _handle_import(remainder, assets, component_imports)
+    for import_node in parsed.imports:
+        if import_node.kind == "component":
+            component_imports[import_node.alias or ""] = import_node.path
             continue
-        if keyword == "set":
-            name, specs = _parse_props_alias(inner)
-            prop_aliases[name] = specs
-            continue
-        if keyword == "component":
-            position -= len(raw_tag)
-            break
-        break
+        assets.append(AssetImport(kind=import_node.kind, path=import_node.path))
 
-    match = _COMPONENT_RE.search(source[position:])
-    if not match:
-        raise ValueError(f"{path}: expected a component declaration")
-
-    component_name = match.group(1)
-    modifiers = frozenset(item.strip() for item in match.group(2).split() if item.strip())
-    body = match.group(3)
+    prop_aliases = {
+        alias.name: [_prop_spec_from_decl(item) for item in alias.props]
+        for alias in parsed.prop_aliases
+    }
 
     (
         prop_specs,
@@ -78,16 +59,15 @@ def compile_component_file(source: str, path: Path) -> CompiledComponent:
         slot_specs,
         action_names,
         preamble,
-        remainder,
-    ) = _parse_component_preamble(body, prop_aliases)
+    ) = _compile_component_directives(parsed.component.directives, prop_aliases)
 
     transform_ctx = TransformContext(component_imports=component_imports)
-    transformed_body = transform_markup(remainder, transform_ctx)
+    transformed_body = transform_markup(parsed.component.body, transform_ctx)
     jinja_source = f"{preamble}{transformed_body}"
 
     return CompiledComponent(
         path=str(path),
-        component_name=component_name,
+        component_name=parsed.component.name,
         source_path=path,
         assets=tuple(assets),
         component_imports=component_imports,
@@ -96,7 +76,7 @@ def compile_component_file(source: str, path: Path) -> CompiledComponent:
         inject_names=tuple(inject_names),
         provide_names=tuple(provide_names),
         action_names=tuple(action_names),
-        modifiers=modifiers,
+        modifiers=frozenset(parsed.component.modifiers),
         jinja_source=jinja_source,
     )
 
@@ -106,68 +86,58 @@ def transform_markup(source: str, ctx: TransformContext) -> str:
     return _emit_nodes(nodes, ctx)
 
 
-def _parse_component_preamble(
-    body: str,
+def _compile_component_directives(
+    directives: tuple[
+        PropsDirectiveNode
+        | InjectDirectiveNode
+        | ProvideDirectiveNode
+        | ComputedDirectiveNode
+        | SlotDirectiveNode
+        | SignalDirectiveNode
+        | ActionDirectiveNode,
+        ...,
+    ],
     prop_aliases: dict[str, list[PropSpec]],
-) -> tuple[list[PropSpec], list[str], list[str], list[SlotSpec], list[str], str, str]:
+) -> tuple[list[PropSpec], list[str], list[str], list[SlotSpec], list[str], str]:
     props: list[PropSpec] = []
     inject_names: list[str] = []
     provide_names: list[str] = []
     slot_specs: list[SlotSpec] = []
     action_names: list[str] = []
     preamble_chunks: list[str] = []
-    position = 0
+    props_seen = False
+    slot_names: set[str] = set()
 
-    while True:
-        position = _skip_whitespace(body, position)
-        if not body.startswith("{%", position):
-            break
-        raw_tag, next_position = _read_tag(body, position)
-        inner = _extract_tag_body(raw_tag)
-        keyword, remainder = _split_keyword(inner)
+    for directive in directives:
+        if isinstance(directive, PropsDirectiveNode):
+            if props_seen:
+                raise ValueError("Only one props block is allowed per component")
+            props = _resolve_props_directive(directive, prop_aliases)
+            props_seen = True
+            continue
+        if isinstance(directive, InjectDirectiveNode):
+            inject_names.extend(directive.names)
+            continue
+        if isinstance(directive, ProvideDirectiveNode):
+            provide_names.extend(directive.names)
+            continue
+        if isinstance(directive, ComputedDirectiveNode):
+            preamble_chunks.append(f"{{% set {directive.name} %}}{directive.body}{{% endset %}}\n")
+            continue
+        if isinstance(directive, SlotDirectiveNode):
+            if directive.name in slot_names:
+                raise ValueError(f"Duplicate slot declaration: {directive.name}")
+            slot_names.add(directive.name)
+            slot_specs.append(SlotSpec(name=directive.name, params=directive.params))
+            continue
+        if isinstance(directive, SignalDirectiveNode):
+            preamble_chunks.append(f"{{% set {directive.name} = {directive.expr} %}}\n")
+            continue
+        if isinstance(directive, ActionDirectiveNode):
+            action_names.append(directive.name)
+            continue
 
-        if keyword == "props":
-            props = _parse_props_block(remainder, prop_aliases)
-            position = next_position
-            continue
-        if keyword == "inject":
-            inject_names.extend(item for item in remainder.split() if item)
-            position = next_position
-            continue
-        if keyword == "provide":
-            provide_names.extend(item for item in remainder.split() if item)
-            position = next_position
-            continue
-        if keyword == "computed":
-            block_body, position = _read_block(body, next_position, "endcomputed")
-            preamble_chunks.append(f"{{% set {remainder.strip()} %}}{block_body}{{% endset %}}\n")
-            continue
-        if keyword == "slot":
-            slot_name, params = _parse_slot_signature(remainder)
-            slot_specs.append(SlotSpec(name=slot_name, params=params))
-            _, position = _read_block(body, next_position, "endslot")
-            continue
-        if keyword == "signal":
-            signal_name, expr = _parse_signal(remainder)
-            preamble_chunks.append(f"{{% set {signal_name} = {expr} %}}\n")
-            position = next_position
-            continue
-        if keyword == "action":
-            action_name = remainder.strip()
-            action_names.append(action_name)
-            _, position = _read_block(body, next_position, "endaction")
-            continue
-        break
-
-    return (
-        props,
-        inject_names,
-        provide_names,
-        slot_specs,
-        action_names,
-        "".join(preamble_chunks),
-        body[position:],
-    )
+    return props, inject_names, provide_names, slot_specs, action_names, "".join(preamble_chunks)
 
 
 def _emit_nodes(nodes: list[Any], ctx: TransformContext) -> str:
@@ -308,7 +278,7 @@ def _needs_raw_tag_passthrough(node: ElementNode) -> bool:
 def _attrs_dict_expr(attrs: list[tuple[str, str | None]]) -> str:
     items: list[str] = []
     for key, value in attrs:
-        force_expression = key in {"when", "each", "value"} or key.startswith("jx-bind:") or key in {"jx-class", "jx-show", "jx-text", "jx-html"}
+        force_expression = key in {"when", "each"} or key.startswith("jx-bind:") or key in {"jx-class", "jx-show", "jx-text", "jx-html"}
         items.append(f"{key!r}: {attr_value_to_expr(value, force_expression=force_expression)}")
     return "{" + ", ".join(items) + "}"
 
@@ -327,163 +297,21 @@ def _optional_attr(attrs: list[tuple[str, str | None]], name: str) -> str | None
     return None
 
 
-def _parse_slot_signature(source: str) -> tuple[str, tuple[str, ...]]:
-    match = re.match(r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*?)\))?$", source.strip(), re.DOTALL)
-    if not match:
-        raise ValueError(f"Invalid slot signature: {source!r}")
-    params = tuple(item.strip() for item in (match.group(2) or "").split(",") if item.strip())
-    return match.group(1), params
-
-
-def _parse_signal(source: str) -> tuple[str, str]:
-    match = _SIGNAL_RE.match(source)
-    if not match:
-        raise ValueError(f"Invalid signal declaration: {source!r}")
-    return match.group(1), match.group(2).strip()
-
-
-def _parse_props_block(source: str, prop_aliases: dict[str, list[PropSpec]]) -> list[PropSpec]:
-    if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", source):
+def _resolve_props_directive(
+    directive: PropsDirectiveNode,
+    prop_aliases: dict[str, list[PropSpec]],
+) -> list[PropSpec]:
+    if directive.alias_name is not None:
         try:
-            return prop_aliases[source]
+            return prop_aliases[directive.alias_name]
         except KeyError as exc:
-            raise ValueError(f"Unknown props alias {source!r}") from exc
-    return _parse_inline_props(source)
+            raise ValueError(f"Unknown props alias {directive.alias_name!r}") from exc
+    return [_prop_spec_from_decl(item) for item in directive.props]
 
 
-def _parse_props_alias(tag_body: str) -> tuple[str, list[PropSpec]]:
-    match = re.match(r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\{.*\})", tag_body, re.DOTALL)
-    if not match:
-        raise ValueError(f"Invalid props alias declaration: {tag_body!r}")
-    name = match.group(1)
-    payload = match.group(2).strip()
-    if not name.endswith("Props"):
-        raise ValueError(f"Props alias must end with 'Props': {name}")
-    inner = payload[1:-1]
-    entries = _split_top_level_commas(inner)
-    specs: list[PropSpec] = []
-    for entry in entries:
-        if not entry.strip():
-            continue
-        key_match = re.match(r'["\']([^"\']+)["\']\s*:\s*(.*)$', entry.strip(), re.DOTALL)
-        if not key_match:
-            raise ValueError(f"Invalid props alias entry: {entry!r}")
-        prop_name = key_match.group(1)
-        type_expr, default_expr = _parse_type_and_default(key_match.group(2).strip())
-        specs.append(PropSpec(name=prop_name, type_expr=type_expr, default_expr=default_expr))
-    return name, specs
-
-
-def _parse_inline_props(source: str) -> list[PropSpec]:
-    specs: list[PropSpec] = []
-    for entry in _split_top_level_commas(source):
-        item = entry.strip()
-        if not item:
-            continue
-        name, remainder = item.split(":", 1)
-        type_expr, default_expr = _parse_type_and_default(remainder.strip())
-        specs.append(PropSpec(name=name.strip(), type_expr=type_expr, default_expr=default_expr))
-    return specs
-
-
-def _parse_type_and_default(source: str) -> tuple[str | None, str | None]:
-    depth = 0
-    in_quote: str | None = None
-    for index, char in enumerate(source):
-        if in_quote:
-            if char == in_quote:
-                in_quote = None
-            continue
-        if char in {'"', "'"}:
-            in_quote = char
-            continue
-        if char in "([{":
-            depth += 1
-            continue
-        if char in ")]}":
-            depth -= 1
-            continue
-        if char == "=" and depth == 0:
-            return source[:index].strip(), source[index + 1 :].strip()
-    return source.strip() or None, None
-
-
-def _split_top_level_commas(source: str) -> list[str]:
-    parts: list[str] = []
-    depth = 0
-    in_quote: str | None = None
-    start = 0
-
-    for index, char in enumerate(source):
-        if in_quote:
-            if char == in_quote:
-                in_quote = None
-            continue
-        if char in {'"', "'"}:
-            in_quote = char
-            continue
-        if char in "([{":
-            depth += 1
-            continue
-        if char in ")]}":
-            depth -= 1
-            continue
-        if char == "," and depth == 0:
-            parts.append(source[start:index])
-            start = index + 1
-    parts.append(source[start:])
-    return parts
-
-
-def _handle_import(
-    source: str,
-    assets: list[AssetImport],
-    component_imports: dict[str, str],
-) -> None:
-    asset_match = re.match(r'(css|js)\s+["\']([^"\']+)["\']$', source)
-    if asset_match:
-        assets.append(AssetImport(kind=asset_match.group(1), path=asset_match.group(2)))
-        return
-
-    component_match = re.match(r'["\']([^"\']+)["\']\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$', source)
-    if component_match:
-        component_imports[component_match.group(2)] = component_match.group(1)
-        return
-
-    raise ValueError(f"Invalid import declaration: {source!r}")
-
-
-def _skip_whitespace(source: str, position: int) -> int:
-    while position < len(source) and source[position].isspace():
-        position += 1
-    return position
-
-
-def _read_tag(source: str, position: int) -> tuple[str, int]:
-    end = source.find("%}", position)
-    if end == -1:
-        raise ValueError("Unclosed Jinja tag")
-    end += 2
-    return source[position:end], end
-
-
-def _read_block(source: str, position: int, end_tag: str) -> tuple[str, int]:
-    pattern = re.compile(rf"\{{%\s*{re.escape(end_tag)}\s*%\}}")
-    match = pattern.search(source, position)
-    if not match:
-        raise ValueError(f"Missing closing block for {end_tag}")
-    return source[position:match.start()], match.end()
-
-
-def _extract_tag_body(raw_tag: str) -> str:
-    match = _TAG_RE.match(raw_tag)
-    if not match:
-        raise ValueError(f"Invalid Jinja tag: {raw_tag!r}")
-    return match.group(1).strip()
-
-
-def _split_keyword(source: str) -> tuple[str, str]:
-    parts = source.split(None, 1)
-    keyword = parts[0]
-    remainder = parts[1].strip() if len(parts) > 1 else ""
-    return keyword, remainder
+def _prop_spec_from_decl(prop: PropDeclNode) -> PropSpec:
+    return PropSpec(
+        name=prop.name,
+        type_expr=prop.type_expr,
+        default_expr=prop.default_expr,
+    )

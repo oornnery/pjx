@@ -67,6 +67,7 @@ class RenderState:
     target: str | None = None
     assets: list[AssetImport] = field(default_factory=list)
     asset_keys: set[tuple[str, str]] = field(default_factory=set)
+    assets_rendered: bool = False
     fragment_counter: int = 0
 
     def register_assets(self, assets: tuple[AssetImport, ...]) -> None:
@@ -84,23 +85,82 @@ class RenderState:
 
 class AttrBag:
     def __init__(self, attrs: dict[str, Any]):
-        self.attrs = attrs
+        self.attrs = dict(attrs)
 
     def __bool__(self) -> bool:
         return bool(self.attrs)
 
-    def __html__(self) -> Markup:
-        if not self.attrs:
-            return Markup("")
-        parts: list[str] = []
-        for key, value in self.attrs.items():
-            if value is True:
-                parts.append(f" {escape(key)}")
+    def render(self, **defaults: Any) -> Markup:
+        merged = dict(self.attrs)
+        for key, value in defaults.items():
+            clean_key = _normalize_attr_name(key)
+            if clean_key is None:
+                continue
+            if clean_key == "class":
+                merged[clean_key] = _merge_classes(value, merged.get(clean_key))
+                continue
+            merged.setdefault(clean_key, value)
+        return _render_attrs(merged)
+
+    def set(self, **kwargs: Any) -> "AttrBag":
+        for key, value in kwargs.items():
+            clean_key = _normalize_attr_name(key)
+            if clean_key is None:
+                continue
+            if clean_key == "class":
+                self.attrs[clean_key] = _merge_classes(self.attrs.get(clean_key), value)
                 continue
             if value in (False, None):
+                self.attrs.pop(clean_key, None)
                 continue
-            parts.append(f' {escape(key)}="{escape(value)}"')
-        return Markup("".join(parts))
+            self.attrs[clean_key] = value
+        return self
+
+    def setdefault(self, **kwargs: Any) -> "AttrBag":
+        for key, value in kwargs.items():
+            clean_key = _normalize_attr_name(key)
+            if clean_key is None or clean_key in self.attrs:
+                continue
+            self.attrs[clean_key] = value
+        return self
+
+    def get(self, name: str, default: Any = None) -> Any:
+        clean_name = _normalize_attr_name(name)
+        if clean_name is None:
+            return default
+        return self.attrs.get(clean_name, default)
+
+    def add_class(self, *values: Any) -> "AttrBag":
+        self.attrs["class"] = _merge_classes(self.attrs.get("class"), *values)
+        return self
+
+    def prepend_class(self, *values: Any) -> "AttrBag":
+        self.attrs["class"] = _merge_classes(*values, self.attrs.get("class"))
+        return self
+
+    def remove_class(self, *names: str) -> "AttrBag":
+        blocked = {item for name in names for item in str(name).split() if item}
+        if not blocked:
+            return self
+        remaining = [
+            token for token in _class_tokens(self.attrs.get("class")) if token not in blocked
+        ]
+        if remaining:
+            self.attrs["class"] = " ".join(remaining)
+        else:
+            self.attrs.pop("class", None)
+        return self
+
+    @property
+    def classes(self) -> str:
+        return " ".join(_class_tokens(self.attrs.get("class")))
+
+    @property
+    def as_dict(self) -> dict[str, Any]:
+        return dict(sorted(self.attrs.items()))
+
+    def __html__(self) -> Markup:
+        return self.render()
 
     def __str__(self) -> str:
         return str(self.__html__())
@@ -131,3 +191,45 @@ class SlotAccessor:
             return Markup(provided)
 
         return wrapper
+
+
+def _normalize_attr_name(name: str) -> str | None:
+    if name.startswith("_"):
+        return None
+    return name.replace("_", "-")
+
+
+def _render_attrs(attrs: dict[str, Any]) -> Markup:
+    if not attrs:
+        return Markup("")
+    parts: list[str] = []
+    for key, value in attrs.items():
+        if value is True:
+            parts.append(f" {escape(key)}")
+            continue
+        if value in (False, None):
+            continue
+        parts.append(f' {escape(key)}="{escape(value)}"')
+    return Markup("".join(parts))
+
+
+def _class_tokens(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, dict):
+        return [name for name, enabled in value.items() if enabled]
+    if isinstance(value, (list, tuple, set)):
+        tokens: list[str] = []
+        for item in value:
+            tokens.extend(_class_tokens(item))
+        return tokens
+    return [token for token in str(value).split() if token]
+
+
+def _merge_classes(*values: Any) -> str:
+    tokens: list[str] = []
+    for value in values:
+        for token in _class_tokens(value):
+            if token not in tokens:
+                tokens.append(token)
+    return " ".join(tokens)

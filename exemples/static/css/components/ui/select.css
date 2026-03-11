@@ -1,0 +1,48 @@
+.select {
+  width: 100%;
+  appearance: none;
+  min-height: 42px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 98%, transparent), color-mix(in srgb, var(--app-surface-soft) 92%, transparent));
+  color: var(--app-text);
+  font: inherit;
+  padding: 0 42px 0 14px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--app-text-subtle) 50%),
+    linear-gradient(135deg, var(--app-text-subtle) 50%, transparent 50%);
+  background-position:
+    calc(100% - 20px) calc(50% - 3px),
+    calc(100% - 14px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+
+.select:hover {
+  border-color: var(--app-border);
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--app-border-emphasis);
+  box-shadow: 0 0 0 4px var(--app-ring-soft);
+}
+
+.select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.select-invalid {
+  border-color: var(--app-status-failed-border);
+  background-color: var(--app-surface-danger-soft);
+}
+
+.select-invalid:focus-visible {
+  box-shadow: 0 0 0 4px var(--app-status-failed-bg);
+}

@@ -1,0 +1,167 @@
+{% import css "/static/css/pages/studio.css" %}
+{% import "layouts/AppLayout.jinja" as AppLayout %}
+{% import "components/ui/Button.jinja" as Button %}
+{% import "components/ui/Card.jinja" as Card %}
+{% import "components/ui/Icon.jinja" as Icon %}
+{% import "components/ui/StatusBadge.jinja" as StatusBadge %}
+
+{% component StudioPage %}
+
+  {% props
+    initial_count: int = 0,
+    prompt: str = "",
+    status: str = "draft",
+    energy_label: str = "Calma",
+    preview: dict = {},
+    highlights: list = [],
+    variants: list = []
+  %}
+
+  {% signal count = signal(initial_count) %}
+  {% signal draft_prompt = signal(prompt) %}
+
+  {% computed meter_class %}
+    {{ "studio-meter studio-meter-hot" if count >= 9 else "studio-meter studio-meter-warm" if count >= 5 else "studio-meter studio-meter-calm" }}
+  {% endcomputed %}
+
+  {% computed panel_class %}
+    {{ "studio-shell studio-shell-hot" if count >= 9 else "studio-shell studio-shell-warm" if count >= 5 else "studio-shell studio-shell-calm" }}
+  {% endcomputed %}
+
+  <AppLayout title="Studio Playground" theme="dark">
+    <section
+      id="studio-shell"
+      class="{{ panel_class }}"
+      jx-bind:data-prompt-length="prompt|length"
+      x-data="{ promptLength: 0 }"
+      x-init="promptLength = Number($el.dataset.promptLength || 0)"
+    >
+      <div class="studio-hero">
+        <p class="studio-kicker">{{ preview.eyebrow }}</p>
+        <h2>{{ preview.title }}</h2>
+        <p class="studio-summary">{{ preview.summary }}</p>
+
+        <div class="studio-hero-meta">
+          <div class="{{ meter_class }}">
+            <span>
+              <Icon name="workflow" size="{{ 14 }}" />
+              <strong>Exploracao</strong>
+            </span>
+            <strong id="studio-count-pill" jx-signal="count">{{ count }}</strong>
+          </div>
+
+          <div class="studio-chip">
+            <span>
+              <Icon name="bolt" size="{{ 14 }}" />
+              <strong>Energia</strong>
+            </span>
+            <strong>{{ energy_label }}</strong>
+          </div>
+
+          <StatusBadge status="{{ status }}" />
+        </div>
+      </div>
+
+      <div class="studio-grid">
+        <Card title="Server Controls">
+          <p id="studio-sync-indicator" class="studio-sync htmx-indicator" aria-live="polite">
+            Atualizando preview...
+          </p>
+
+          <div class="studio-counter-actions">
+            <form
+              method="post"
+              action="/actions/studio/dec"
+              hx-post="/actions/studio/dec"
+              hx-target="#studio-shell"
+              hx-swap="outerHTML"
+              hx-indicator="#studio-sync-indicator"
+            >
+              <Button variant="outline" type="submit">
+                <Icon name="activity" size="{{ 16 }}" />
+                Diminuir
+              </Button>
+            </form>
+
+            <form
+              method="post"
+              action="/actions/studio/inc"
+              hx-post="/actions/studio/inc"
+              hx-target="#studio-shell"
+              hx-swap="outerHTML"
+              hx-indicator="#studio-sync-indicator"
+            >
+              <Button variant="default" type="submit">
+                <Icon name="sparkles" size="{{ 16 }}" />
+                Intensificar
+              </Button>
+            </form>
+          </div>
+
+          <form
+            method="post"
+            action="/actions/studio/prompt"
+            class="studio-form"
+            hx-post="/actions/studio/prompt"
+            hx-target="#studio-shell"
+            hx-swap="outerHTML"
+            hx-indicator="#studio-sync-indicator"
+          >
+            <label for="studio-prompt">Prompt</label>
+            <input
+              id="studio-prompt"
+              name="prompt"
+              class="studio-input"
+              value="{{ draft_prompt }}"
+              placeholder="Descreva a interface que voce quer explorar"
+              x-on:input="promptLength = $event.target.value.length"
+            >
+            <p class="studio-helper">
+              O valor atual do input e enviado ao servidor e volta como preview pronto.
+              <span class="studio-helper-counter">
+                <Icon name="terminal" size="{{ 14 }}" />
+                <strong x-text="promptLength"></strong> caracteres
+              </span>
+            </p>
+            <Button variant="secondary" type="submit">
+              <Icon name="server" size="{{ 16 }}" />
+              Renderizar no servidor
+            </Button>
+          </form>
+
+          <ul class="studio-highlight-list">
+            <For each="highlights" as="item">
+              <li class="studio-highlight-row">
+                <span>{{ item.label }}</span>
+                <strong>{{ item.value }}</strong>
+              </li>
+            </For>
+          </ul>
+        </Card>
+
+        <Card title="Rendered Preview">
+          <div id="studio-preview" class="studio-preview">
+            <p class="studio-preview-label">HTML vindo do servidor</p>
+            <For each="preview.lines" as="line">
+              <p class="studio-preview-line">{{ line }}</p>
+            </For>
+          </div>
+        </Card>
+      </div>
+
+      <Card title="Variant Catalog">
+        <div class="studio-variant-grid">
+          <For each="variants" as="variant">
+            <article class="studio-variant-card">
+              <div class="studio-variant-head">
+                <h3>{{ variant.name }}</h3>
+                <StatusBadge status="{{ variant.status }}" />
+              </div>
+              <p>{{ variant.description }}</p>
+            </article>
+          </For>
+        </div>
+      </Card>
+    </section>
+  </AppLayout>
+{% endcomponent %}

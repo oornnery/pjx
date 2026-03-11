@@ -1,0 +1,39 @@
+.card {
+  border: 1px solid var(--app-border);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 98%, transparent), color-mix(in srgb, var(--app-surface-soft) 96%, transparent));
+  overflow: hidden;
+}
+
+.card-bordered {
+  box-shadow: var(--app-shadow-card);
+}
+
+.card-header,
+.card-footer {
+  padding: 16px 18px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--app-border-soft);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--app-text-strong);
+}
+
+.card-body {
+  padding: 20px 18px;
+  display: grid;
+  gap: 14px;
+  color: inherit;
+}
+
+.card-footer {
+  border-top: 1px solid var(--app-border-soft);
+  color: inherit;
+}

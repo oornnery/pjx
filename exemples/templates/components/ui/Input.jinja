@@ -1,0 +1,31 @@
+{% import css "/static/css/components/ui/input.css" %}
+
+{% component Input %}
+
+  {% props
+    name: str,
+    value: str = "",
+    type: Literal["text", "email", "search", "url", "password"] = "text",
+    placeholder: Optional[str] = None,
+    invalid: bool = false,
+    disabled: bool = false,
+    id: Optional[str] = None
+  %}
+
+  {% computed classes %}
+    {{ "input input-invalid" if invalid else "input" }}
+  {% endcomputed %}
+
+  <input
+    {{ attrs.render(
+      id=id or name,
+      name=name,
+      type=type,
+      value=value,
+      placeholder=placeholder,
+      class=classes,
+      disabled=disabled,
+      aria_invalid="true" if invalid else None
+    ) }}
+  >
+{% endcomponent %}

@@ -1,0 +1,31 @@
+{% import css "/static/css/components/ui/switch.css" %}
+
+{% component Switch %}
+
+  {% props
+    name: Optional[str] = None,
+    value: str = "true",
+    checked: bool = false,
+    disabled: bool = false,
+    id: Optional[str] = None,
+    label: Optional[str] = None
+  %}
+
+  <label class="switch">
+    <input
+      {{ attrs.render(
+        id=id or name,
+        name=name,
+        type="checkbox",
+        value=value,
+        checked=checked,
+        disabled=disabled,
+        class="switch-input"
+      ) }}
+    >
+    <span class="switch-track" aria-hidden="true">
+      <span class="switch-thumb"></span>
+    </span>
+    <span class="switch-copy">{{ content or label }}</span>
+  </label>
+{% endcomponent %}

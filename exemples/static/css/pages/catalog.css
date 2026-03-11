@@ -1,0 +1,111 @@
+.catalog-shell {
+  display: grid;
+  gap: 22px;
+}
+
+.catalog-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.catalog-stat-card p,
+.catalog-entry-card code,
+.catalog-meta-label,
+.catalog-entry-path {
+  color: var(--app-text-subtle);
+}
+
+.catalog-stat-value {
+  display: block;
+  font-size: 2.6rem;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-weight: 700;
+}
+
+.catalog-stat-icon,
+.catalog-entry-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--app-surface-soft) 92%, transparent);
+  border: 1px solid var(--app-border);
+  color: var(--app-text-strong);
+}
+
+.catalog-list {
+  display: grid;
+  gap: 18px;
+}
+
+.catalog-entry-head {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+}
+
+.catalog-entry-head strong {
+  display: block;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  color: var(--app-text-strong);
+}
+
+.catalog-entry-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.catalog-entry-path,
+.catalog-meta-label {
+  margin: 0;
+  font-size: 0.74rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.catalog-meta-grid,
+.catalog-asset-row {
+  display: grid;
+  gap: 18px;
+}
+
+.catalog-meta-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.catalog-asset-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.catalog-entry-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+  color: var(--app-text-muted);
+}
+
+.catalog-entry-card code {
+  display: inline-flex;
+  margin-top: 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--app-surface-soft) 94%, transparent);
+  border: 1px solid var(--app-border);
+}
+
+@media (max-width: 920px) {
+  .catalog-stats-grid,
+  .catalog-meta-grid,
+  .catalog-asset-row {
+    grid-template-columns: 1fr;
+  }
+}

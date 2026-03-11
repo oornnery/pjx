@@ -1,0 +1,122 @@
+{% import css "/static/css/pages/showcase.css" %}
+{% import "layouts/AppLayout.jinja" as AppLayout %}
+{% import "components/ui/Card.jinja" as Card %}
+{% import "components/ui/Icon.jinja" as Icon %}
+{% import "components/ui/StatusBadge.jinja" as StatusBadge %}
+{% import "components/ui/ThemePanel.jinja" as ThemePanel %}
+
+{% component ShowcasePage %}
+
+  {% props
+    page_intro: str = "",
+    demos: list = [],
+    features: list = [],
+    capabilities: list = []
+  %}
+
+  <AppLayout title="PJX Showcase" theme="dark">
+    <section class="showcase-shell">
+      <div class="showcase-hero">
+        <div class="showcase-copy">
+          <p class="showcase-kicker">Server-first UI for Python</p>
+          <h2>{{ page_intro }}</h2>
+          <p class="showcase-summary">
+            PJX junta componentes, templates estruturados, HTMX, Alpine e FastAPI
+            num fluxo onde o app final so declara intencao e o framework segura o resto.
+          </p>
+
+          <div class="showcase-link-row">
+            <a class="showcase-link showcase-link-primary" href="/studio">
+              <Icon name="bolt" size="{{ 16 }}" />
+              <span>Abrir Studio</span>
+            </a>
+            <a class="showcase-link" href="/catalog">
+              <Icon name="database" size="{{ 16 }}" />
+              <span>Ver Catalogo</span>
+            </a>
+          </div>
+        </div>
+
+        <ThemePanel
+          title="Framework defaults em acao"
+          eyebrow="Provide / inject"
+          icon="sparkles"
+          tone="hot"
+          class="showcase-context-panel"
+          tooltip="ThemePanel injeta theme sem prop drilling"
+        >
+          <p>
+            O layout fornece o tema global, assets do browser entram automaticamente
+            e o componente filho so consome contexto.
+          </p>
+
+          <ul class="showcase-capability-list">
+            <For each="capabilities" as="item">
+              <li>
+                <div class="showcase-capability-head">
+                  <span class="showcase-capability-icon">
+                    <Icon name="{{ item.icon }}" size="{{ 16 }}" />
+                  </span>
+                  <strong>{{ item.title }}</strong>
+                </div>
+                <span>{{ item.detail }}</span>
+              </li>
+            </For>
+          </ul>
+        </ThemePanel>
+      </div>
+
+      <div class="showcase-feature-grid">
+        <For each="features" as="feature">
+          <Card class="showcase-feature-card">
+            {% slot header %}
+              <div class="showcase-feature-head">
+                <span class="showcase-feature-icon">
+                  <Icon name="{{ feature.icon }}" size="{{ 18 }}" />
+                </span>
+                <strong>{{ feature.title }}</strong>
+              </div>
+            {% endslot %}
+            <p>{{ feature.summary }}</p>
+          </Card>
+        </For>
+      </div>
+
+      <div class="showcase-demo-grid">
+        <For each="demos" as="demo">
+          <Card class="showcase-demo-card" bordered="{{ demo.featured }}">
+            {% slot header %}
+              <div class="showcase-demo-head">
+                <div>
+                  <p class="showcase-demo-kicker">{{ demo.category }}</p>
+                  <div class="showcase-demo-title-row">
+                    <span class="showcase-feature-icon">
+                      <Icon name="{{ demo.icon }}" size="{{ 16 }}" />
+                    </span>
+                    <strong>{{ demo.title }}</strong>
+                  </div>
+                </div>
+                <StatusBadge status="{{ demo.status }}" />
+              </div>
+            {% endslot %}
+
+            <p class="showcase-demo-summary">{{ demo.summary }}</p>
+
+            <ul class="showcase-tag-list">
+              <For each="demo.tags" as="tag">
+                <li>{{ tag }}</li>
+              </For>
+            </ul>
+
+            {% slot footer %}
+              <a class="showcase-demo-link" href="{{ demo.path }}">
+                <span>Abrir exemplo</span>
+                <Icon name="arrow-up-right" size="{{ 16 }}" />
+              </a>
+            {% endslot %}
+          </Card>
+        </For>
+      </div>
+    </section>
+  </AppLayout>
+{% endcomponent %}

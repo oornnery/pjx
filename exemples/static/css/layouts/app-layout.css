@@ -1,0 +1,436 @@
+:root,
+html[data-theme="light"],
+[data-theme="light"] {
+  --app-page-radial: rgba(148, 163, 184, 0.14);
+  --app-page-start: #f8fafc;
+  --app-page-end: #f1f5f9;
+  --app-text: #0f172a;
+  --app-text-strong: #0f172a;
+  --app-text-muted: #475569;
+  --app-text-subtle: #64748b;
+  --app-text-faint: #94a3b8;
+  --app-text-inverse: #f8fafc;
+  --app-text-inverse-muted: #cbd5e1;
+  --app-border: #e2e8f0;
+  --app-border-soft: #eef2f7;
+  --app-border-strong: #dbe3ee;
+  --app-border-translucent: rgba(148, 163, 184, 0.14);
+  --app-border-overlay: rgba(148, 163, 184, 0.16);
+  --app-border-emphasis: rgba(59, 130, 246, 0.28);
+  --app-surface: #ffffff;
+  --app-surface-soft: #f8fafc;
+  --app-surface-softer: #f1f5f9;
+  --app-surface-panel: rgba(255, 255, 255, 0.9);
+  --app-surface-panel-strong: #ffffff;
+  --app-surface-overlay: rgba(255, 255, 255, 0.04);
+  --app-surface-hover: rgba(248, 250, 252, 0.88);
+  --app-surface-selected: #eff6ff;
+  --app-surface-selected-warm: #fff7ed;
+  --app-surface-danger-soft: rgba(254, 242, 242, 0.9);
+  --app-surface-success-soft: rgba(34, 197, 94, 0.1);
+  --app-surface-warning-soft: rgba(245, 158, 11, 0.12);
+  --app-surface-info-soft: rgba(59, 130, 246, 0.1);
+  --app-surface-failed-soft: rgba(239, 68, 68, 0.1);
+  --app-surface-inverse: #0f172a;
+  --app-surface-inverse-soft: #111827;
+  --app-accent-soft: rgba(15, 23, 42, 0.08);
+  --app-ring: rgba(59, 130, 246, 0.22);
+  --app-ring-soft: rgba(59, 130, 246, 0.14);
+  --app-ring-strong: rgba(59, 130, 246, 0.18);
+  --app-shadow-layout: 0 24px 80px rgba(15, 23, 42, 0.08);
+  --app-shadow-card: 0 18px 48px rgba(15, 23, 42, 0.08);
+  --app-shadow-button: 0 10px 30px rgba(15, 23, 42, 0.16);
+  --app-shadow-button-inverse: 0 10px 30px rgba(2, 6, 23, 0.24);
+  --app-shadow-tooltip: 0 18px 40px rgba(15, 23, 42, 0.24);
+  --app-tooltip-bg: rgba(15, 23, 42, 0.96);
+  --app-tooltip-fg: #f8fafc;
+  --app-code-bg: #0f172a;
+  --app-code-fg: #e2e8f0;
+  --app-hero-glow-blue: rgba(59, 130, 246, 0.16);
+  --app-hero-glow-blue-soft: rgba(59, 130, 246, 0.14);
+  --app-hero-glow-blue-faint: rgba(59, 130, 246, 0.12);
+  --app-hero-glow-amber: rgba(245, 158, 11, 0.18);
+  --app-hero-gradient-start: rgba(15, 23, 42, 0.98);
+  --app-hero-gradient-mid: rgba(30, 41, 59, 0.96);
+  --app-hero-gradient-end: rgba(17, 24, 39, 0.96);
+  --app-hero-text: #f8fafc;
+  --app-hero-text-muted: #cbd5e1;
+  --app-hero-kicker: #94a3b8;
+  --app-hero-border: rgba(148, 163, 184, 0.14);
+  --app-hero-surface: rgba(255, 255, 255, 0.05);
+  --app-hero-surface-strong: rgba(248, 250, 252, 0.08);
+  --app-hero-outline-border: rgba(148, 163, 184, 0.16);
+  --app-hero-outline-bg: rgba(255, 255, 255, 0.04);
+  --app-hero-outline-fg: #e2e8f0;
+  --app-hero-primary-bg: #f8fafc;
+  --app-hero-primary-fg: #0f172a;
+  --app-hero-primary-border: transparent;
+  --app-status-neutral-bg: rgba(15, 23, 42, 0.06);
+  --app-status-ready-fg: #166534;
+  --app-status-ready-bg: rgba(34, 197, 94, 0.1);
+  --app-status-ready-border: rgba(34, 197, 94, 0.16);
+  --app-status-building-fg: #92400e;
+  --app-status-building-bg: rgba(245, 158, 11, 0.12);
+  --app-status-building-border: rgba(245, 158, 11, 0.2);
+  --app-status-draft-fg: #1d4ed8;
+  --app-status-draft-bg: rgba(59, 130, 246, 0.1);
+  --app-status-draft-border: rgba(59, 130, 246, 0.18);
+  --app-status-failed-fg: #b91c1c;
+  --app-status-failed-bg: rgba(239, 68, 68, 0.1);
+  --app-status-failed-border: rgba(239, 68, 68, 0.18);
+  --app-field-required: #dc2626;
+  --app-field-error: #b91c1c;
+  --app-field-error-soft: #fca5a5;
+  --app-nav-active-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+html[data-theme="dark"],
+[data-theme="dark"] {
+  --app-page-radial: rgba(59, 130, 246, 0.14);
+  --app-page-start: #020817;
+  --app-page-end: #0f172a;
+  --app-text: #e2e8f0;
+  --app-text-strong: #f8fafc;
+  --app-text-muted: #cbd5e1;
+  --app-text-subtle: #94a3b8;
+  --app-text-faint: #64748b;
+  --app-text-inverse: #0f172a;
+  --app-text-inverse-muted: #334155;
+  --app-border: rgba(148, 163, 184, 0.16);
+  --app-border-soft: rgba(148, 163, 184, 0.08);
+  --app-border-strong: rgba(148, 163, 184, 0.24);
+  --app-border-translucent: rgba(148, 163, 184, 0.14);
+  --app-border-overlay: rgba(148, 163, 184, 0.14);
+  --app-border-emphasis: rgba(96, 165, 250, 0.24);
+  --app-surface: rgba(15, 23, 42, 0.92);
+  --app-surface-soft: rgba(255, 255, 255, 0.03);
+  --app-surface-softer: rgba(255, 255, 255, 0.04);
+  --app-surface-panel: rgba(15, 23, 42, 0.92);
+  --app-surface-panel-strong: #0f172a;
+  --app-surface-overlay: rgba(255, 255, 255, 0.04);
+  --app-surface-hover: rgba(255, 255, 255, 0.06);
+  --app-surface-selected: rgba(59, 130, 246, 0.16);
+  --app-surface-selected-warm: rgba(245, 158, 11, 0.14);
+  --app-surface-danger-soft: rgba(127, 29, 29, 0.18);
+  --app-surface-success-soft: rgba(34, 197, 94, 0.16);
+  --app-surface-warning-soft: rgba(245, 158, 11, 0.16);
+  --app-surface-info-soft: rgba(59, 130, 246, 0.16);
+  --app-surface-failed-soft: rgba(239, 68, 68, 0.16);
+  --app-surface-inverse: #f8fafc;
+  --app-surface-inverse-soft: #e2e8f0;
+  --app-accent-soft: rgba(248, 250, 252, 0.08);
+  --app-ring: rgba(96, 165, 250, 0.2);
+  --app-ring-soft: rgba(96, 165, 250, 0.14);
+  --app-ring-strong: rgba(96, 165, 250, 0.18);
+  --app-shadow-layout: 0 28px 90px rgba(2, 6, 23, 0.46);
+  --app-shadow-card: 0 18px 48px rgba(2, 6, 23, 0.28);
+  --app-shadow-button: 0 10px 30px rgba(2, 6, 23, 0.24);
+  --app-shadow-button-inverse: 0 10px 30px rgba(2, 6, 23, 0.24);
+  --app-shadow-tooltip: 0 18px 40px rgba(2, 6, 23, 0.4);
+  --app-tooltip-bg: rgba(15, 23, 42, 0.96);
+  --app-tooltip-fg: #f8fafc;
+  --app-code-bg: rgba(2, 6, 23, 0.82);
+  --app-code-fg: #e2e8f0;
+  --app-hero-glow-blue: rgba(59, 130, 246, 0.18);
+  --app-hero-glow-blue-soft: rgba(59, 130, 246, 0.16);
+  --app-hero-glow-blue-faint: rgba(59, 130, 246, 0.14);
+  --app-hero-glow-amber: rgba(245, 158, 11, 0.18);
+  --app-hero-gradient-start: rgba(15, 23, 42, 0.98);
+  --app-hero-gradient-mid: rgba(30, 41, 59, 0.96);
+  --app-hero-gradient-end: rgba(17, 24, 39, 0.96);
+  --app-hero-text: #f8fafc;
+  --app-hero-text-muted: #cbd5e1;
+  --app-hero-kicker: #94a3b8;
+  --app-hero-border: rgba(148, 163, 184, 0.14);
+  --app-hero-surface: rgba(255, 255, 255, 0.05);
+  --app-hero-surface-strong: rgba(248, 250, 252, 0.08);
+  --app-hero-outline-border: rgba(148, 163, 184, 0.16);
+  --app-hero-outline-bg: rgba(255, 255, 255, 0.04);
+  --app-hero-outline-fg: #e2e8f0;
+  --app-hero-primary-bg: #f8fafc;
+  --app-hero-primary-fg: #0f172a;
+  --app-hero-primary-border: transparent;
+  --app-status-neutral-bg: rgba(255, 255, 255, 0.04);
+  --app-status-ready-fg: #86efac;
+  --app-status-ready-bg: rgba(34, 197, 94, 0.16);
+  --app-status-ready-border: rgba(34, 197, 94, 0.22);
+  --app-status-building-fg: #fcd34d;
+  --app-status-building-bg: rgba(245, 158, 11, 0.16);
+  --app-status-building-border: rgba(245, 158, 11, 0.24);
+  --app-status-draft-fg: #93c5fd;
+  --app-status-draft-bg: rgba(59, 130, 246, 0.16);
+  --app-status-draft-border: rgba(59, 130, 246, 0.22);
+  --app-status-failed-fg: #fca5a5;
+  --app-status-failed-bg: rgba(239, 68, 68, 0.16);
+  --app-status-failed-border: rgba(239, 68, 68, 0.22);
+  --app-field-required: #f87171;
+  --app-field-error: #fca5a5;
+  --app-field-error-soft: #fca5a5;
+  --app-nav-active-shadow: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[x-cloak] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top, var(--app-page-radial), transparent 28%),
+    linear-gradient(180deg, var(--app-page-start) 0%, var(--app-page-end) 100%);
+  color: var(--app-text);
+  font-family: "Inter", "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+body {
+  padding: 24px;
+}
+
+.app-layout {
+  max-width: 1240px;
+  margin: 0 auto;
+  border: 1px solid var(--app-border);
+  border-radius: 24px;
+  overflow: hidden;
+  background: linear-gradient(180deg, var(--app-surface-panel-strong), var(--app-surface-panel));
+  box-shadow: var(--app-shadow-layout);
+  color: var(--app-text);
+}
+
+.app-header {
+  padding: 28px 32px 20px;
+  border-bottom: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface-panel-strong) 86%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.app-header-bar {
+  display: grid;
+  gap: 18px;
+}
+
+.app-toolbar {
+  display: grid;
+  gap: 14px;
+}
+
+.app-theme-field {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  justify-self: start;
+  min-height: 52px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface-panel-strong) 90%, var(--app-surface-softer));
+  color: var(--app-text);
+}
+
+.app-theme-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--app-accent-soft);
+  color: var(--app-text);
+}
+
+.app-theme-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.app-theme-copy strong {
+  font-size: 0.88rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-theme-copy small {
+  color: var(--app-text-subtle);
+  font-size: 0.74rem;
+  font-weight: 500;
+}
+
+.app-theme-select {
+  min-width: 120px;
+  min-height: 36px;
+  border: 1px solid var(--app-border-strong);
+  border-radius: 10px;
+  background: var(--app-surface);
+  color: var(--app-text);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 500;
+  padding: 0 12px;
+}
+
+.app-theme-select:focus-visible {
+  outline: none;
+  border-color: var(--app-border-emphasis);
+  box-shadow: 0 0 0 4px var(--app-ring-soft);
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: clamp(2rem, 4vw, 3.5rem);
+  line-height: 1;
+  letter-spacing: -0.05em;
+  font-weight: 700;
+}
+
+.app-eyebrow {
+  margin: 0 0 10px;
+  color: var(--app-text-subtle);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app-main {
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+}
+
+.app-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.app-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  text-decoration: none;
+  color: var(--app-text-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+
+.app-nav-link:hover {
+  color: var(--app-text);
+  background: var(--app-surface-softer);
+  border-color: var(--app-border);
+}
+
+.app-nav-link-active {
+  color: var(--app-text);
+  background: var(--app-surface-softer);
+  border-color: var(--app-border);
+  box-shadow: var(--app-nav-active-shadow);
+}
+
+.app-nav-link .icon {
+  opacity: 0.8;
+}
+
+.hero {
+  display: grid;
+  gap: 10px;
+}
+
+.hero h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--app-text-muted);
+  line-height: 1.65;
+}
+
+.stats-grid {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--app-border);
+  background: color-mix(in srgb, var(--app-surface-panel-strong) 92%, var(--app-surface-softer));
+  display: grid;
+  gap: 8px;
+}
+
+.stat-card-first {
+  border-color: var(--app-border-emphasis);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--app-surface) 92%, transparent), var(--app-surface-selected));
+}
+
+.counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: 16px;
+  background: var(--app-surface-softer);
+  border: 1px solid var(--app-border);
+}
+
+.counter strong {
+  min-width: 72px;
+  text-align: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+@media (max-width: 920px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  body {
+    padding: 12px;
+  }
+
+  .app-header {
+    padding: 20px 18px 16px;
+  }
+
+  .app-main {
+    padding: 18px;
+  }
+
+  .app-theme-field {
+    width: 100%;
+    grid-template-columns: auto 1fr;
+  }
+
+  .app-theme-select {
+    grid-column: 1 / -1;
+  }
+}

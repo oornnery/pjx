@@ -1,0 +1,75 @@
+.accordion {
+  border: 1px solid var(--app-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--app-surface) 96%, transparent);
+  overflow: hidden;
+}
+
+.accordion-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.accordion-summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.accordion-copy strong {
+  color: var(--app-text-strong);
+  font-size: 0.94rem;
+  letter-spacing: -0.01em;
+}
+
+.accordion-copy span {
+  color: var(--app-text-subtle);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.accordion-indicator {
+  position: relative;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--app-border);
+  background: var(--app-surface-soft);
+}
+
+.accordion-indicator::before,
+.accordion-indicator::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: var(--app-text-subtle);
+  transform: translate(-50%, -50%);
+  transition: transform 140ms ease, opacity 140ms ease;
+}
+
+.accordion-indicator::after {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+.accordion[open] .accordion-indicator::after {
+  opacity: 0;
+}
+
+.accordion-body {
+  padding: 0 16px 16px;
+  color: var(--app-text-muted);
+  line-height: 1.65;
+}

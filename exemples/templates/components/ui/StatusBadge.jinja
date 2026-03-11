@@ -1,0 +1,16 @@
+{% import css "/static/css/components/ui/status-badge.css" %}
+
+{% component StatusBadge %}
+
+  {% props
+    status: Literal["draft", "building", "ready", "failed"] = "draft"
+  %}
+
+  {% computed classes %}
+    {{ "status-badge status-" ~ status }}
+  {% endcomputed %}
+
+  <span {{ attrs.render(class=classes) }}>
+    {{ status }}
+  </span>
+{% endcomponent %}

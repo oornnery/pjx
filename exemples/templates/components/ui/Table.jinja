@@ -1,0 +1,52 @@
+{% import css "/static/css/components/ui/table.css" %}
+{% import "components/ui/ForEach.jinja" as ForEach %}
+
+{% component Table %}
+
+  {% props
+    columns: list = [],
+    rows: list = [],
+    caption: Optional[str] = None
+  %}
+
+  {% slot row(value, index) %}{% endslot %}
+  {% slot empty %}{% endslot %}
+
+  <div class="table-shell">
+    <If when="caption">
+      <p class="table-caption">{{ caption }}</p>
+    </If>
+
+    <div class="table-scroll">
+      <table class="table">
+        <thead>
+          <tr>
+            <ForEach items="{{ columns }}">
+              {% slot item(value, index) %}
+                <th>{{ value.label if value.label is defined else value }}</th>
+              {% endslot %}
+            </ForEach>
+          </tr>
+        </thead>
+
+        <tbody>
+          <If when="rows">
+            {% for value in rows %}
+              <tr>
+                {{ slot.row(value=value, index=loop.index0) }}
+              </tr>
+            {% endfor %}
+
+            <Else>
+              <tr>
+                <td class="table-empty-cell" colspan="{{ columns|length or 1 }}">
+                  {{ slot.empty or "No rows available." }}
+                </td>
+              </tr>
+            </Else>
+          </If>
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% endcomponent %}

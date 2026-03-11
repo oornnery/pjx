@@ -1,0 +1,137 @@
+{% import css "/static/css/layouts/app-layout.css" %}
+{% import "components/ui/Icon.jinja" as Icon %}
+
+{% component AppLayout %}
+
+  {% props
+    title: str,
+    theme: Literal["light", "dark", "system"] = "system"
+  %}
+
+  {% provide theme %}
+  {% computed current_path %}{{ request.url.path if request else "" }}{% endcomputed %}
+
+  {{ assets.render() }}
+  <div
+    class="app-layout"
+    jx-bind:data-theme-default="theme"
+    x-data="{
+      themePreference: 'system',
+      mediaQuery: null,
+      init() {
+        const fallback = this.$el.dataset.themeDefault || 'system';
+        const saved = window.localStorage.getItem('pjx-theme');
+        this.mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        this.themePreference = fallback;
+        if (saved === 'dark' || saved === 'light' || saved === 'system') {
+          this.themePreference = saved;
+        }
+        this.syncTheme();
+        const onChange = () => {
+          if (this.themePreference === 'system') {
+            this.syncTheme();
+          }
+        };
+        if (this.mediaQuery.addEventListener) {
+          this.mediaQuery.addEventListener('change', onChange);
+        } else if (this.mediaQuery.addListener) {
+          this.mediaQuery.addListener(onChange);
+        }
+      },
+      resolvedTheme() {
+        return this.themePreference === 'system'
+          ? (this.mediaQuery && this.mediaQuery.matches ? 'dark' : 'light')
+          : this.themePreference;
+      },
+      syncTheme() {
+        const resolved = this.resolvedTheme();
+        document.documentElement.dataset.theme = resolved;
+      },
+      updateTheme() {
+        window.localStorage.setItem('pjx-theme', this.themePreference);
+        this.syncTheme();
+      }
+    }"
+    x-bind:data-theme="resolvedTheme()"
+  >
+    <header class="app-header">
+      <div class="app-header-bar">
+        <div>
+          <p class="app-eyebrow">PJX Example</p>
+          <h1>{{ title }}</h1>
+        </div>
+
+        <div class="app-toolbar">
+          <label class="app-theme-field" for="app-theme-select">
+            <span class="app-theme-icon" x-show="resolvedTheme() === 'light'" x-cloak>
+              <Icon name="sun" size="{{ 15 }}" />
+            </span>
+            <span class="app-theme-icon" x-show="resolvedTheme() === 'dark'" x-cloak>
+              <Icon name="moon" size="{{ 15 }}" />
+            </span>
+            <span class="app-theme-copy">
+              <strong>Theme</strong>
+              <small x-text="resolvedTheme() === 'dark' ? 'Dark palette active' : 'Light palette active'">
+                Light palette active
+              </small>
+            </span>
+            <select
+              id="app-theme-select"
+              class="app-theme-select"
+              x-model="themePreference"
+              x-on:change="updateTheme()"
+              aria-label="Theme"
+            >
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </select>
+          </label>
+
+          <nav class="app-nav" aria-label="Examples">
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/' else 'app-nav-link' }}" href="/">
+              <Icon name="sparkles" size="{{ 15 }}" />
+              <span>Showcase</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/dashboard' else 'app-nav-link' }}" href="/dashboard">
+              <Icon name="layout" size="{{ 15 }}" />
+              <span>Dashboard</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/patterns' else 'app-nav-link' }}" href="/patterns">
+              <Icon name="blocks" size="{{ 15 }}" />
+              <span>Patterns</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/data' else 'app-nav-link' }}" href="/data">
+              <Icon name="table" size="{{ 15 }}" />
+              <span>Data</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/forms' else 'app-nav-link' }}" href="/forms">
+              <Icon name="mail" size="{{ 15 }}" />
+              <span>Forms</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/status' else 'app-nav-link' }}" href="/status">
+              <Icon name="activity" size="{{ 15 }}" />
+              <span>Status</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/signals' else 'app-nav-link' }}" href="/signals">
+              <Icon name="workflow" size="{{ 15 }}" />
+              <span>Signals</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/studio' else 'app-nav-link' }}" href="/studio">
+              <Icon name="bolt" size="{{ 15 }}" />
+              <span>Studio</span>
+            </a>
+            <a class="{{ 'app-nav-link app-nav-link-active' if current_path == '/catalog' else 'app-nav-link' }}" href="/catalog">
+              <Icon name="database" size="{{ 15 }}" />
+              <span>Catalog</span>
+            </a>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-main">
+      {{ content }}
+    </main>
+  </div>
+{% endcomponent %}

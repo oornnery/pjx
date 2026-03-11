@@ -1,0 +1,36 @@
+{% import "layouts/AppLayout.jinja" as AppLayout %}
+{% import "components/ui/Button.jinja" as Button %}
+{% import "components/ui/Card.jinja" as Card %}
+
+{% component SignalsCounter %}
+
+  {% props initial_count: int = 0 %}
+
+  {% signal count = signal(initial_count) %}
+
+  <AppLayout title="Signals Counter" theme="dark">
+    <Card title="Counter">
+      <div class="counter">
+        <Button
+          size="icon"
+          variant="outline"
+          hx-post="/actions/counter/dec"
+          hx-target="#counter-value"
+          hx-swap="outerHTML"
+        >
+          -
+        </Button>
+        <strong id="counter-value" jx-signal="count" aria-live="polite">{{ count }}</strong>
+        <Button
+          size="icon"
+          variant="default"
+          hx-post="/actions/counter/inc"
+          hx-target="#counter-value"
+          hx-swap="outerHTML"
+        >
+          +
+        </Button>
+      </div>
+    </Card>
+  </AppLayout>
+{% endcomponent %}

@@ -1,36 +1,148 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-try:
-    from fastapi.responses import HTMLResponse
-except Exception:  # pragma: no cover - optional dependency during import
-    HTMLResponse = None
+from fastapi.responses import HTMLResponse
 
-from .models import DirectiveContext, Element, RenderState
+from .models import AssetImport, DirectiveContext, Element, RenderState
 from .runtime import Runtime
 
 
+@dataclass(slots=True, frozen=True)
+class TemplateMount:
+    path: Path
+    prefix: str | None = None
+
+    @property
+    def alias(self) -> str:
+        normalized_prefix = _normalize_template_prefix(self.prefix)
+        if normalized_prefix is None:
+            return "@"
+        return f"@{normalized_prefix}"
+
+
 class Catalog:
-    def __init__(self, *, root: str, aliases: dict[str, str] | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        root: str,
+        aliases: dict[str, str] | None = None,
+        auto_reload: bool = True,
+    ) -> None:
         self.root = Path(root)
         self.aliases = aliases or {}
+        self.auto_reload = auto_reload
+        self.base_assets: list[AssetImport] = []
         self.directives: dict[str, Callable[..., Any]] = {}
+        self._template_mounts: list[TemplateMount] = [TemplateMount(path=self.root)]
         self.runtime = Runtime(self)
 
+    @property
+    def template_roots(self) -> list[Path]:
+        roots: list[Path] = []
+        for mount in self._template_mounts:
+            if mount.path not in roots:
+                roots.append(mount.path)
+        return roots
+
+    @property
+    def template_mounts(self) -> tuple[TemplateMount, ...]:
+        return tuple(self._template_mounts)
+
+    def add_template_root(
+        self,
+        path: str | Path,
+        *,
+        prefix: str | None = None,
+    ) -> TemplateMount:
+        template_root = Path(path)
+        normalized_prefix = _normalize_template_prefix(prefix)
+        mount = TemplateMount(path=template_root, prefix=normalized_prefix)
+        if mount not in self._template_mounts:
+            self._template_mounts.append(mount)
+        if normalized_prefix is not None:
+            self.aliases[f"@{normalized_prefix}"] = str(template_root)
+        return mount
+
     def resolve_path(self, template_path: str) -> Path:
-        for alias, target in self.aliases.items():
+        for alias, target in sorted(
+            self.aliases.items(),
+            key=lambda item: len(item[0]),
+            reverse=True,
+        ):
             if template_path == alias:
                 return Path(target)
             if template_path.startswith(f"{alias}/"):
                 suffix = template_path[len(alias) + 1 :]
                 return Path(target) / suffix
-        return self.root / template_path
+        for template_root in self.template_roots:
+            candidate = template_root / template_path
+            if candidate.exists():
+                return candidate
+        return self.template_roots[0] / template_path
 
     def register_directive(self, name: str, fn: Callable[..., Any]) -> None:
         self.directives[name] = fn
+
+    def add_asset(self, *, kind: str, path: str) -> None:
+        asset = AssetImport(kind=kind, path=path)
+        if asset not in self.base_assets:
+            self.base_assets.append(asset)
+
+    def list_components(self) -> list[str]:
+        components: dict[str, Path] = {}
+        for mount in self._template_mounts:
+            for path in mount.path.rglob("*.jinja"):
+                if not path.is_file():
+                    continue
+                relative_path = str(path.relative_to(mount.path))
+                normalized_prefix = _normalize_template_prefix(mount.prefix)
+                if normalized_prefix is None:
+                    import_path = relative_path
+                else:
+                    import_path = f"@{normalized_prefix}/{relative_path}"
+                components.setdefault(import_path, path)
+        return sorted(components)
+
+    def import_path_for_file(self, path: str | Path) -> str:
+        resolved = Path(path).resolve()
+        for mount in self._template_mounts:
+            template_root = mount.path.resolve()
+            if not resolved.is_relative_to(template_root):
+                continue
+            relative_path = str(resolved.relative_to(template_root))
+            normalized_prefix = _normalize_template_prefix(mount.prefix)
+            if normalized_prefix is None:
+                return relative_path
+            return f"@{normalized_prefix}/{relative_path}"
+        return str(resolved)
+
+    def get_signature(self, template_path: str) -> dict[str, Any]:
+        instance = self.runtime.get_component_instance(template_path)
+        component = instance.component
+        return {
+            "component": component.component_name,
+            "required": [
+                spec.name for spec in component.prop_specs if spec.default_expr is None
+            ],
+            "optional": [
+                spec.name for spec in component.prop_specs if spec.default_expr is not None
+            ],
+            "props": [
+                {
+                    "name": spec.name,
+                    "type": spec.type_expr,
+                    "default": spec.default_expr,
+                }
+                for spec in component.prop_specs
+            ],
+            "slots": sorted(component.slot_specs),
+            "css": [asset.path for asset in component.assets if asset.kind == "css"],
+            "js": [asset.path for asset in component.assets if asset.kind == "js"],
+        }
 
     def render(
         self,
@@ -40,7 +152,7 @@ class Catalog:
         request: Any = None,
         partial: bool = False,
         target: str | None = None,
-    ) -> Any:
+    ) -> HTMLResponse:
         html_output = self.render_string(
             template=template,
             context=context,
@@ -48,8 +160,6 @@ class Catalog:
             partial=partial,
             target=target,
         )
-        if HTMLResponse is None:
-            return html_output
         return HTMLResponse(html_output)
 
     def render_string(
@@ -140,3 +250,13 @@ def _merge_classes(existing: Any, value: Any) -> str:
     elif value:
         tokens.extend(str(value).split())
     return " ".join(dict.fromkeys(tokens))
+
+
+def _normalize_template_prefix(prefix: str | None) -> str | None:
+    if prefix is None:
+        return None
+    normalized = prefix.strip()
+    if not normalized or normalized == "@":
+        return None
+    normalized = normalized.lstrip("@").strip("/")
+    return normalized or None

@@ -1,0 +1,35 @@
+.tooltip {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip-trigger {
+  display: inline-flex;
+}
+
+.tooltip-panel {
+  position: absolute;
+  z-index: 40;
+  min-width: 180px;
+  max-width: 240px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--app-tooltip-bg);
+  color: var(--app-tooltip-fg);
+  box-shadow: var(--app-shadow-tooltip);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.tooltip-top .tooltip-panel {
+  left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
+}
+
+.tooltip-bottom .tooltip-panel {
+  left: 50%;
+  top: calc(100% + 12px);
+  transform: translateX(-50%);
+}

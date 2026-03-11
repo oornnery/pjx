@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import html
-from typing import Any, Literal, Optional, Union, get_args, get_origin
+from typing import Any, Literal, Optional, Union, cast, get_args, get_origin
 
 from jinja2 import Environment, StrictUndefined, pass_context
 from markupsafe import Markup
 
+from .assets import AssetsView, render_assets
 from .compiler import compile_component_file
 from .models import AttrBag, CompiledComponent, RenderState, SlotAccessor
 
@@ -28,6 +29,7 @@ SAFE_TYPE_GLOBALS = {
 class ComponentInstance:
     component: CompiledComponent
     template: Any
+    source_mtime_ns: int
 
 
 class Runtime:
@@ -39,26 +41,29 @@ class Runtime:
             lstrip_blocks=False,
             undefined=StrictUndefined,
         )
-        self.environment.globals.update(
-            {
-                "__pjx_render_component": self.render_component,
-                "__pjx_render_attrs": self.render_attrs,
-            }
-        )
+        globals_map = cast(dict[str, Any], self.environment.globals)
+        globals_map["__pjx_render_component"] = self.render_component
+        globals_map["__pjx_render_attrs"] = self.render_attrs
         self._template_cache: dict[str, ComponentInstance] = {}
         self._expr_cache: dict[str, Any] = {}
 
     def get_component_instance(self, template_path: str) -> ComponentInstance:
         source_path = self.catalog.resolve_path(template_path)
         cache_key = str(source_path)
-        try:
-            return self._template_cache[cache_key]
-        except KeyError:
-            component = compile_component_file(source_path.read_text(), source_path)
-            template = self.environment.from_string(component.jinja_source)
-            instance = ComponentInstance(component=component, template=template)
-            self._template_cache[cache_key] = instance
-            return instance
+        source_mtime_ns = source_path.stat().st_mtime_ns
+        cached = self._template_cache.get(cache_key)
+        if cached is not None:
+            if not self.catalog.auto_reload or cached.source_mtime_ns == source_mtime_ns:
+                return cached
+        component = compile_component_file(source_path.read_text(), source_path)
+        template = self.environment.from_string(component.jinja_source)
+        instance = ComponentInstance(
+            component=component,
+            template=template,
+            source_mtime_ns=source_mtime_ns,
+        )
+        self._template_cache[cache_key] = instance
+        return instance
 
     def evaluate_expr(self, expr: str, context: dict[str, Any]) -> Any:
         compiled = self._expr_cache.get(expr)
@@ -82,6 +87,8 @@ class Runtime:
             state = RenderState(catalog=self.catalog, request=request, partial=partial, target=target)
             context = dict(context)
             context["__pjx_render_state"] = state
+        context["assets"] = AssetsView(state)
+        self._collect_template_assets(instance.component, state, seen=set())
         html_output = self._render_component_instance(
             instance,
             props=context,
@@ -97,8 +104,26 @@ class Runtime:
             return extract_fragment_by_id(html_output, target)
         if partial:
             return html_output
+        if state.assets_rendered:
+            return html_output
         assets_html = render_assets(state.assets)
         return f"{assets_html}{html_output}"
+
+    def _collect_template_assets(
+        self,
+        component: CompiledComponent,
+        render_state: RenderState,
+        *,
+        seen: set[str],
+    ) -> None:
+        if component.path in seen:
+            return
+        seen.add(component.path)
+        render_state.register_assets(tuple(self.catalog.base_assets))
+        render_state.register_assets(component.assets)
+        for template_path in component.component_imports.values():
+            child_instance = self.get_component_instance(template_path)
+            self._collect_template_assets(child_instance.component, render_state, seen=seen)
 
     def _render_component_instance(
         self,
@@ -214,16 +239,6 @@ class Runtime:
                 continue
             chunks.append(f' {html.escape(key)}="{html.escape(str(value))}"')
         return Markup("".join(chunks))
-
-
-def render_assets(assets: list[Any]) -> str:
-    chunks: list[str] = []
-    for asset in assets:
-        if asset.kind == "css":
-            chunks.append(f'<link rel="stylesheet" href="{html.escape(asset.path)}">')
-        elif asset.kind == "js":
-            chunks.append(f'<script src="{html.escape(asset.path)}" defer></script>')
-    return "".join(chunks)
 
 
 def extract_fragment_by_id(html_source: str, target_id: str) -> str:
