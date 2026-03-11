@@ -87,7 +87,7 @@ Filtro de simplicidade:
 Pipeline geral:
 
 ```text
-arquivo .pjx
+arquivo .jinja (temporariamente nos exemplos; extensao-alvo: .pjx)
    ↓
 lexer / parser PJX
    ↓
@@ -142,7 +142,7 @@ Gramática canônica do PJX v0.1:
 * fluxo preferencial por `<If>`, `<For>` e `<Switch>`
 * suporte equivalente por `{% if %}`, `{% for %}` e `{% set %}`
 * diretivas `jx-*` restritas a comportamento e atributos de elemento
-* metadados locais por `{% import css "..." %}` e `{% import js "..." %}`
+* imports e metadados locais por `{% import ... %}` no topo do arquivo sempre que possivel
 * modificadores no final da declaracao principal, ex.: `{% component UserList async %}`
 
 Decisoes de sintaxe:
@@ -160,6 +160,8 @@ Decisoes de sintaxe:
 Sintaxe base:
 
 ```jinja
+{% import css "/static/css/button.css" %}
+
 {% component Button %}
   {% props
     variant: Literal["default", "secondary", "outline", "ghost"] = "default",
@@ -167,8 +169,6 @@ Sintaxe base:
     type: str = "button",
     disabled: bool = false
   %}
-
-  {% import css "/static/css/button.css" %}
 
   <button
     type="{{ type }}"
@@ -202,6 +202,7 @@ Regras:
 
 * componente e declarado como bloco e consumido como tag
 * a declaracao de componente deve virar um no proprio da AST
+* todos os imports devem ficar no topo do arquivo sempre que possivel
 * attrs extras entram no P0 como bag reservada `attrs`
 * o core inicial nao precisa de spread sintatico nem merge magico de attrs
 
@@ -210,10 +211,11 @@ Regras:
 Direcao:
 
 ```jinja
+{% import css "/static/components/alert.css" %}
+{% import js "/static/components/alert.js" %}
+
 {% component Alert %}
   {% props message: str %}
-  {% import css "/static/components/alert.css" %}
-  {% import js "/static/components/alert.js" %}
 
   <div class="alert">{{ message }}</div>
 {% endcomponent %}
@@ -222,6 +224,7 @@ Direcao:
 Requisitos:
 
 * registrar CSS e JS por componente
+* manter todos os imports agrupados no topo do arquivo como boa pratica
 * deduplicar assets no render final
 * suportar `inline`, `external` e `bundle manifest`
 * entrar no parser como no proprio da AST

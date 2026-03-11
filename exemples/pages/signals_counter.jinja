@@ -1,0 +1,27 @@
+{% import "@/layouts/AppLayout.jinja" as AppLayout %}
+{% import "@/components/ui/Button.jinja" as Button %}
+{% import "@/components/ui/Card.jinja" as Card %}
+
+{% component SignalsCounter %}
+
+  {% props initial_count: int = 0 %}
+
+  {% signal count = signal(initial_count) %}
+  {% action inc %}
+    {{ count.set(count.get() + 1) }}
+  {% endaction %}
+
+  {% action dec %}
+    {{ count.set(count.get() - 1) }}
+  {% endaction %}
+
+  <AppLayout title="Signals Counter" theme="dark">
+    <Card title="Counter">
+      <div class="counter">
+        <Button size="icon" variant="outline" jx-on:click="dec">-</Button>
+        <strong id="counter-value" jx-signal="count">{{ count }}</strong>
+        <Button size="icon" variant="default" jx-on:click="inc">+</Button>
+      </div>
+    </Card>
+  </AppLayout>
+{% endcomponent %}

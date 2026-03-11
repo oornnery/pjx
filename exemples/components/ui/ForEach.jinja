@@ -1,0 +1,19 @@
+{% set ForEachProps = {
+  "items": list
+} %}
+
+{% component ForEach %}
+  {% props ForEachProps %}
+  {% slot item(value, index) %}{% endslot %}
+  {% slot empty %}{% endslot %}
+
+  <If when="items">
+    {% for value in items %}
+      {{ slot.item(value=value, index=loop.index0) }}
+    {% endfor %}
+
+    <Else>
+      {{ slot.empty or "" }}
+    </Else>
+  </If>
+{% endcomponent %}

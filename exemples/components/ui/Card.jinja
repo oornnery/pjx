@@ -1,0 +1,26 @@
+{% import css "/static/components/ui/card.css" %}
+
+{% component Card %}
+
+  {% props
+    title: Optional[str] = None,
+    bordered: bool = true
+  %}
+
+  {% slot header %}{% endslot %}
+  {% slot footer %}{% endslot %}
+
+  <section class="card{% if bordered %} card-bordered{% endif %}">
+    <header class="card-header">
+      {{ slot.header or title }}
+    </header>
+
+    <div class="card-body">
+      {{ content }}
+    </div>
+
+    <footer class="card-footer">
+      {{ slot.footer }}
+    </footer>
+  </section>
+{% endcomponent %}
