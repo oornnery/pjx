@@ -1,0 +1,492 @@
+@import "layouts/Layout.pjx"
+@from pjx.ui import Button, Badge, Alert, Skeleton, Toggle, Slider, Spinner, Tag, Stat, Avatar, AvatarGroup, EmptyState
+@from pjx.layout import Card, Stack, Row, Grid, Divider, Section
+@from pjx.forms import Input, Field, TextArea, Select, Checkbox, RadioGroup, RadioItem, Combobox, Label
+@from pjx.nav import Accordion, Tabs, TabList, Tab, TabPanel, DropdownMenu, DropdownItem, DropdownSeparator, Breadcrumb, BreadcrumbItem, Table, TableHead, TableRow, TableCell, Pagination
+@from pjx.overlay import Dialog, AlertDialog, Popover, Tooltip
+
+@props {}
+
+<Layout title="Kitchen Sink — PJX" active="kitchen">
+
+  <div class="showcase-shell">
+
+    <!-- Accordion -->
+    <Card title="Accordion">
+      <p class="text-sm text-muted-foreground mb-3">
+        Collapsible content panels. Uses native <code>&lt;details&gt;</code> — no JS.
+      </p>
+      <Accordion title="What is PJX?">
+        PJX is a server-first component framework for Python.
+        It compiles <code>.pjx</code> files to Jinja2 templates.
+      </Accordion>
+      <Accordion title="How do I use it?" description="Getting started">
+        Import the components you need and use them in your templates.
+        <code>@from pjx.ui import Button</code>
+      </Accordion>
+      <Accordion title="Is it customizable?">
+        Yes. All components use CSS custom properties that
+        you can override in your own stylesheet.
+      </Accordion>
+    </Card>
+
+    <!-- Alert -->
+    <Card title="Alert">
+      <p class="text-sm text-muted-foreground mb-3">
+        Informational messages and notifications.
+      </p>
+      <Stack gap="sm">
+        <Alert type="success" message="Your changes have been saved." />
+        <Alert type="info" title="Information" message="This is an alert with icon, title and description." />
+        <Alert type="warning" title="Warning: Check this out" message="This one uses a warning variant." />
+        <Alert type="danger" title="Destructive: Action failed" message="Please verify the operation and retry." />
+      </Stack>
+    </Card>
+
+    <!-- Avatar -->
+    <Card title="Avatar">
+      <p class="text-sm text-muted-foreground mb-3">User profile pictures and placeholders.</p>
+      <Row gap="md" align="center">
+        <Avatar name="Dakota Rivers" size="xl" />
+        <Avatar name="CN" size="lg" />
+        <Avatar name="Adam" size="md" />
+        <Avatar name="Jo" size="sm" />
+        <Avatar name="X" size="xs" />
+      </Row>
+      <div class="mt-3">
+        <AvatarGroup>
+          <Avatar name="Dakota" size="sm" />
+          <Avatar name="Shannon" size="sm" />
+          <Avatar name="Adam" size="sm" />
+        </AvatarGroup>
+      </div>
+    </Card>
+
+    <!-- Badge -->
+    <Card title="Badge">
+      <p class="text-sm text-muted-foreground mb-3">Status indicators and labels.</p>
+      <Row gap="sm" align="center">
+        <Badge text="Primary" variant="primary" />
+        <Badge text="Secondary" variant="secondary" />
+        <Badge text="Destructive" variant="destructive" />
+        <Badge text="Outline" variant="outline" />
+        <Badge text="Neutral" variant="neutral" />
+        <Badge text="Ready" variant="ready" />
+        <Badge text="Building" variant="building" />
+        <Badge text="Failed" variant="failed" />
+      </Row>
+    </Card>
+
+    <!-- Breadcrumb -->
+    <Card title="Breadcrumb">
+      <p class="text-sm text-muted-foreground mb-3">Navigation hierarchy indicators.</p>
+      <Stack gap="sm">
+        <Breadcrumb>
+          <BreadcrumbItem href="/" label="Home" />
+          <BreadcrumbItem href="/components" label="Components" />
+          <BreadcrumbItem label="Breadcrumb" active="true" />
+        </Breadcrumb>
+      </Stack>
+    </Card>
+
+    <!-- Button -->
+    <Card title="Button">
+      <p class="text-sm text-muted-foreground mb-3">Interactive buttons with various styles and states.</p>
+      <Row gap="sm" align="center">
+        <Button label="Primary" variant="default" size="md" />
+        <Button label="Secondary" variant="secondary" size="md" />
+        <Button label="Outline" variant="outline" size="md" />
+        <Button label="Ghost" variant="ghost" size="md" />
+        <Button label="Danger" variant="danger" size="md" />
+        <Button label="Link" variant="link" size="md" />
+      </Row>
+      <Row gap="sm" align="center">
+        <Button label="Small" variant="default" size="sm" />
+        <Button label="Medium" variant="default" size="md" />
+        <Button label="Large" variant="default" size="lg" />
+      </Row>
+      <Row gap="sm" align="center">
+        <Button label="Loading…" variant="secondary" size="md">
+          <:icon><Spinner size="sm" /></:icon>
+        </Button>
+      </Row>
+    </Card>
+
+    <!-- Card -->
+    <Card title="Card">
+      <p class="text-sm text-muted-foreground mb-3">Content containers with optional header and footer slots.</p>
+      <div class="showcase-demo-grid">
+        <Card title="Simple card">
+          <p class="text-sm text-muted-foreground m-0">Just a title and body content.</p>
+        </Card>
+        <Card>
+          <:header>
+            <strong>Custom header</strong>
+            <Badge text="live" variant="ready" />
+          </:header>
+          <p class="text-sm text-muted-foreground m-0">Header with components inside it.</p>
+          <:footer>
+            <Button label="Action" variant="secondary" size="sm" />
+          </:footer>
+        </Card>
+      </div>
+    </Card>
+
+    <!-- Checkbox -->
+    <Card title="Checkbox">
+      <p class="text-sm text-muted-foreground mb-3">Boolean input controls.</p>
+      <Stack gap="sm">
+        <Checkbox name="terms" label="Accept terms and conditions" value="1" />
+        <Checkbox name="newsletter" label="Subscribe to newsletter" value="1" />
+        <Checkbox name="disabled" label="Disabled option" value="1" disabled="true" />
+      </Stack>
+    </Card>
+
+    <!-- Combobox -->
+    <Card title="Combobox">
+      <p class="text-sm text-muted-foreground mb-3">Searchable dropdown selection (Alpine-powered).</p>
+      <div class="max-w-xs">
+        <Combobox
+          name="fruit"
+          label="Fruit"
+          placeholder="Search a fruit…"
+          options="Apple,Banana,Cherry,Mango,Orange,Papaya,Strawberry,Watermelon"
+        />
+      </div>
+    </Card>
+
+    <!-- Dialog -->
+    <Card title="Dialog">
+      <p class="text-sm text-muted-foreground mb-3">Modal dialogs (native dialog element).</p>
+      <Row gap="sm">
+        <Dialog title="Edit Profile" description="Make changes to your profile here.">
+          <:trigger>
+            <Button label="Open dialog" variant="default" size="md" />
+          </:trigger>
+          <Stack gap="sm">
+            <Input name="dname" label="Name" placeholder="Your name" />
+            <Input name="demail" label="Email" type="email" placeholder="you@example.com" />
+          </Stack>
+          <:footer>
+            <Button label="Save changes" variant="default" size="md" />
+          </:footer>
+        </Dialog>
+        <AlertDialog
+          title="Are you sure?"
+          description="This action cannot be undone. This will permanently delete your data."
+          confirm_label="Delete"
+          cancel_label="Cancel"
+        >
+          <:trigger>
+            <Button label="Delete account" variant="danger" size="md" />
+          </:trigger>
+        </AlertDialog>
+      </Row>
+    </Card>
+
+    <!-- Dropdown -->
+    <Card title="Dropdown Menu">
+      <p class="text-sm text-muted-foreground mb-3">Contextual menus and actions.</p>
+      <DropdownMenu>
+        <:trigger>
+          <Button label="Open menu ▾" variant="secondary" size="md" />
+        </:trigger>
+        <DropdownItem label="Profile" href="#" />
+        <DropdownItem label="Settings" href="#" />
+        <DropdownSeparator />
+        <DropdownItem label="Sign out" href="#" />
+      </DropdownMenu>
+    </Card>
+
+    <!-- Empty State -->
+    <Card title="Empty State">
+      <EmptyState title="No results found" description="Try adjusting your search or filters." />
+    </Card>
+
+    <!-- Input -->
+    <Card title="Input">
+      <p class="text-sm text-muted-foreground mb-3">Text input fields with labels.</p>
+      <div class="grid gap-4 max-w-md">
+        <Input name="text_demo" label="Text" placeholder="Enter text…" />
+        <Input name="email_demo" type="email" label="Email" placeholder="you@example.com" />
+        <Input name="pass_demo" type="password" label="Password" placeholder="••••••••" />
+        <Input name="num_demo" type="number" label="Number" placeholder="42" />
+        <Input name="err_demo" label="With error" error="This field is required." />
+        <Input name="dis_demo" label="Disabled" value="Disabled value" disabled="true" />
+      </div>
+    </Card>
+
+    <!-- Label -->
+    <Card title="Label">
+      <p class="text-sm text-muted-foreground mb-3">Standalone field labels.</p>
+      <Stack gap="sm">
+        <Label for="lbl_name">Your full name</Label>
+        <input id="lbl_name" class="input max-w-xs" placeholder="Enter your name" />
+        <p class="text-muted-foreground text-sm">This is your legal name.</p>
+        <Label for="lbl_email" required="true">Email address</Label>
+        <input id="lbl_email" class="input max-w-xs" placeholder="you@example.com" />
+      </Stack>
+    </Card>
+
+    <!-- Pagination -->
+    <Card title="Pagination">
+      <p class="text-sm text-muted-foreground mb-3">Navigation for multi-page content.</p>
+      <Stack gap="sm">
+        <Pagination page="1" total="20" href="/kitchen-sink?page={page}" />
+        <Pagination page="5" total="20" href="/kitchen-sink?page={page}" />
+        <Pagination page="20" total="20" href="/kitchen-sink?page={page}" />
+      </Stack>
+    </Card>
+
+    <!-- Popover -->
+    <Card title="Popover">
+      <p class="text-sm text-muted-foreground mb-3">Floating content overlays.</p>
+      <Popover label="More info" placement="bottom">
+        <:trigger>
+          <Button label="Open popover" variant="outline" size="md" />
+        </:trigger>
+        <p class="text-sm text-muted-foreground m-0">
+          This is additional information shown in a floating panel.
+        </p>
+      </Popover>
+    </Card>
+
+    <!-- Radio Group -->
+    <Card title="Radio Group">
+      <p class="text-sm text-muted-foreground mb-3">Single selection from multiple options.</p>
+      <div class="max-w-md">
+        <RadioGroup name="plan" label="Choose a plan">
+          <RadioItem
+            name="plan"
+            value="starter"
+            label="Starter Plan"
+            description="Perfect for small businesses getting started."
+          />
+          <RadioItem
+            name="plan"
+            value="pro"
+            label="Pro Plan"
+            description="Advanced features for growing businesses."
+          />
+        </RadioGroup>
+      </div>
+    </Card>
+
+    <!-- Select -->
+    <Card title="Select">
+      <p class="text-sm text-muted-foreground mb-3">Dropdown selection menus.</p>
+      <div class="grid gap-4 max-w-xs">
+        <Select name="fruit_sel" label="Fruits">
+          <option value="">Pick a fruit</option>
+          <option value="apple">Apple</option>
+          <option value="banana">Banana</option>
+          <option value="mango">Mango</option>
+        </Select>
+        <Select name="dis_sel" label="Disabled" disabled="true">
+          <option>Disabled</option>
+        </Select>
+      </div>
+    </Card>
+
+    <!-- Skeleton -->
+    <Card title="Skeleton">
+      <p class="text-sm text-muted-foreground mb-3">Loading state placeholders.</p>
+      <Stack gap="sm">
+        <Skeleton variant="text" />
+        <Skeleton variant="text" />
+        <Skeleton variant="text" />
+      </Stack>
+      <div class="flex gap-3 items-center mt-4">
+        <Skeleton variant="circle" />
+        <Stack gap="sm" style="flex:1">
+          <Skeleton variant="text" />
+          <Skeleton variant="text" />
+        </Stack>
+      </div>
+      <div class="mt-4">
+        <Skeleton variant="rect" />
+      </div>
+    </Card>
+
+    <!-- Slider -->
+    <Card title="Slider">
+      <p class="text-sm text-muted-foreground mb-3">Range input controls.</p>
+      <div class="grid gap-4 max-w-sm">
+        <Slider name="s1" value="25" />
+        <Slider name="s2" value="3" min="1" max="10" step="1" />
+        <Slider name="s3" value="75" />
+      </div>
+    </Card>
+
+    <!-- Spinner -->
+    <Card title="Spinner">
+      <Row gap="md" align="center">
+        <Spinner size="sm" />
+        <Spinner size="md" />
+        <Spinner size="lg" />
+      </Row>
+    </Card>
+
+    <!-- Toggle / Switch -->
+    <Card title="Toggle">
+      <p class="text-sm text-muted-foreground mb-3">Toggle switches for boolean values.</p>
+      <Stack gap="sm">
+        <Toggle name="sw1" label="Notifications" />
+        <Toggle name="sw2" label="Dark mode" checked="true" />
+        <Toggle name="sw3" label="Auto-save" />
+        <Toggle name="sw4" label="Disabled" disabled="true" />
+      </Stack>
+    </Card>
+
+    <!-- Table -->
+    <Card title="Table">
+      <p class="text-sm text-muted-foreground mb-3">Data display in tabular format.</p>
+      <Table>
+        <:head>
+          <TableHead>
+            <TableCell header="true">Name</TableCell>
+            <TableCell header="true">Email</TableCell>
+            <TableCell header="true">Status</TableCell>
+            <TableCell header="true">Role</TableCell>
+          </TableHead>
+        </:head>
+        <TableRow>
+          <TableCell>John Doe</TableCell>
+          <TableCell>john@example.com</TableCell>
+          <TableCell><Badge text="Active" variant="ready" /></TableCell>
+          <TableCell>Admin</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>Jane Smith</TableCell>
+          <TableCell>jane@example.com</TableCell>
+          <TableCell><Badge text="Pending" variant="building" /></TableCell>
+          <TableCell>User</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>Bob Johnson</TableCell>
+          <TableCell>bob@example.com</TableCell>
+          <TableCell><Badge text="Inactive" variant="neutral" /></TableCell>
+          <TableCell>User</TableCell>
+        </TableRow>
+      </Table>
+    </Card>
+
+    <!-- Tabs -->
+    <Card title="Tabs">
+      <p class="text-sm text-muted-foreground mb-3">Organized content panels (Alpine-powered).</p>
+      <Tabs default_tab="account">
+        <TabList>
+          <Tab id="account" label="Account" />
+          <Tab id="password" label="Password" />
+          <Tab id="billing" label="Billing" />
+        </TabList>
+        <TabPanel id="account">
+          <p class="text-sm text-muted-foreground mb-3">
+            Make changes to your account here.
+          </p>
+          <div class="grid gap-3 max-w-sm">
+            <Input name="acc_name" label="Name" value="Pedro Duarte" />
+            <Input name="acc_user" label="Username" value="@peduarte" />
+          </div>
+          <div class="mt-3">
+            <Button label="Save changes" variant="default" size="md" />
+          </div>
+        </TabPanel>
+        <TabPanel id="password">
+          <div class="grid gap-3 max-w-sm">
+            <Input name="cur_pass" type="password" label="Current password" />
+            <Input name="new_pass" type="password" label="New password" />
+          </div>
+          <div class="mt-3">
+            <Button label="Change password" variant="default" size="md" />
+          </div>
+        </TabPanel>
+        <TabPanel id="billing">
+          <p class="text-sm text-muted-foreground m-0">
+            Billing information coming soon.
+          </p>
+        </TabPanel>
+      </Tabs>
+    </Card>
+
+    <!-- TextArea -->
+    <Card title="Textarea">
+      <p class="text-sm text-muted-foreground mb-3">Multi-line text input fields.</p>
+      <div class="grid gap-4 max-w-md">
+        <TextArea name="msg1" placeholder="Type your message here…" />
+        <TextArea name="msg2" label="With label" placeholder="Type your message here…" />
+        <TextArea name="msg3" label="With error" error="Message is required." />
+        <TextArea name="msg4" label="With help" help="Max 500 characters." placeholder="Type your message here…" />
+      </div>
+    </Card>
+
+    <!-- Toast -->
+    <Card title="Toast">
+      <p class="text-sm text-muted-foreground mb-3">Non-intrusive notifications.</p>
+      <Row gap="sm">
+        <button
+          class="btn-secondary"
+          x-on:click="$dispatch('pjx-toast', { type: 'success', title: 'Success!', message: 'Your changes have been saved.' })"
+          type="button"
+        >Success</button>
+        <button
+          class="btn-secondary"
+          x-on:click="$dispatch('pjx-toast', { type: 'danger', title: 'Error', message: 'Something went wrong.' })"
+          type="button"
+        >Error</button>
+        <button
+          class="btn-secondary"
+          x-on:click="$dispatch('pjx-toast', { type: 'info', title: 'Info', message: 'New version available.' })"
+          type="button"
+        >Info</button>
+        <button
+          class="btn-secondary"
+          x-on:click="$dispatch('pjx-toast', { type: 'warning', title: 'Warning', message: 'Storage almost full.' })"
+          type="button"
+        >Warning</button>
+      </Row>
+    </Card>
+
+    <!-- Tooltip -->
+    <Card title="Tooltip">
+      <p class="text-sm text-muted-foreground mb-3">Contextual help and information.</p>
+      <Row gap="lg" align="center">
+        <Tooltip text="Tooltip on top" placement="top">
+          <Button label="Top" variant="outline" size="sm" />
+        </Tooltip>
+        <Tooltip text="Tooltip on bottom" placement="bottom">
+          <Button label="Bottom" variant="outline" size="sm" />
+        </Tooltip>
+        <Tooltip text="Tooltip on left" placement="left">
+          <Button label="Left" variant="outline" size="sm" />
+        </Tooltip>
+        <Tooltip text="Tooltip on right" placement="right">
+          <Button label="Right" variant="outline" size="sm" />
+        </Tooltip>
+      </Row>
+    </Card>
+
+    <!-- Stat -->
+    <Card title="Stat">
+      <div class="stats-grid">
+        <Stat label="Templates" value="8" />
+        <Stat label="Components" value="24" />
+        <Stat label="Routes" value="5" />
+        <Stat label="Stars" value="1.2k" trend="↑ 12%" />
+      </div>
+    </Card>
+
+    <!-- Tag -->
+    <Card title="Tag">
+      <Row gap="sm">
+        <Tag label="Python" />
+        <Tag label="HTMX" />
+        <Tag label="Alpine" />
+        <Tag label="Jinja2" />
+        <Tag label="Server-first" />
+      </Row>
+    </Card>
+
+  </div>
+
+</Layout>

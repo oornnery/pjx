@@ -9,25 +9,15 @@ O CLI do PJX existe para duas tarefas:
 
 Implementacao atual:
 
-* interface: [pjx/cli.py](/home/oornnery/proj/pjx/pjx/cli.py)
-* nucleo: [pjx/tooling.py](/home/oornnery/proj/pjx/pjx/tooling.py)
+* interface: `pjx/cli.py`
+* nucleo: `pjx/tooling.py`
 
 ## Stack
 
 ```text
-Typer
-|
-`-- parsing de comandos e exit codes
-
-Rich
-|
-`-- output de terminal
-
-tooling.py
-|
-+-- load_project
-+-- check_project
-`-- format_project
+Typer -> parsing de comandos e exit codes
+Rich  -> output de terminal
+tooling.py -> load_project, check_project, format_project
 ```
 
 ## Comandos
@@ -44,14 +34,14 @@ Aceita:
 
 * import target, como `exemples.main:pjx`
 * pasta de projeto
-* arquivo `.jinja`
+* arquivo `.pjx`
 
 ### format
 
 ```bash
 uv run pjx format exemples.main:pjx --check
 uv run pjx format exemples.main:pjx
-uv run pjx format path/to/Button.jinja
+uv run pjx format path/to/Button.pjx
 ```
 
 ## Exit Codes
@@ -68,12 +58,8 @@ Hoje o `pjx check` cobre:
 
 * parse estrutural
 * compile step
-* alias de import ausente
-* alias de import duplicado
 * imports inexistentes
 * self-import
-* assets locais ausentes
-* nome de componente divergente do arquivo
 * nome de componente fora de TitleCase
 * nome de componente duplicado
 * template sombreado entre mounts
@@ -88,21 +74,13 @@ A saida textual usa codigos numericos estaveis:
 [101] parse_error
 [102] compile_error
 [105] missing_import
+[108] component_name_mismatch
+[109] component_name_style
+[110] duplicate_component_name
+[111] shadowed_template
+[112] import_cycle
+[113] missing_route_template
 ```
-
-Exemplo:
-
-```text
-Template issues:
-  components/ui/Broken.jinja
-    ERROR [105] missing_import [components/ui/Missing.jinja]: imported component "components/ui/Missing.jinja" does not exist
-```
-
-Objetivo:
-
-* facilitar leitura rapida
-* facilitar busca
-* manter automacao simples
 
 ## JSON Output
 
@@ -137,8 +115,8 @@ O formatter atual e estrutural, nao um pretty-printer completo de HTML.
 
 Ele:
 
-* reorganiza preambulo
-* estabiliza blocos de props
+* reorganiza imports
+* estabiliza blocos de @props, @slot, @state
 * normaliza quebras de linha do componente
 
 Ele nao:
@@ -149,6 +127,6 @@ Ele nao:
 
 ## Limites Atuais
 
-* o `check` valida bastante coisa, mas ainda nao cobre todos os contratos semanticos possiveis do runtime
+* o `check` valida bastante coisa, mas ainda nao cobre todos os contratos
+  semanticos possiveis do runtime
 * o formatter ainda nao trabalha com spans/token stream
-* a saida do `check` hoje e simples por design; ainda da para enriquecer com tabelas e agrupamentos do Rich

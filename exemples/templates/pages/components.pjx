@@ -1,0 +1,121 @@
+@import "layouts/Layout.pjx"
+@from pjx.ui import Button, Badge, Alert, Stat, Tag
+@from pjx.layout import Card
+@from pjx.nav import Accordion
+@from pjx.forms import Input, Field
+
+@props {}
+
+<Layout title="Components — PJX" active="components">
+
+  <div class="showcase-shell">
+
+    <!-- Buttons -->
+    <Card title="Button">
+      <p class="text-sm text-muted-foreground mb-3">
+        Variants: <code>default</code>, <code>secondary</code>, <code>outline</code>, <code>ghost</code>.
+        Sizes: <code>sm</code>, <code>md</code>, <code>lg</code>.
+      </p>
+      <div class="flex gap-2 flex-wrap items-center">
+        <Button label="Default" variant="default" />
+        <Button label="Secondary" variant="secondary" />
+        <Button label="Outline" variant="outline" />
+        <Button label="Ghost" variant="ghost" />
+      </div>
+      <div class="flex gap-2 flex-wrap items-center mt-3">
+        <Button label="Small" variant="secondary" size="sm" />
+        <Button label="Medium" variant="secondary" size="md" />
+        <Button label="Large" variant="secondary" size="lg" />
+      </div>
+    </Card>
+
+    <!-- Badges -->
+    <Card title="Badge / Status">
+      <p class="text-sm text-muted-foreground mb-3">
+        Statuses: <code>neutral</code>, <code>ready</code>, <code>building</code>, <code>draft</code>, <code>failed</code>.
+      </p>
+      <div class="flex gap-2 flex-wrap">
+        <Badge variant="neutral" text="neutral" />
+        <Badge variant="ready" text="ready" />
+        <Badge variant="building" text="building" />
+        <Badge variant="draft" text="draft" />
+        <Badge variant="failed" text="failed" />
+      </div>
+    </Card>
+
+    <!-- Alerts -->
+    <Card title="Alert">
+      <div class="grid gap-3">
+        <Alert message="This is an info alert." type="info" />
+        <Alert message="Operation completed successfully." type="success" />
+        <Alert message="This action may have side effects." type="warning" />
+        <Alert message="Something went wrong. Please try again." type="danger" />
+      </div>
+    </Card>
+
+    <!-- Cards -->
+    <Card title="Card">
+      <p class="text-sm text-muted-foreground mb-3">Cards support optional header, body and footer slots.</p>
+      <div class="showcase-demo-grid">
+        <Card title="Simple card">
+          <p class="text-sm text-muted-foreground m-0">Just a title and body content.</p>
+        </Card>
+        <Card>
+          <:header>
+            <strong>Custom header slot</strong>
+            <Badge variant="ready" text="live" />
+          </:header>
+          <p class="text-sm text-muted-foreground m-0">Header with components inside it.</p>
+          <:footer>
+            <Button label="Action" variant="secondary" size="sm" />
+          </:footer>
+        </Card>
+      </div>
+    </Card>
+
+    <!-- Stats -->
+    <Card title="Stat">
+      <div class="stats-grid">
+        <Stat label="Templates" value="8" />
+        <Stat label="Components" value="12" />
+        <Stat label="Routes" value="3" />
+      </div>
+    </Card>
+
+    <!-- Accordion -->
+    <Card title="Accordion">
+      <p class="text-sm text-muted-foreground mb-3">
+        Uses native HTML <code>&lt;details&gt;</code> — no JavaScript needed.
+      </p>
+      <Accordion title="What is PJX?" description="A quick overview">
+        PJX is a server-first component framework for Python.
+        It compiles <code>.pjx</code> files to Jinja2 templates.
+      </Accordion>
+      <Accordion title="Does it need JavaScript?" description="Progressive enhancement">
+        HTMX and Alpine are optional. PJX generates plain HTML by default.
+        Interactivity is added progressively via attributes.
+      </Accordion>
+      <Accordion title="How do slots work?" description="Named and default">
+        Declare <code>@slot footer?</code> inside <code>@component</code>.
+        Pass content with <code>&lt;:footer&gt;...&lt;/:footer&gt;</code> at the call site.
+      </Accordion>
+    </Card>
+
+    <!-- Inputs -->
+    <Card title="Input &amp; Field">
+      <div class="grid gap-4 max-w-md">
+        <Input name="email" type="email" label="Email" placeholder="you@example.com" />
+        <Input name="name" label="Full name" required="true" />
+        <Input name="broken" label="With error" error="This field is required." />
+        <Field label="Custom field" help="Any element can go inside.">
+          <select class="select">
+            <option>Option A</option>
+            <option>Option B</option>
+          </select>
+        </Field>
+      </div>
+    </Card>
+
+  </div>
+
+</Layout>

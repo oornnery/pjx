@@ -1,75 +1,87 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
-
 from fastapi import Form
 
-from exemples.data import (
-    decrement_counter,
-    decrement_studio_count,
-    increment_counter,
-    increment_studio_count,
-    submit_forms_demo,
-    update_studio_prompt,
-)
 from pjx import PJXRouter
+
+from exemples.state import Counter, Todo
 
 
 actions = PJXRouter()
 
 
+# ── Counter ───────────────────────────────────────────────────────────────────
+
+
 @actions.action(
     "/actions/counter/inc",
-    template="pages/signals_counter.jinja",
-    target="counter-value",
+    template="pages/counter.pjx",
+    target="counter-display",
 )
-def increment_counter_action() -> dict[str, Any]:
-    state = increment_counter()
-    return {"initial_count": state["count"]}
+def increment_counter_action() -> dict:
+    Counter.increment()
+    return Counter.context()
 
 
 @actions.action(
     "/actions/counter/dec",
-    template="pages/signals_counter.jinja",
-    target="counter-value",
+    template="pages/counter.pjx",
+    target="counter-display",
 )
-def decrement_counter_action() -> dict[str, Any]:
-    state = decrement_counter()
-    return {"initial_count": state["count"]}
+def decrement_counter_action() -> dict:
+    Counter.decrement()
+    return Counter.context()
+
+
+# ── Todo ──────────────────────────────────────────────────────────────────────
 
 
 @actions.action(
-    "/actions/studio/inc", template="pages/studio.jinja", target="studio-shell"
+    "/actions/todo/add",
+    template="pages/apps.pjx",
+    target="todo-list",
 )
-def studio_count_up() -> dict[str, Any]:
-    return increment_studio_count()
+def add_todo_action(text: str = Form(...)) -> dict:
+    if text.strip():
+        Todo.add(text)
+    return Counter.context() | Todo.context()
 
 
 @actions.action(
-    "/actions/studio/dec", template="pages/studio.jinja", target="studio-shell"
+    "/actions/todo/toggle/{todo_id}",
+    template="pages/apps.pjx",
+    target="todo-list",
 )
-def studio_count_down() -> dict[str, Any]:
-    return decrement_studio_count()
+def toggle_todo_action(todo_id: int) -> dict:
+    Todo.toggle(todo_id)
+    return Counter.context() | Todo.context()
 
 
 @actions.action(
-    "/actions/studio/prompt", template="pages/studio.jinja", target="studio-shell"
+    "/actions/todo/delete/{todo_id}",
+    template="pages/apps.pjx",
+    target="todo-list",
 )
-def studio_prompt_submit(prompt: Annotated[str, Form()]) -> dict[str, Any]:
-    return update_studio_prompt(prompt)
+def delete_todo_action(todo_id: int) -> dict:
+    Todo.delete(todo_id)
+    return Counter.context() | Todo.context()
+
+
+# ── Contact form ──────────────────────────────────────────────────────────────
 
 
 @actions.action(
-    "/actions/forms/submit",
-    template="pages/forms_playground.jinja",
-    target="forms-shell",
+    "/actions/contact/submit",
+    template="pages/apps.pjx",
+    target="contact-form-wrap",
 )
-def forms_submit_action(
-    name: Annotated[str, Form()],
-    email: Annotated[str, Form()],
-    message: Annotated[str, Form()],
-) -> dict[str, object]:
-    return submit_forms_demo(name, email, message)
+def contact_submit_action(
+    cf_name: str = Form(""),
+    cf_email: str = Form(""),
+    cf_msg: str = Form(""),
+) -> dict:
+    # In a real app: send email, save to DB, etc.
+    return {"contact_success": True, "cf_name": cf_name}
 
 
 __all__ = ["actions"]

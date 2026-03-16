@@ -1,29 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import importlib
 import json
-from pathlib import Path
 import re
 import sys
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
-from .ast import (
-    ActionDirectiveNode,
-    ComputedDirectiveNode,
-    ImportNode,
-    InjectDirectiveNode,
-    PropDeclNode,
-    PropsAliasNode,
-    PropsDirectiveNode,
-    ProvideDirectiveNode,
-    SignalDirectiveNode,
-    SlotDirectiveNode,
-)
+from .ast import FromImport, ImportDirective, PjxFile, PropDef
 from .catalog import Catalog
-from .compiler import compile_component_file
-from .fastapi import PJX
-from .parser import parse_component_source
+from .compiler import compile_pjx
+from .parser import parse
 
 
 TITLE_CASE_RE = re.compile(r"^[A-Z][A-Za-z0-9]*$")
@@ -57,16 +45,16 @@ class ValidationIssue:
 @dataclass(slots=True)
 class TemplateCheckResult:
     path: str
-    component_name: str | None = None
+    component_names: list[str] = field(default_factory=list)
     issues: list[ValidationIssue] = field(default_factory=list)
 
     @property
     def error_count(self) -> int:
-        return sum(1 for issue in self.issues if issue.severity == "error")
+        return sum(1 for i in self.issues if i.severity == "error")
 
     @property
     def warning_count(self) -> int:
-        return sum(1 for issue in self.issues if issue.severity == "warning")
+        return sum(1 for i in self.issues if i.severity == "warning")
 
 
 @dataclass(slots=True)
@@ -100,20 +88,20 @@ class CheckReport:
             "validation_map": dict(self.validation_map),
             "templates": [
                 {
-                    "path": item.path,
-                    "component_name": item.component_name,
-                    "issues": [asdict(issue) for issue in item.issues],
+                    "path": t.path,
+                    "component_names": t.component_names,
+                    "issues": [asdict(i) for i in t.issues],
                 }
-                for item in self.templates
+                for t in self.templates
             ],
             "routes": [
                 {
-                    "path": item.path,
-                    "methods": list(item.methods),
-                    "template": item.template,
-                    "issues": [asdict(issue) for issue in item.issues],
+                    "path": r.path,
+                    "methods": list(r.methods),
+                    "template": r.template,
+                    "issues": [asdict(i) for i in r.issues],
                 }
-                for item in self.routes
+                for r in self.routes
             ],
         }
 
@@ -128,17 +116,15 @@ class FormatResult:
 class LoadedProject:
     root: Path
     catalog: Catalog
-    pjx: PJX | None
+    pjx: Any | None = None
     files: tuple[Path, ...] | None = None
 
 
 def load_project(target: str | None) -> LoadedProject:
     if not target:
         return _load_from_path(Path.cwd())
-
     if ":" in target and not Path(target).exists():
         return _load_from_import(target)
-
     return _load_from_path(Path(target))
 
 
@@ -146,19 +132,21 @@ def check_project(target: str | None) -> CheckReport:
     project = load_project(target)
     files = _collect_template_files(project)
     template_results: list[TemplateCheckResult] = []
-    compiled_by_path: dict[str, tuple[str, list[str]]] = {}
+    compiled_by_path: dict[str, tuple[list[str], list[str]]] = {}
     relative_roots = _build_import_path_index(project.catalog)
 
     for file_path in files:
-        template_result = _check_template_file(project, file_path)
-        template_results.append(template_result)
-
-        if template_result.error_count > 0:
+        result = _check_template_file(project, file_path)
+        template_results.append(result)
+        if result.error_count > 0:
             continue
-
-        compiled = compile_component_file(file_path.read_text(), file_path)
-        imports = list(compiled.component_imports.values())
-        compiled_by_path[template_result.path] = (compiled.component_name, imports)
+        try:
+            ast = parse(file_path.read_text(), str(file_path))
+            compile_pjx(ast, str(file_path))
+            imports = _extract_import_paths(ast)
+            compiled_by_path[result.path] = (result.component_names, imports)
+        except Exception:
+            pass
 
     _apply_duplicate_component_name_checks(template_results)
     _apply_shadowed_template_checks(template_results, relative_roots)
@@ -169,7 +157,6 @@ def check_project(target: str | None) -> CheckReport:
     validation_map: dict[str, int] = {}
     errors = 0
     warnings = 0
-
     for issue in _iter_issues(template_results, route_results):
         label = _validation_label(issue.number, issue.code)
         validation_map[label] = validation_map.get(label, 0) + 1
@@ -180,15 +167,13 @@ def check_project(target: str | None) -> CheckReport:
 
     return CheckReport(
         root=str(project.root),
-        template_roots=tuple(str(path) for path in project.catalog.template_roots),
+        template_roots=tuple(str(p) for p in project.catalog.template_roots),
         files_checked=len(files),
         routes_checked=len(route_results),
         errors=errors,
         warnings=warnings,
         validation_map=dict(
-            sorted(
-                validation_map.items(), key=lambda item: _validation_sort_key(item[0])
-            )
+            sorted(validation_map.items(), key=lambda kv: _validation_sort_key(kv[0]))
         ),
         templates=template_results,
         routes=route_results,
@@ -199,7 +184,6 @@ def format_project(target: str | None, *, check: bool = False) -> list[FormatRes
     project = load_project(target)
     files = _collect_template_files(project)
     results: list[FormatResult] = []
-
     for file_path in files:
         source = file_path.read_text()
         formatted = format_template_source(source, file_path)
@@ -211,41 +195,96 @@ def format_project(target: str | None, *, check: bool = False) -> list[FormatRes
                 path=_display_path(file_path, project.catalog), changed=changed
             )
         )
-
     return results
 
 
 def format_template_source(source: str, path: Path) -> str:
-    parsed = parse_component_source(source, path)
-
+    ast = parse(source, str(path))
     blocks: list[str] = []
-    if parsed.imports:
-        blocks.extend(_format_import(item) for item in parsed.imports)
-    if parsed.prop_aliases:
-        blocks.extend(_format_props_alias(item) for item in parsed.prop_aliases)
 
-    component_lines: list[str] = []
-    component_header = " ".join(
-        ("component", parsed.component.name, *parsed.component.modifiers)
-    ).strip()
-    component_lines.append(f"{{% {component_header} %}}")
+    for imp in ast.imports:
+        blocks.append(_format_import(imp))
 
-    if parsed.component.directives:
-        component_lines.append("")
-        for index, directive in enumerate(parsed.component.directives):
-            component_lines.extend(_format_directive(directive))
-            if index != len(parsed.component.directives) - 1:
-                component_lines.append("")
-
-    body = _normalize_block_body(parsed.component.body)
-    if body:
-        component_lines.append("")
-        component_lines.extend(body.splitlines())
-
-    component_lines.append("{% endcomponent %}")
-    blocks.append("\n".join(component_lines))
+    if ast.is_multi_component:
+        for comp in ast.components:
+            blocks.append(_format_component_def(comp))
+    else:
+        blocks.append(_format_page_file(ast))
 
     return "\n\n".join(blocks).rstrip() + "\n"
+
+
+def render_check_report(report: CheckReport, *, output_format: str = "text") -> str:
+    if output_format == "json":
+        return json.dumps(report.as_dict(), indent=2, sort_keys=True)
+
+    lines = [
+        "PJX Check",
+        f"Root: {report.root}",
+        f"Template roots: {', '.join(report.template_roots)}",
+        f"Files checked: {report.files_checked}",
+        f"Routes checked: {report.routes_checked}",
+        f"Errors: {report.errors}",
+        f"Warnings: {report.warnings}",
+    ]
+
+    if report.validation_map:
+        lines.append("")
+        lines.append("Validation map:")
+        for label, count in report.validation_map.items():
+            lines.append(f"  {label}: {count}")
+
+    with_issues = [t for t in report.templates if t.issues]
+    if with_issues:
+        lines.append("")
+        lines.append("Template issues:")
+        for item in with_issues:
+            lines.append(f"  {item.path}")
+            for issue in item.issues:
+                related = f" [{issue.related_path}]" if issue.related_path else ""
+                label = _validation_label(issue.number, issue.code)
+                lines.append(
+                    f"    {issue.severity.upper()} {label}{related}: {issue.message}"
+                )
+
+    route_issues = [r for r in report.routes if r.issues]
+    if route_issues:
+        lines.append("")
+        lines.append("Route issues:")
+        for item in route_issues:
+            lines.append(f"  {'/'.join(item.methods)} {item.path} -> {item.template}")
+            for issue in item.issues:
+                related = f" [{issue.related_path}]" if issue.related_path else ""
+                label = _validation_label(issue.number, issue.code)
+                lines.append(
+                    f"    {issue.severity.upper()} {label}{related}: {issue.message}"
+                )
+
+    return "\n".join(lines)
+
+
+def render_format_report(results: list[FormatResult], *, check: bool = False) -> str:
+    changed = [r.path for r in results if r.changed]
+    unchanged = len(results) - len(changed)
+
+    if not results:
+        return "PJX Format\nNo templates found."
+
+    lines = [
+        "PJX Format",
+        f"Templates scanned: {len(results)}",
+        f"Changed: {len(changed)}",
+        f"Unchanged: {unchanged}",
+    ]
+
+    if changed:
+        lines.append("")
+        lines.append("Templates:")
+        for path in changed:
+            prefix = "would format" if check else "formatted"
+            lines.append(f"  {prefix}: {path}")
+
+    return "\n".join(lines)
 
 
 def _issue(
@@ -272,82 +311,7 @@ def _validation_label(number: int, code: str) -> str:
 
 def _validation_sort_key(label: str) -> int:
     match = re.match(r"^\[(\d+)\]", label)
-    if match is None:
-        return 999
-    return int(match.group(1))
-
-
-def render_check_report(report: CheckReport, *, output_format: str = "text") -> str:
-    if output_format == "json":
-        return json.dumps(report.as_dict(), indent=2, sort_keys=True)
-
-    lines = [
-        "PJX Check",
-        f"Root: {report.root}",
-        f"Template roots: {', '.join(report.template_roots)}",
-        f"Files checked: {report.files_checked}",
-        f"Routes checked: {report.routes_checked}",
-        f"Errors: {report.errors}",
-        f"Warnings: {report.warnings}",
-    ]
-
-    if report.validation_map:
-        lines.append("")
-        lines.append("Validation map:")
-        for label, count in report.validation_map.items():
-            lines.append(f"  {label}: {count}")
-
-    template_with_issues = [item for item in report.templates if item.issues]
-    if template_with_issues:
-        lines.append("")
-        lines.append("Template issues:")
-        for item in template_with_issues:
-            lines.append(f"  {item.path}")
-            for issue in item.issues:
-                related = f" [{issue.related_path}]" if issue.related_path else ""
-                label = _validation_label(issue.number, issue.code)
-                lines.append(
-                    f"    {issue.severity.upper()} {label}{related}: {issue.message}"
-                )
-
-    route_with_issues = [item for item in report.routes if item.issues]
-    if route_with_issues:
-        lines.append("")
-        lines.append("Route issues:")
-        for item in route_with_issues:
-            lines.append(f"  {'/'.join(item.methods)} {item.path} -> {item.template}")
-            for issue in item.issues:
-                related = f" [{issue.related_path}]" if issue.related_path else ""
-                label = _validation_label(issue.number, issue.code)
-                lines.append(
-                    f"    {issue.severity.upper()} {label}{related}: {issue.message}"
-                )
-
-    return "\n".join(lines)
-
-
-def render_format_report(results: list[FormatResult], *, check: bool = False) -> str:
-    changed = [item.path for item in results if item.changed]
-    unchanged = len(results) - len(changed)
-
-    if not results:
-        return "PJX Format\nNo templates found."
-
-    lines = [
-        "PJX Format",
-        f"Templates scanned: {len(results)}",
-        f"Changed: {len(changed)}",
-        f"Unchanged: {unchanged}",
-    ]
-
-    if changed:
-        lines.append("")
-        lines.append("Templates:")
-        for path in changed:
-            prefix = "would format" if check else "formatted"
-            lines.append(f"  {prefix}: {path}")
-
-    return "\n".join(lines)
+    return int(match.group(1)) if match else 999
 
 
 def _load_from_import(target: str) -> LoadedProject:
@@ -362,10 +326,16 @@ def _load_from_import(target: str) -> LoadedProject:
     module = importlib.import_module(module_name)
     obj = getattr(module, attr_name)
 
-    if isinstance(obj, PJX):
-        return LoadedProject(root=obj.root, catalog=obj.catalog, pjx=obj)
+    from .fastapi import Pjx
+
+    if isinstance(obj, Pjx):
+        return LoadedProject(
+            root=obj.templates_dir.parent,
+            catalog=obj.catalog,
+            pjx=obj,
+        )
     if isinstance(obj, Catalog):
-        return LoadedProject(root=obj.root, catalog=obj, pjx=None)
+        return LoadedProject(root=obj.root, catalog=obj)
     if isinstance(obj, Path):
         return _load_from_path(obj)
     if isinstance(obj, str):
@@ -388,16 +358,17 @@ def _load_from_path(path: Path) -> LoadedProject:
             if template_root.name == "templates"
             else template_root,
             catalog=catalog,
-            pjx=None,
             files=(resolved,),
         )
 
     project_root = resolved
     template_root = _discover_template_root(project_root)
     catalog = Catalog(
-        root=str(template_root), aliases={"@": str(template_root)}, auto_reload=False
+        root=str(template_root),
+        aliases={"@": str(template_root)},
+        auto_reload=False,
     )
-    return LoadedProject(root=project_root, catalog=catalog, pjx=None)
+    return LoadedProject(root=project_root, catalog=catalog)
 
 
 def _discover_template_root(path: Path) -> Path:
@@ -412,14 +383,22 @@ def _discover_template_root(path: Path) -> Path:
 def _collect_template_files(project: LoadedProject) -> list[Path]:
     if project.files is not None:
         return list(project.files)
-
     files: dict[str, Path] = {}
     for template_root in project.catalog.template_roots:
-        for path in template_root.rglob("*.jinja"):
-            if not path.is_file():
-                continue
-            files.setdefault(str(path.resolve()), path)
+        for path in template_root.rglob("*.pjx"):
+            if path.is_file():
+                files.setdefault(str(path.resolve()), path)
     return sorted(files.values())
+
+
+def _extract_import_paths(ast: PjxFile) -> list[str]:
+    paths: list[str] = []
+    for imp in ast.imports:
+        if isinstance(imp, ImportDirective):
+            paths.append(imp.path)
+        elif isinstance(imp, FromImport):
+            paths.append(imp.module)
+    return paths
 
 
 def _check_template_file(
@@ -429,103 +408,57 @@ def _check_template_file(
     source = file_path.read_text()
 
     try:
-        parsed = parse_component_source(source, file_path)
+        ast = parse(source, str(file_path))
     except Exception as exc:
         result.issues.append(
             _issue(
-                severity="error",
-                code="parse_error",
-                message=str(exc),
-                path=result.path,
+                severity="error", code="parse_error", message=str(exc), path=result.path
             )
         )
         return result
 
-    result.component_name = parsed.component.name
-
-    if not _matches_component_stem(file_path.stem, parsed.component.name):
-        result.issues.append(
-            _issue(
-                severity="warning",
-                code="component_name_mismatch",
-                message=f"file stem {file_path.stem!r} does not match component {parsed.component.name!r}",
-                path=result.path,
-            )
-        )
-
-    if not TITLE_CASE_RE.fullmatch(parsed.component.name):
-        result.issues.append(
-            _issue(
-                severity="warning",
-                code="component_name_style",
-                message=f"component name {parsed.component.name!r} should be TitleCase",
-                path=result.path,
-            )
-        )
-
-    aliases: dict[str, str] = {}
-    for import_node in parsed.imports:
-        if import_node.kind == "component":
-            if import_node.alias is None:
+    if ast.is_multi_component:
+        for comp in ast.components:
+            result.component_names.append(comp.name)
+            if not TITLE_CASE_RE.fullmatch(comp.name):
                 result.issues.append(
                     _issue(
-                        severity="error",
-                        code="missing_import_alias",
-                        message=f"component import {import_node.path!r} requires an alias",
+                        severity="warning",
+                        code="component_name_style",
+                        message=f"component name {comp.name!r} should be TitleCase",
                         path=result.path,
                     )
                 )
-                continue
+    else:
+        stem = file_path.stem
+        if ast.body:
+            result.component_names.append(stem)
 
-            previous = aliases.get(import_node.alias)
-            if previous is not None:
-                result.issues.append(
-                    _issue(
-                        severity="error",
-                        code="duplicate_import_alias",
-                        message=f"component import alias {import_node.alias!r} is declared more than once",
-                        path=result.path,
-                        related_path=previous,
-                    )
-                )
-            else:
-                aliases[import_node.alias] = import_node.path
-
-            resolved_path = project.catalog.resolve_path(import_node.path)
-            if not resolved_path.exists():
+    for imp in ast.imports:
+        if isinstance(imp, ImportDirective):
+            resolved = project.catalog.resolve_path(imp.path)
+            if not resolved.exists():
                 result.issues.append(
                     _issue(
                         severity="error",
                         code="missing_import",
-                        message=f"imported component {import_node.path!r} does not exist",
+                        message=f"imported template {imp.path!r} does not exist",
                         path=result.path,
-                        related_path=import_node.path,
+                        related_path=imp.path,
                     )
                 )
-            elif resolved_path.resolve() == file_path.resolve():
+            elif resolved.resolve() == file_path.resolve():
                 result.issues.append(
                     _issue(
                         severity="warning",
                         code="self_import",
-                        message=f"component imports itself via {import_node.path!r}",
+                        message=f"template imports itself via {imp.path!r}",
                         path=result.path,
-                    )
-                )
-        else:
-            missing_asset = _resolve_asset_path(project, import_node)
-            if missing_asset is not None and not missing_asset.exists():
-                result.issues.append(
-                    _issue(
-                        severity="warning",
-                        code="missing_asset",
-                        message=f"asset {import_node.path!r} does not exist",
-                        path=result.path,
-                        related_path=str(missing_asset),
                     )
                 )
 
     try:
-        compile_component_file(source, file_path)
+        compile_pjx(ast, str(file_path))
     except Exception as exc:
         result.issues.append(
             _issue(
@@ -539,35 +472,21 @@ def _check_template_file(
     return result
 
 
-def _resolve_asset_path(project: LoadedProject, import_node: ImportNode) -> Path | None:
-    asset_path = import_node.path
-    if asset_path.startswith("/static/"):
-        return project.root / asset_path.lstrip("/")
-
-    candidate = Path(asset_path)
-    if candidate.is_absolute():
-        return candidate
-
-    return None
-
-
 def _apply_duplicate_component_name_checks(results: list[TemplateCheckResult]) -> None:
     index: dict[str, list[TemplateCheckResult]] = {}
     for result in results:
-        if result.component_name is None:
-            continue
-        index.setdefault(result.component_name, []).append(result)
-
-    for component_name, items in index.items():
+        for name in result.component_names:
+            index.setdefault(name, []).append(result)
+    for name, items in index.items():
         if len(items) < 2:
             continue
         for item in items:
-            related = [other.path for other in items if other.path != item.path]
+            related = [o.path for o in items if o.path != item.path]
             item.issues.append(
                 _issue(
                     severity="warning",
                     code="duplicate_component_name",
-                    message=f"component name {component_name!r} is used by multiple templates",
+                    message=f"component name {name!r} is used by multiple templates",
                     path=item.path,
                     related_path=", ".join(related),
                 )
@@ -577,14 +496,14 @@ def _apply_duplicate_component_name_checks(results: list[TemplateCheckResult]) -
 def _build_import_path_index(catalog: Catalog) -> dict[str, list[str]]:
     index: dict[str, list[str]] = {}
     for mount in catalog.template_mounts:
-        for path in mount.path.rglob("*.jinja"):
+        for path in mount.path.rglob("*.pjx"):
             if not path.is_file():
                 continue
-            relative_path = str(path.relative_to(mount.path))
+            relative = str(path.relative_to(mount.path))
             if mount.prefix is None:
-                import_path = relative_path
+                import_path = relative
             else:
-                import_path = f"@{mount.prefix}/{relative_path}"
+                import_path = f"@{mount.prefix}/{relative}"
             index.setdefault(import_path, []).append(str(mount.path))
     return index
 
@@ -593,27 +512,23 @@ def _apply_shadowed_template_checks(
     results: list[TemplateCheckResult],
     relative_roots: dict[str, list[str]],
 ) -> None:
-    if len(relative_roots) < 2:
-        return
-
     for result in results:
         roots = relative_roots.get(result.path)
-        if roots is None or len(roots) < 2:
-            continue
-        result.issues.append(
-            _issue(
-                severity="warning",
-                code="shadowed_template",
-                message=f"template path {result.path!r} exists in multiple template roots",
-                path=result.path,
-                related_path=", ".join(roots),
+        if roots and len(roots) >= 2:
+            result.issues.append(
+                _issue(
+                    severity="warning",
+                    code="shadowed_template",
+                    message=f"template path {result.path!r} exists in multiple template roots",
+                    path=result.path,
+                    related_path=", ".join(roots),
+                )
             )
-        )
 
 
 def _apply_cycle_checks(
     results: list[TemplateCheckResult],
-    compiled_by_path: dict[str, tuple[str, list[str]]],
+    compiled_by_path: dict[str, tuple[list[str], list[str]]],
 ) -> None:
     adjacency = {
         path: [child for child in children if child in compiled_by_path]
@@ -629,16 +544,16 @@ def _apply_cycle_checks(
         if path in visiting:
             cycle = stack[stack.index(path) :] + [path]
             for item in cycle[:-1]:
-                result_index[item].issues.append(
-                    _issue(
-                        severity="error",
-                        code="import_cycle",
-                        message=f"component import cycle detected: {' -> '.join(cycle)}",
-                        path=item,
+                if item in result_index:
+                    result_index[item].issues.append(
+                        _issue(
+                            severity="error",
+                            code="import_cycle",
+                            message=f"import cycle detected: {' -> '.join(cycle)}",
+                            path=item,
+                        )
                     )
-                )
             return
-
         visiting.add(path)
         stack.append(path)
         for child in adjacency.get(path, []):
@@ -654,7 +569,6 @@ def _apply_cycle_checks(
 def _check_routes(project: LoadedProject) -> list[RouteCheckResult]:
     if project.pjx is None:
         return []
-
     route_results: list[RouteCheckResult] = []
     for route in getattr(project.pjx, "_pending_routes", []):
         item = RouteCheckResult(
@@ -662,8 +576,8 @@ def _check_routes(project: LoadedProject) -> list[RouteCheckResult]:
             methods=route.methods,
             template=route.template,
         )
-        resolved_path = project.catalog.resolve_path(route.template)
-        if not resolved_path.exists():
+        resolved = project.catalog.resolve_path(route.template)
+        if not resolved.exists():
             item.issues.append(
                 _issue(
                     severity="error",
@@ -694,106 +608,104 @@ def _display_path(path: Path, catalog: Catalog) -> str:
 
 
 def _matches_component_stem(stem: str, component_name: str) -> bool:
-    normalized_stem = stem.replace("_", "").lower()
-    normalized_component = component_name.lower()
-    if normalized_stem == normalized_component:
+    ns = stem.replace("_", "").lower()
+    nc = component_name.lower()
+    if ns == nc:
         return True
     for suffix in ("page", "layout", "component"):
-        if normalized_component.endswith(
-            suffix
-        ) and normalized_stem == normalized_component.removesuffix(suffix):
+        if nc.endswith(suffix) and ns == nc.removesuffix(suffix):
             return True
     return False
 
 
-def _normalize_block_body(body: str) -> str:
-    lines = body.splitlines()
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    while lines and not lines[-1].strip():
-        lines.pop()
-    return "\n".join(line.rstrip() for line in lines)
+def _format_import(imp: ImportDirective | FromImport) -> str:
+    if isinstance(imp, FromImport):
+        names = ", ".join(imp.names)
+        return f"@from {imp.module} import {names}"
+    return f'@import "{imp.path}"'
 
 
-def _format_import(import_node: ImportNode) -> str:
-    if import_node.kind == "component":
-        return f'{{% import "{import_node.path}" as {import_node.alias} %}}'
-    return f'{{% import {import_node.kind} "{import_node.path}" %}}'
+def _format_component_def(comp: Any) -> str:
+    lines: list[str] = []
+    header = f"@component {comp.name} {{"
+    lines.append(header)
 
+    if comp.props:
+        props_str = ", ".join(_format_prop_def(p) for p in comp.props.props)
+        lines.append(f"  @props {{ {props_str} }}")
 
-def _format_props_alias(alias: PropsAliasNode) -> str:
-    lines = [f"{{% set {alias.name} = {{"]
-    for index, prop in enumerate(alias.props):
-        suffix = "," if index < len(alias.props) - 1 else ""
-        lines.append(f'  "{prop.name}": {_format_prop_decl(prop)}{suffix}')
-    lines.append("} %}")
+    for slot in comp.slots:
+        opt = "?" if slot.optional else ""
+        lines.append(f"  @slot {slot.name}{opt}")
+
+    if comp.state:
+        fields = ", ".join(f"{f.name}: {f.value}" for f in comp.state.fields)
+        lines.append(f"  @state {{ {fields} }}")
+
+    if comp.bind:
+        lines.append(f"  @bind from {comp.bind.module} import {comp.bind.class_name}")
+
+    for let in comp.lets:
+        lines.append(f"  @let {let.name} = {let.expr}")
+
+    body = _format_body_nodes(comp.children)
+    if body.strip():
+        lines.append(body)
+
+    lines.append("}")
     return "\n".join(lines)
 
 
-def _format_directive(
-    directive: (
-        PropsDirectiveNode
-        | InjectDirectiveNode
-        | ProvideDirectiveNode
-        | ComputedDirectiveNode
-        | SlotDirectiveNode
-        | SignalDirectiveNode
-        | ActionDirectiveNode
-    ),
-) -> list[str]:
-    if isinstance(directive, PropsDirectiveNode):
-        if directive.alias_name:
-            return [f"  {{% props {directive.alias_name} %}}"]
-        if len(directive.props) <= 1:
-            prop_decl = ", ".join(_format_prop_decl(item) for item in directive.props)
-            return [f"  {{% props {prop_decl} %}}"]
-        lines = ["  {% props"]
-        for index, prop in enumerate(directive.props):
-            suffix = "," if index < len(directive.props) - 1 else ""
-            lines.append(f"    {_format_prop_decl(prop)}{suffix}")
-        lines.append("  %}")
-        return lines
+def _format_page_file(ast: PjxFile) -> str:
+    lines: list[str] = []
 
-    if isinstance(directive, InjectDirectiveNode):
-        return [f"  {{% inject {' '.join(directive.names)} %}}"]
+    if ast.bind:
+        lines.append(f"@bind from {ast.bind.module} import {ast.bind.class_name}")
 
-    if isinstance(directive, ProvideDirectiveNode):
-        return [f"  {{% provide {' '.join(directive.names)} %}}"]
+    if ast.props:
+        props_str = ", ".join(_format_prop_def(p) for p in ast.props.props)
+        lines.append(f"@props {{ {props_str} }}")
 
-    if isinstance(directive, ComputedDirectiveNode):
-        lines = [f"  {{% computed {directive.name} %}}"]
-        body = _normalize_block_body(directive.body)
-        if body:
-            lines.extend(f"    {line}" if line else "" for line in body.splitlines())
-        lines.append("  {% endcomputed %}")
-        return lines
+    for slot in ast.slots:
+        opt = "?" if slot.optional else ""
+        lines.append(f"@slot {slot.name}{opt}")
 
-    if isinstance(directive, SlotDirectiveNode):
-        signature = directive.name
-        if directive.params:
-            signature += f"({', '.join(directive.params)})"
-        return [f"  {{% slot {signature} %}}{{% endslot %}}"]
+    if ast.state:
+        fields = ", ".join(f"{f.name}: {f.value}" for f in ast.state.fields)
+        lines.append(f"@state {{ {fields} }}")
 
-    if isinstance(directive, SignalDirectiveNode):
-        return [f"  {{% signal {directive.name} = signal({directive.expr}) %}}"]
+    for let in ast.lets:
+        lines.append(f"@let {let.name} = {let.expr}")
 
-    if isinstance(directive, ActionDirectiveNode):
-        lines = [f"  {{% action {directive.name} %}}"]
-        body = _normalize_block_body(directive.body)
-        if body:
-            lines.extend(f"    {line}" if line else "" for line in body.splitlines())
-        lines.append("  {% endaction %}")
-        return lines
+    body = _format_body_nodes(ast.body)
+    if body.strip():
+        if lines:
+            lines.append("")
+        lines.append(body)
 
-    raise TypeError(f"Unsupported directive type: {type(directive)!r}")
+    return "\n".join(lines)
 
 
-def _format_prop_decl(prop: PropDeclNode) -> str:
-    chunks = [prop.name]
+def _format_prop_def(prop: PropDef) -> str:
+    parts = [prop.name]
     if prop.type_expr:
-        chunks.append(f": {prop.type_expr}")
+        parts.append(f": {prop.type_expr}")
     if prop.default_expr is not None:
-        chunks.append(f" = {prop.default_expr}")
+        parts.append(f" = {prop.default_expr}")
+    return "".join(parts)
+
+
+def _format_body_nodes(nodes: tuple[Any, ...]) -> str:
+    from .ast import TextNode, ExprNode
+
+    chunks: list[str] = []
+    for node in nodes:
+        if isinstance(node, TextNode):
+            chunks.append(node.content)
+        elif isinstance(node, ExprNode):
+            chunks.append(node.content)
+        else:
+            chunks.append(str(node))
     return "".join(chunks)
 
 

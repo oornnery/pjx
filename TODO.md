@@ -7,28 +7,30 @@ miniframework maduro.
 
 Objetivo:
 
-* linguagem propria para componentes server-first
+* linguagem propria para componentes server-first com sintaxe `@directive`
 * FastAPI como base real do app host
-* compile pipeline clara: linguagem -> parser/AST -> compiler/IR -> renderer
+* compile pipeline clara: `.pjx` -> parser/AST -> compiler -> Jinja2
 * HTMX e Alpine como enhancement
 * DX simples, com pouco boilerplate
 
-## Fase 0: consolidar o que ja existe
+## Fase 0: consolidar o que ja existe (feito)
 
-Meta:
-
-* deixar a base atual previsivel, documentada e usavel
-
-Checklist:
-
-* [x] `PJX` integrado como sub-app FastAPI
-* [x] `PJXRouter`
+* [x] `Pjx` integrado via `init_app(app)`
+* [x] `PjxRouter`
 * [x] `templates/` como raiz
 * [x] mounts com prefixo `@prefix/...`
-* [x] parser estrutural do arquivo
-* [x] `pjx check`
-* [x] `pjx format`
+* [x] parser estrutural com sintaxe `@directive`
+* [x] `pjx check` e `pjx format`
 * [x] docs iniciais de arquitetura e uso
+* [x] `render()` como Depends, `Page`/`Template` como return types
+* [x] `@pjx.context_processor`
+* [x] extensao `.pjx` canonica
+* [x] `PropValidationError` com exceptions customizadas
+* [x] boundary check em `extract_fragment_by_id`
+* [x] multi-component `_extract_meta`
+* [x] `:prop` binding em component calls
+* [x] `jx-text`/`jx-html` directives
+* [x] app de exemplo limpo com props canonicos
 
 ## Fase 1: endurecer o core
 
@@ -45,7 +47,7 @@ Meta:
 
 ### Runtime
 
-* [ ] melhorar extração de partials para algo menos fragil que busca por `id`
+* [ ] melhorar extracao de partials para algo menos fragil que busca por `id`
 * [ ] cache mais observavel e com estatisticas
 * [ ] separar melhor render de assets e render de markup
 * [ ] interface explicita de renderer backend
@@ -54,25 +56,24 @@ Meta:
 
 * [ ] enriquecer `AttrBag` com `set`, `setdefault`, `add_class`, `remove_class`
 * [ ] mapear melhor o contrato das diretivas customizadas
-* [ ] documentar o que e core directive vs custom directive
+* [ ] scoped slot `let:` bindings (parser ja captura, falta emit no compiler)
 
 ## Fase 2: parser e compiler mais fortes
 
 Meta:
 
-* sair do modo “estrutura forte, markup medio” para uma base bem mais confiavel
+* sair do modo "estrutura forte, markup medio" para uma base bem mais confiavel
 
 ### Parser
 
 * [ ] introduzir lexer/token stream
 * [ ] spans e mensagens de erro melhores
-* [ ] parser do markup menos baseado em transformacao de string
-* [ ] formatter com base em token stream
+* [ ] formatter baseado em token stream
 
 ### Compiler
 
 * [ ] introduzir uma IR intermediaria explicita
-* [ ] separar melhor built-ins (`If`, `For`, `Switch`) do resto do transform
+* [ ] separar melhor built-ins (`Show`, `For`, `Switch`) do resto do transform
 * [ ] surface clara para extensao futura do compiler
 
 ## Fase 3: linguagem
@@ -84,21 +85,18 @@ Meta:
 ### Sintaxe
 
 * [ ] congelar a forma canonica de expressoes em attrs
-* [ ] decidir oficialmente se `prop={{ expr }}` continua sendo a unica forma P0
-* [ ] avaliar `:prop="expr"` apenas como sugar opcional P1
-* [ ] formalizar modificadores de componente ou remover se continuarem sem semantica
+* [ ] avaliar `:prop="expr"` como sugar oficial
+* [ ] formalizar modificadores de componente ou remover
 
 ### Blocos e built-ins
 
 * [ ] revisar `signal` e `action` para semantica clara
-* [ ] avaliar `Fill`/slots nomeados com sintaxe mais explicita
 * [ ] revisar se `computed` deve continuar como bloco ou ganhar forma inline
 
 ### Imports e mounts
 
-* [ ] relative imports reais como `./Sibling.jinja`
+* [ ] relative imports reais como `./Sibling.pjx`
 * [ ] estrategia de conflito entre mounts com nomes iguais
-* [ ] `pjx check` com validacoes especificas para alias de mount
 
 ## Fase 4: runtime interativo nativo
 
@@ -111,12 +109,11 @@ Meta:
 * [ ] registry real de actions
 * [ ] dependency graph de signals
 * [ ] estrategia de update parcial por fragmento
-* [ ] contrato claro entre runtime server e browser bridge
 
 ### Browser bridge
 
-* [ ] decidir se existe bridge propria alem de `pjx-browser.js`
-* [ ] eventos do tipo `jx-on:*` com semantica oficial
+* [ ] decidir se existe bridge propria
+* [ ] eventos `jx-on:*` com semantica oficial
 * [ ] progressive enhancement consistente
 
 ## Fase 5: renderer backend
@@ -127,7 +124,7 @@ Meta:
 
 ### Interface
 
-* [ ] `RendererBackend`/`Protocol`
+* [ ] `RendererBackend` protocol
 * [ ] adapter Jinja2
 * [ ] adapter experimental MiniJinja
 
@@ -147,9 +144,8 @@ Meta:
 ### Check
 
 * [ ] mais regras semanticas
-* [ ] tabela Rich opcional para resumo
+* [ ] tabela Rich para resumo
 * [ ] pagina de documentacao dos codigos `[NNN]`
-* [ ] modo machine-readable mais forte
 
 ### Format
 
@@ -170,34 +166,26 @@ Meta:
 Meta:
 
 * reduzir ainda mais o boilerplate do projeto host
+
+Checklist:
+
 * [ ] helper de projeto novo
 * [ ] scaffold de `templates/components/layouts/pages`
 * [ ] presets de browser integrations
-* [ ] suporte melhor a apps montados em prefixo, tipo `/ui`
-* [ ] storybook-like local preview ou gallery interna
+* [ ] storybook-like local preview
 
 ## Fase 8: primitives e demo app
 
 Meta:
 
 * usar o demo como prova real do framework
-* [ ] Tabs
-* [ ] Dialog/Sheet
-* [ ] Combobox
-* [ ] Table mais rica com sorting/filtering server-first
-* [ ] primitives de navigation
+
+Checklist:
+
+* [x] Tabs, Dialog, Combobox, Table, Pagination, Tooltip, Popover
+* [x] Accordion, Breadcrumb, Dropdown, Avatar, Skeleton, Toggle, Slider
+* [ ] primitives de navigation mais ricos
 * [ ] exemplos de auth, dashboard e admin com mounts prefixados
-
-## Fase 9: docs
-
-Meta:
-
-* fazer a documentacao acompanhar o framework
-* [ ] documentar todos os codigos do `check`
-* [ ] cookbook com exemplos pequenos
-* [ ] docs de extensao de directives
-* [ ] docs de assets e Tailwind
-* [ ] docs de performance e troubleshooting
 
 ## Regras de Prioridade
 

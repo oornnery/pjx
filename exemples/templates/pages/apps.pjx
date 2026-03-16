@@ -1,0 +1,203 @@
+@bind from exemples.state import Counter, Todo
+
+@import "layouts/Layout.pjx"
+@from pjx.layout import Card, Grid, Stack, Row, Divider
+@from pjx.ui import Button, Badge, Stat
+@from pjx.forms import Input, Field
+@from pjx.nav import Table, TableHead, TableRow, TableCell
+
+@props {
+  count: int = 0,
+  todos: list = [],
+  todo_total: int = 0,
+  todo_done: int = 0,
+}
+
+<Layout title="Apps — PJX" active="apps">
+
+  <div class="showcase-shell">
+
+    <!-- Counter -->
+    <Card title="HTMX Counter">
+      <:header>
+        <strong>HTMX Counter</strong>
+        <Badge text="live" variant="ready" />
+      </:header>
+      <p class="text-sm text-muted-foreground mb-4">
+        Each button sends a <code>POST</code> to the server.
+        State lives in <code>Counter</code> (a Python class).
+        HTMX swaps only the <code>#counter-display</code> fragment.
+      </p>
+      <div id="counter-display" class="counter">
+        <button
+          class="btn-secondary"
+          @click.htmx="post:/actions/counter/dec"
+          @target="#counter-display"
+          @swap="outerHTML"
+        >−</button>
+        <strong>{{ count }}</strong>
+        <button
+          class="btn"
+          @click.htmx="post:/actions/counter/inc"
+          @target="#counter-display"
+          @swap="outerHTML"
+        >+</button>
+      </div>
+      <:footer>
+        <span class="text-sm text-muted-foreground">
+          State in <code>exemples/state.py :: Counter</code> — persists across requests.
+        </span>
+      </:footer>
+    </Card>
+
+    <!-- Todo App -->
+    <Card title="Todo App">
+      <:header>
+        <strong>Todo App</strong>
+        <Row gap="sm">
+          <Badge text="{{ todo_done }}/{{ todo_total }} done" variant="neutral" />
+        </Row>
+      </:header>
+
+      <form
+        hx-post="/actions/todo/add"
+        hx-target="#todo-list"
+        hx-swap="innerHTML"
+        class="flex gap-2"
+        onsubmit="this.reset()"
+      >
+        <input
+          class="input flex-1"
+          name="text"
+          placeholder="Add a new task…"
+          required
+          autocomplete="off"
+        />
+        <Button label="Add" variant="default" size="md" type="submit" />
+      </form>
+
+      <div id="todo-list" class="flex flex-col gap-1">
+        <For each="{{ todos }}" as="item">
+          <div class="flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-colors{{ ' opacity-60' if item.done else '' }}">
+            <button
+              class="btn-icon-ghost size-7 text-sm shrink-0"
+              hx-post="/actions/todo/toggle/{{ item.id }}"
+              hx-target="#todo-list"
+              hx-swap="innerHTML"
+              type="button"
+              title="Toggle"
+            >{{ '✓' if item.done else '○' }}</button>
+            <span class="{{ 'line-through text-muted-foreground' if item.done else 'flex-1' }}">
+              {{ item.text }}
+            </span>
+            <button
+              class="btn-icon-ghost size-7 text-muted-foreground ml-auto shrink-0"
+              hx-post="/actions/todo/delete/{{ item.id }}"
+              hx-target="#todo-list"
+              hx-swap="innerHTML"
+              type="button"
+              title="Delete"
+            >×</button>
+          </div>
+        </For>
+        <Show when="{{ not todos }}">
+          <p class="text-center text-muted-foreground text-sm py-6 m-0">
+            No tasks yet. Add one above!
+          </p>
+        </Show>
+      </div>
+
+      <:footer>
+        <span class="text-sm text-muted-foreground">
+          State in <code>exemples/state.py :: Todo</code> — persists across requests.
+        </span>
+      </:footer>
+    </Card>
+
+    <!-- Data Table -->
+    <Card title="Data Table">
+      <p class="text-sm text-muted-foreground mb-3">
+        Static user table. In a real app, use HTMX for pagination and sorting.
+      </p>
+      <Table>
+        <:head>
+          <TableHead>
+            <TableCell header="true">Name</TableCell>
+            <TableCell header="true">Email</TableCell>
+            <TableCell header="true">Status</TableCell>
+            <TableCell header="true">Role</TableCell>
+            <TableCell header="true">Joined</TableCell>
+          </TableHead>
+        </:head>
+        <TableRow>
+          <TableCell>Alice Martin</TableCell>
+          <TableCell>alice@example.com</TableCell>
+          <TableCell><Badge text="Active" variant="ready" /></TableCell>
+          <TableCell>Admin</TableCell>
+          <TableCell>Jan 2024</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>Bob Chen</TableCell>
+          <TableCell>bob@example.com</TableCell>
+          <TableCell><Badge text="Pending" variant="building" /></TableCell>
+          <TableCell>User</TableCell>
+          <TableCell>Mar 2024</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>Carol White</TableCell>
+          <TableCell>carol@example.com</TableCell>
+          <TableCell><Badge text="Active" variant="ready" /></TableCell>
+          <TableCell>Editor</TableCell>
+          <TableCell>Feb 2024</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>Dan Lopez</TableCell>
+          <TableCell>dan@example.com</TableCell>
+          <TableCell><Badge text="Inactive" variant="neutral" /></TableCell>
+          <TableCell>User</TableCell>
+          <TableCell>Jun 2023</TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell>Eva Brown</TableCell>
+          <TableCell>eva@example.com</TableCell>
+          <TableCell><Badge text="Active" variant="ready" /></TableCell>
+          <TableCell>User</TableCell>
+          <TableCell>Oct 2024</TableCell>
+        </TableRow>
+      </Table>
+    </Card>
+
+    <!-- Contact Form -->
+    <Card title="Contact Form">
+      <p class="text-sm text-muted-foreground mb-3">
+        HTMX form submission with server-side validation feedback.
+      </p>
+      <div id="contact-form-wrap">
+        <form
+          hx-post="/actions/contact/submit"
+          hx-target="#contact-form-wrap"
+          hx-swap="innerHTML"
+          class="grid gap-4 max-w-md"
+        >
+          <Input name="cf_name" label="Full name" placeholder="Your name" required="true" />
+          <Input name="cf_email" type="email" label="Email" placeholder="you@example.com" required="true" />
+          <div role="group" class="field">
+            <label class="label" for="cf_msg">Message</label>
+            <textarea
+              class="textarea"
+              id="cf_msg"
+              name="cf_msg"
+              placeholder="How can we help?"
+              rows="4"
+            ></textarea>
+          </div>
+          <div>
+            <Button label="Send message" variant="default" size="md" type="submit" />
+          </div>
+        </form>
+      </div>
+    </Card>
+
+  </div>
+
+</Layout>

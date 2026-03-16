@@ -1,0 +1,46 @@
+@bind from exemples.state import Counter
+
+@import "layouts/Layout.pjx"
+@from pjx.layout import Card
+@from pjx.ui import Badge
+
+@props { count: int = 0 }
+
+<Layout title="Counter — PJX" active="counter">
+
+  <Card title="HTMX Server Counter">
+    <:header>
+      <strong>HTMX Server Counter</strong>
+      <Badge variant="ready" text="live" />
+    </:header>
+
+    <p class="text-sm text-muted-foreground mb-4">
+      Each button sends a <code>POST</code> to the server.
+      The counter state lives in <code>Counter</code> (a Python class).
+      HTMX swaps only the <code>#counter-display</code> fragment — no full reload.
+    </p>
+
+    <div id="counter-display" class="counter">
+      <button
+        class="btn-secondary"
+        @click.htmx="post:/actions/counter/dec"
+        @target="#counter-display"
+        @swap="outerHTML"
+      >−</button>
+      <strong>{{ count }}</strong>
+      <button
+        class="btn"
+        @click.htmx="post:/actions/counter/inc"
+        @target="#counter-display"
+        @swap="outerHTML"
+      >+</button>
+    </div>
+
+    <:footer>
+      <span class="text-sm text-muted-foreground">
+        State lives in <code>exemples/state.py :: Counter</code> — persists across requests in dev.
+      </span>
+    </:footer>
+  </Card>
+
+</Layout>

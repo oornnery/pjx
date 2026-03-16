@@ -1,0 +1,191 @@
+@import "layouts/Layout.pjx"
+@from pjx.ui import Button, Badge, Alert, Stat, Tag
+@from pjx.layout import Card, Stack, Row
+@from pjx.nav import Accordion
+
+@props {
+  status: str = "ready",
+  items: list = [],
+  counter: int = 0,
+  snippet_props: str = "",
+  snippet_control: str = "",
+  snippet_slots: str = "",
+  snippet_alpine: str = "",
+  snippet_htmx: str = "",
+  snippet_multicomp: str = "",
+  snippet_bind: str = "",
+}
+
+<Layout title="PJX — Server-first Components" active="showcase">
+
+  <div class="showcase-shell">
+
+    <!-- Hero -->
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="rounded-xl border bg-card p-8 space-y-4">
+        <p class="text-xs font-semibold tracking-widest uppercase text-muted-foreground">Server-first components for Python</p>
+        <h2 class="text-3xl md:text-4xl font-bold tracking-tight leading-tight">Build reactive UIs<br />without leaving Python</h2>
+        <p class="text-muted-foreground leading-relaxed">
+          PJX compiles <code>.pjx</code> templates to Jinja2. Props, slots, HTMX and Alpine —
+          all declarative, all server-rendered. No JavaScript build step required.
+        </p>
+        <div class="flex flex-wrap gap-3 pt-2">
+          <a href="/counter" class="btn">Live counter demo</a>
+          <a href="/components" class="btn-outline">Component gallery</a>
+        </div>
+      </div>
+
+      <Card title="Pipeline">
+        <ul class="space-y-3">
+          <For each="{{ items }}" as="item">
+            <li class="space-y-1">
+              <div class="flex items-center gap-2">
+                <span class="flex items-center justify-center size-8 rounded-lg bg-muted text-foreground text-sm">⚙</span>
+                <strong class="text-sm">{{ item.name }}</strong>
+              </div>
+              <span class="text-sm text-muted-foreground">{{ item.desc }}</span>
+            </li>
+          </For>
+        </ul>
+        <:footer>
+          <Badge variant="{{ status }}" text="{{ status | title }}" />
+        </:footer>
+      </Card>
+    </div>
+
+    <!-- Features -->
+    <div class="grid md:grid-cols-3 gap-6">
+
+      <Card title="Props &amp; Types">
+        <p class="text-sm text-muted-foreground mb-3">
+          Declare typed props with defaults. PJX validates at render time — no silent failures.
+        </p>
+        <pre class="rounded-lg bg-muted p-4 text-sm overflow-x-auto"><code>{{ snippet_props | safe }}</code></pre>
+      </Card>
+
+      <Card title="Control Structures">
+        <p class="text-sm text-muted-foreground mb-3">
+          <code>&lt;Show&gt;</code>, <code>&lt;For&gt;</code> and <code>&lt;Switch&gt;</code>
+          compile to Jinja2 <code>if/for</code>. No custom runtime, pure templates.
+        </p>
+        <pre class="rounded-lg bg-muted p-4 text-sm overflow-x-auto"><code>{{ snippet_control | safe }}</code></pre>
+      </Card>
+
+      <Card title="Named Slots">
+        <p class="text-sm text-muted-foreground mb-3">
+          Declare <code>@slot footer?</code> and fill it with <code>&lt;:footer&gt;</code>.
+          Optional slots detected via <code>@has_slot()</code>.
+        </p>
+        <pre class="rounded-lg bg-muted p-4 text-sm overflow-x-auto"><code>{{ snippet_slots | safe }}</code></pre>
+      </Card>
+
+    </div>
+
+    <!-- Demos -->
+    <div class="showcase-demo-grid">
+
+      <Card>
+        <:header>
+          <div class="flex items-start justify-between gap-4 w-full">
+            <div class="flex items-center gap-2">
+              <span class="flex items-center justify-center size-8 rounded-lg bg-muted text-sm">🏔</span>
+              <strong>Alpine.js State</strong>
+            </div>
+            <Badge variant="draft" text="@state" />
+          </div>
+        </:header>
+        <p class="text-sm text-muted-foreground mb-3">
+          Declare client-side state with <code>@state</code>.
+          Serialised as JSON and passed to Alpine <code>x-data</code>.
+        </p>
+        <pre class="rounded-lg bg-muted p-4 text-sm overflow-x-auto"><code>{{ snippet_alpine | safe }}</code></pre>
+      </Card>
+
+      <Card>
+        <:header>
+          <div class="flex items-start justify-between gap-4 w-full">
+            <div class="flex items-center gap-2">
+              <span class="flex items-center justify-center size-8 rounded-lg bg-muted text-sm">⚡</span>
+              <strong>HTMX Actions</strong>
+            </div>
+            <Badge variant="building" text="@bind" />
+          </div>
+        </:header>
+        <p class="text-sm text-muted-foreground mb-3">
+          Bind a template to a Python class with <code>@bind</code>.
+          HTMX partial renders swap only the changed fragment.
+        </p>
+        <pre class="rounded-lg bg-muted p-4 text-sm overflow-x-auto"><code>{{ snippet_htmx | safe }}</code></pre>
+        <a href="/counter" class="btn-ghost text-sm mt-2 inline-flex">Open live demo →</a>
+      </Card>
+
+      <Card>
+        <:header>
+          <div class="flex items-start justify-between gap-4 w-full">
+            <div class="flex items-center gap-2">
+              <span class="flex items-center justify-center size-8 rounded-lg bg-muted text-sm">📦</span>
+              <strong>Multi-component Files</strong>
+            </div>
+            <Badge variant="neutral" text="@from import" />
+          </div>
+        </:header>
+        <p class="text-sm text-muted-foreground mb-3">
+          Define multiple components in one <code>.pjx</code> file.
+          Import with <code>@from module import Stat, Tag</code>.
+        </p>
+        <div class="flex gap-4 flex-wrap mb-3">
+          <Stat label="Templates" value="6" />
+          <Stat label="Components" value="14" />
+          <Stat label="Routes" value="3" />
+        </div>
+        <div class="flex gap-2 flex-wrap">
+          <Tag label="props" />
+          <Tag label="slots" />
+          <Tag label="htmx" />
+          <Tag label="alpine" />
+        </div>
+      </Card>
+
+      <Card>
+        <:header>
+          <div class="flex items-start justify-between gap-4 w-full">
+            <div class="flex items-center gap-2">
+              <span class="flex items-center justify-center size-8 rounded-lg bg-muted text-sm">🔗</span>
+              <strong>Server State with @bind</strong>
+            </div>
+            <Badge variant="ready" text="new" />
+          </div>
+        </:header>
+        <p class="text-sm text-muted-foreground mb-3">
+          Annotate a template with <code>@bind from module import Class</code>
+          to document its Python backing. The class holds server-side state.
+        </p>
+        <pre class="rounded-lg bg-muted p-4 text-sm overflow-x-auto"><code>{{ snippet_bind | safe }}</code></pre>
+      </Card>
+
+    </div>
+
+    <!-- FAQ -->
+    <div>
+      <Accordion title="What does PJX compile to?" description="The compilation pipeline, step by step">
+        PJX parses <code>.pjx</code> source into a typed AST, then compiles it to a plain
+        Jinja2 template string. The runtime uses the standard Jinja2 engine — no custom
+        interpreter, no runtime overhead beyond a single parse step per file.
+      </Accordion>
+
+      <Accordion title="Do I need JavaScript?" description="HTMX and Alpine are optional">
+        No. HTMX and Alpine are progressive enhancements. If you don't use
+        <code>@click.htmx</code> or <code>@state</code>, no JS is needed.
+        PJX generates plain HTML by default.
+      </Accordion>
+
+      <Accordion title="How are HTMX partials handled?" description="Fragment extraction">
+        When an action route declares a <code>target</code>, PJX renders the full template
+        and extracts the matching <code>id</code> fragment before responding — no separate
+        partial template needed.
+      </Accordion>
+    </div>
+
+  </div>
+
+</Layout>

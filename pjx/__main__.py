@@ -1,9 +1,1 @@
-from __future__ import annotations
-
-import sys
-
-from .cli import main
-
-
-if __name__ == "__main__":
-    raise SystemExit(main(sys.argv[1:]))
+"""PJX has no CLI entry point. Run the dev server directly with uvicorn."""

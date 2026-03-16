@@ -19,3 +19,5 @@ htmlcov/
 .agents/
 .idea.*
 .vscode/
+.verdent/
+.claude/

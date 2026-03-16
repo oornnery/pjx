@@ -7,7 +7,7 @@ from inspect import Parameter, Signature, isawaitable, signature
 from pathlib import Path
 from typing import Any, TypeAlias, TypedDict, cast
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.routing import Mount
@@ -43,10 +43,6 @@ class _PendingDirective:
     fn: Callable[..., Any]
 
 
-def is_htmx_request(request: Request | None) -> bool:
-    return request is not None and request.headers.get("HX-Request") == "true"
-
-
 PACKAGE_ROOT = Path(__file__).resolve().parent
 PACKAGE_STATIC_ROOT = PACKAGE_ROOT / "static"
 DEFAULT_FRAMEWORK_STATIC_URL = "/_pjx"
@@ -60,9 +56,123 @@ class TemplateMountMapping(TypedDict, total=False):
 TemplateMountInput: TypeAlias = str | Path | TemplateMount | TemplateMountMapping
 
 
-class PJXRouter:
-    def __init__(self, *, prefix: str = "") -> None:
+def is_htmx(request: Request | None) -> bool:
+    return request is not None and request.headers.get("HX-Request") == "true"
+
+
+is_htmx_request = is_htmx
+
+
+class Template:
+    __slots__ = ("_catalog", "_template", "_request", "_context_processors")
+
+    def __init__(
+        self,
+        catalog: Catalog,
+        template: str,
+        request: Request,
+        context_processors: list[Callable[..., Any]],
+    ) -> None:
+        self._catalog = catalog
+        self._template = template
+        self._request = request
+        self._context_processors = context_processors
+
+    async def __call__(self, **context: Any) -> HTMLResponse:
+        merged = await _run_context_processors(self._context_processors, self._request)
+        merged.update(context)
+        partial = is_htmx(self._request)
+        html = self._catalog.render_string(
+            template=self._template,
+            context=merged,
+            request=self._request,
+            partial=partial,
+            target=None,
+        )
+        return HTMLResponse(content=html)
+
+
+class Page:
+    __slots__ = ("_catalog", "_template", "_layout", "_request", "_context_processors")
+
+    def __init__(
+        self,
+        catalog: Catalog,
+        template: str,
+        layout: str | None,
+        request: Request,
+        context_processors: list[Callable[..., Any]],
+    ) -> None:
+        self._catalog = catalog
+        self._template = template
+        self._layout = layout
+        self._request = request
+        self._context_processors = context_processors
+
+    async def __call__(self, **context: Any) -> HTMLResponse:
+        merged = await _run_context_processors(self._context_processors, self._request)
+        merged.update(context)
+        if self._layout and not is_htmx(self._request):
+            content_html = self._catalog.render_string(
+                template=self._template,
+                context=merged,
+                request=self._request,
+                partial=False,
+                target=None,
+            )
+            merged["__pjx_content"] = content_html
+            html = self._catalog.render_string(
+                template=self._layout,
+                context=merged,
+                request=self._request,
+                partial=False,
+                target=None,
+            )
+        else:
+            html = self._catalog.render_string(
+                template=self._template,
+                context=merged,
+                request=self._request,
+                partial=is_htmx(self._request),
+                target=None,
+            )
+        return HTMLResponse(content=html)
+
+
+def render(
+    template: str,
+    *,
+    layout: str | None = None,
+) -> Any:
+    async def _dependency(request: Request) -> Page | Template:
+        pjx_instance: Pjx = request.app.state.pjx
+        catalog: Catalog = request.app.state.pjx_catalog
+        processors = list(pjx_instance._context_processors)
+        if layout:
+            return Page(catalog, template, layout, request, processors)
+        return Template(catalog, template, request, processors)
+
+    return Depends(_dependency)
+
+
+async def _run_context_processors(
+    processors: list[Callable[..., Any]],
+    request: Request,
+) -> dict[str, Any]:
+    merged: dict[str, Any] = {"request": request}
+    for processor in processors:
+        result = processor(request)
+        if isawaitable(result):
+            result = await result
+        if isinstance(result, Mapping):
+            merged.update(result)
+    return merged
+
+
+class PjxRouter:
+    def __init__(self, *, prefix: str = "", tags: list[str] | None = None) -> None:
         self.prefix = _normalize_prefix(prefix)
+        self.tags = tags
         self._pending_routes: list[_PendingRoute] = []
         self._pending_directives: list[_PendingDirective] = []
 
@@ -126,13 +236,13 @@ class PJXRouter:
 
         return decorator
 
-    def include(self, *routers: PJXRouter) -> PJXRouter:
+    def include(self, *routers: PjxRouter) -> PjxRouter:
         for router in routers:
             self._pending_routes.extend(router.routes)
             self._pending_directives.extend(router.directives)
         return self
 
-    def include_router(self, *routers: PJXRouter) -> PJXRouter:
+    def include_router(self, *routers: PjxRouter) -> PjxRouter:
         return self.include(*routers)
 
     def _queue_route(
@@ -164,77 +274,79 @@ class PJXRouter:
         return decorator
 
 
-class PJX:
+class Pjx:
     def __init__(
         self,
         *,
-        root: str | Path,
-        templates: TemplateMountInput | Sequence[TemplateMountInput] = "templates",
-        routers: Sequence[PJXRouter] | None = None,
+        templates_dir: str | Path = "templates",
+        components_dir: str | Path | None = "components",
+        routers: Sequence[PjxRouter] | None = None,
         browser: Sequence[str] | None = None,
         css: str | None = None,
         renderer: str = "jinja2",
         aliases: Mapping[str, str] | None = None,
         auto_reload: bool = True,
+        cache: bool = True,
+        eager_compile: bool = False,
+        static_dir: str | Path | None = "static",
         static_url: str = "/static",
-        static_dir: str | Path = "static",
         framework_static_url: str = DEFAULT_FRAMEWORK_STATIC_URL,
     ) -> None:
-        self.root = Path(root)
-        template_mounts = _resolve_template_mounts(self.root, templates)
-        self.templates_root = template_mounts[0].path
-        resolved_aliases = {"@": str(self.templates_root)}
-        if aliases:
-            resolved_aliases.update(aliases)
+        self.templates_dir = Path(templates_dir)
+        self.components_dir = Path(components_dir) if components_dir else None
         self.browser = tuple(browser or ())
         self.css = css
         self.renderer = renderer
+        self.auto_reload = auto_reload
+        self.cache = cache
+        self.eager_compile = eager_compile
         self.static_url = static_url.rstrip("/") or "/static"
         self.framework_static_url = (
             framework_static_url.rstrip("/") or DEFAULT_FRAMEWORK_STATIC_URL
         )
-        self.static_dir = (
-            self.root / static_dir
-            if not Path(static_dir).is_absolute()
-            else Path(static_dir)
-        )
+        self.static_dir = Path(static_dir) if static_dir else None
+
+        resolved_aliases = {"@": str(self.templates_dir)}
+        if aliases:
+            resolved_aliases.update(aliases)
+
         self.catalog = Catalog(
-            root=str(self.templates_root),
+            root=str(self.templates_dir),
             aliases=dict(resolved_aliases),
             auto_reload=auto_reload,
         )
-        if template_mounts[0].prefix is not None:
-            self.catalog.add_template_root(
-                template_mounts[0].path,
-                prefix=template_mounts[0].prefix,
-            )
-        for template_mount in template_mounts[1:]:
-            self.catalog.add_template_root(
-                template_mount.path,
-                prefix=template_mount.prefix,
-            )
+
+        builtin_components = PACKAGE_ROOT / "components"
+        if builtin_components.exists():
+            self.catalog.add_template_root(builtin_components)
+
         self._app: FastAPI | None = None
         self._pending_routes: list[_PendingRoute] = []
         self._included_routers: set[int] = set()
+        self._context_processors: list[Callable[..., Any]] = []
+
         self._configure_integrations()
+
         if routers:
-            self.include(*routers)
+            for router in routers:
+                self.include_router(router)
 
-    def app(self, *args: Any, **kwargs: Any) -> FastAPI:
-        if self._app is not None:
-            return self._app
-
-        app = FastAPI(*args, **kwargs)
+    def init_app(self, app: FastAPI) -> None:
         app.state.pjx = self
         app.state.pjx_catalog = self.catalog
+        self._app = app
+
         self._mount_static(app)
         self._mount_framework_static(app)
         self._register_pending_routes(app)
-        self._app = app
-        return app
 
-    def fastapi(self, *args: Any, **kwargs: Any) -> FastAPI:
-        return self.app(*args, **kwargs)
+        if self.eager_compile:
+            for component_path in self.catalog.list_components():
+                self.catalog.runtime.get_component_instance(component_path)
+
+    def context_processor(self, fn: Callable[..., Any]) -> Callable[..., Any]:
+        self._context_processors.append(fn)
+        return fn
 
     def page(
         self,
@@ -289,7 +401,7 @@ class PJX:
 
         return decorator
 
-    def include(self, *routers: PJXRouter) -> PJX:
+    def include_router(self, *routers: PjxRouter) -> Pjx:
         for router in routers:
             router_id = id(router)
             if router_id in self._included_routers:
@@ -304,32 +416,27 @@ class PJX:
             for route in router.routes:
                 self._pending_routes.append(route)
                 if self._app is not None:
-                    _register_route(self._app, self.catalog, route)
+                    _register_route(
+                        self._app, self.catalog, self._context_processors, route
+                    )
 
         return self
 
-    def include_router(self, *routers: PJXRouter) -> PJX:
-        return self.include(*routers)
+    def include(self, *routers: PjxRouter) -> Pjx:
+        return self.include_router(*routers)
 
-    def add_templates(self, *templates: TemplateMountInput) -> PJX:
+    def add_templates(self, *templates: TemplateMountInput) -> Pjx:
         if not templates:
             return self
-        for template_mount in _resolve_template_mounts(self.root, templates):
+        root = (
+            self.templates_dir.parent if self.templates_dir.is_absolute() else Path(".")
+        )
+        for template_mount in _resolve_template_mounts(root, templates):
             self.catalog.add_template_root(
                 template_mount.path,
                 prefix=template_mount.prefix,
             )
         return self
-
-    def tailwind_content_globs(self) -> tuple[str, ...]:
-        template_globs = {
-            str(mount.path / "**/*.jinja") for mount in self.catalog.template_mounts
-        }
-        return (
-            str(self.root / "**/*.pjx"),
-            *sorted(template_globs),
-            str(self.root / "**/*.py"),
-        )
 
     def integrations(self) -> dict[str, Any]:
         return {
@@ -374,6 +481,10 @@ class PJX:
                     kind="js", path=f"{self.framework_static_url}/js/pjx-browser.js"
                 )
             )
+        if self.css in ("pjx", "default"):
+            assets.append(
+                AssetImport(kind="css", path=f"{self.framework_static_url}/css/pjx.css")
+            )
         return tuple(assets)
 
     def _queue_route(
@@ -398,17 +509,23 @@ class PJX:
             )
             self._pending_routes.append(route)
             if self._app is not None:
-                _register_route(self._app, self.catalog, route)
+                _register_route(
+                    self._app, self.catalog, self._context_processors, route
+                )
             return fn
 
         return decorator
 
     def _register_pending_routes(self, app: FastAPI) -> None:
         for route in self._pending_routes:
-            _register_route(app, self.catalog, route)
+            _register_route(app, self.catalog, self._context_processors, route)
 
     def _mount_static(self, app: FastAPI) -> None:
-        if self.static_dir.exists() and not _has_mount(app, self.static_url):
+        if (
+            self.static_dir
+            and self.static_dir.exists()
+            and not _has_mount(app, self.static_url)
+        ):
             app.mount(
                 self.static_url, StaticFiles(directory=self.static_dir), name="static"
             )
@@ -424,12 +541,23 @@ class PJX:
             )
 
 
-def _register_route(app: FastAPI, catalog: Catalog, route: _PendingRoute) -> None:
+PJX = Pjx
+PJXRouter = PjxRouter
+PJXDeclarative = PjxRouter
+
+
+def _register_route(
+    app: FastAPI,
+    catalog: Catalog,
+    context_processors: list[Callable[..., Any]],
+    route: _PendingRoute,
+) -> None:
     endpoint = _make_html_endpoint(
         catalog,
         route.endpoint,
         route.template,
         route.target,
+        context_processors,
     )
     app.api_route(
         route.path,
@@ -445,6 +573,7 @@ def _make_html_endpoint(
     fn: Callable[..., Any],
     default_template: str,
     default_target: str | None,
+    context_processors: list[Callable[..., Any]],
 ) -> Callable[..., Any]:
     original_signature = signature(fn)
     route_signature = _ensure_request_signature(original_signature)
@@ -467,13 +596,17 @@ def _make_html_endpoint(
             default_template=default_template,
             default_target=default_target,
         )
-        partial = bool(render_result.target) and is_htmx_request(request)
+
+        ctx = await _run_context_processors(context_processors, request)
+        ctx.update(render_result.context)
+
+        partial = bool(render_result.target) and is_htmx(request)
         template_name = render_result.template
         if template_name is None:
             raise RuntimeError("PJX route resolution produced no template name.")
         html = catalog.render_string(
             template=template_name,
-            context=dict(render_result.context),
+            context=ctx,
             request=request,
             partial=partial,
             target=render_result.target if partial else None,
@@ -629,6 +762,3 @@ def _coerce_template_mount_inputs(
     if isinstance(templates, Mapping):
         return [cast(TemplateMountMapping, templates)]
     return list(templates)
-
-
-PJXDeclarative = PJXRouter

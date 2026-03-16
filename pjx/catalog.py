@@ -95,16 +95,17 @@ class Catalog:
     def list_components(self) -> list[str]:
         components: dict[str, Path] = {}
         for mount in self._template_mounts:
-            for path in mount.path.rglob("*.jinja"):
-                if not path.is_file():
-                    continue
-                relative_path = str(path.relative_to(mount.path))
-                normalized_prefix = _normalize_template_prefix(mount.prefix)
-                if normalized_prefix is None:
-                    import_path = relative_path
-                else:
-                    import_path = f"@{normalized_prefix}/{relative_path}"
-                components.setdefault(import_path, path)
+            for pattern in ("*.pjx",):
+                for path in mount.path.rglob(pattern):
+                    if not path.is_file():
+                        continue
+                    relative_path = str(path.relative_to(mount.path))
+                    normalized_prefix = _normalize_template_prefix(mount.prefix)
+                    if normalized_prefix is None:
+                        import_path = relative_path
+                    else:
+                        import_path = f"@{normalized_prefix}/{relative_path}"
+                    components.setdefault(import_path, path)
         return sorted(components)
 
     def import_path_for_file(self, path: str | Path) -> str:
@@ -208,7 +209,12 @@ class Catalog:
                 element.attrs[key.split(":", 1)[1]] = value
                 element.attrs.pop(key, None)
                 continue
-            if key in {"jx-text", "jx-html"}:
+            if key == "jx-text":
+                element.text_content = str(value)
+                element.attrs.pop(key, None)
+                continue
+            if key == "jx-html":
+                element.html_content = str(value)
                 element.attrs.pop(key, None)
                 continue
             if key == "jx-class":

@@ -2,226 +2,165 @@
 
 ## Visao Geral
 
-A linguagem atual do PJX ainda usa extensao `.jinja`, mas ja tem uma camada de
-parser e compiler propria.
+A linguagem do PJX usa extensao `.pjx` e sintaxe `@directive` para diretivas
+do framework.
 
-Estrutura canônica:
+Estrutura canonica:
 
-```jinja
-{% import css "/static/css/components/ui/button.css" %}
-{% import "layouts/AppLayout.jinja" as AppLayout %}
-{% import "components/ui/Button.jinja" as Button %}
+```text
+@from pjx.ui import Button, Badge
+@import "layouts/Layout.pjx"
 
-{% component ExamplePage %}
-  {% props title: str, count: int = 0 %}
+@props { title: str = "Home", count: int = 0 }
 
-  <AppLayout page_title="Example">
-    <Button>{{ title }}</Button>
-  </AppLayout>
-{% endcomponent %}
+<Layout title="{{ title }}">
+  <Button label="{{ title }}" />
+</Layout>
 ```
 
 ## Ordem do Arquivo
 
-O formato esperado hoje e:
+O formato esperado e:
 
 ```text
-1. imports
-2. props aliases opcionais com {% set ... = {...} %}
-3. um unico {% component ... %} ... {% endcomponent %}
-4. dentro do componente:
-   - directives do preamble
-   - corpo do markup
+1. imports (@from, @import)
+2. @bind (opcional)
+3. @props
+4. @slot declarations
+5. @state (opcional)
+6. @let (opcional)
+7. body markup
+```
+
+Em modo multi-component:
+
+```text
+1. imports (@from, @import)
+2. @component Name {
+     @props { ... }
+     @slot name?
+     body
+   }
+3. @component Name2 { ... }
 ```
 
 ## Imports
 
 Tipos suportados:
 
-```jinja
-{% import "components/ui/Button.jinja" as Button %}
-{% import css "/static/css/components/ui/button.css" %}
-{% import js "/static/js/example.js" %}
+```text
+@from pjx.ui import Button, Badge, Alert
+@from pjx.layout import Card
+@import "layouts/Layout.pjx"
 ```
 
 Regras:
 
-* componentes precisam de alias
+* `@from module import Name` importa componentes de um modulo PJX
+* `@import "path"` importa um template inteiro
 * componentes usados no markup precisam estar importados
-* css e js viram assets do componente
-
-## Template Mounts e Prefixos
-
-Quando voce registra mounts extras:
-
-```python
-pjx = PJX(
-    root=BASE_DIR,
-    templates=[
-        "templates",
-        {"prefix": "admin", "path": "admin_templates"},
-    ],
-)
-```
-
-voce pode importar assim:
-
-```jinja
-{% import "@admin/components/ui/Button.jinja" as AdminButton %}
-{% import "@admin/layouts/AdminLayout.jinja" as AdminLayout %}
-```
-
-Convencao:
-
-* mount principal: sem prefixo, como `components/...`
-* mount extra: `@prefix/...`
-
-## Component
-
-O componente e definido por um unico bloco:
-
-```jinja
-{% component Button %}
-  ...
-{% endcomponent %}
-```
-
-Hoje o parser aceita modificadores depois do nome:
-
-```jinja
-{% component Button async experimental %}
-```
-
-Mas eles ainda sao so metadado do componente compilado; nao existe semantica
-publica forte para eles ainda.
 
 ## Props
 
 Inline:
 
-```jinja
-{% props title: str, count: int = 0 %}
-```
-
-Multilinha:
-
-```jinja
-{% props
-  title: str,
-  count: int = 0,
-  active: bool = False
-%}
-```
-
-Alias de props:
-
-```jinja
-{% set ButtonProps = {
-  "label": label: str,
-  "variant": variant: str = "primary"
-} %}
-
-{% component Button %}
-  {% props ButtonProps %}
-  ...
-{% endcomponent %}
+```text
+@props { title: str, count: int = 0 }
 ```
 
 Regras atuais:
 
-* so pode existir um bloco `props` por componente
+* so pode existir um bloco `@props` por componente/pagina
 * type hints basicos sao validados no runtime
-* props ausentes sem default geram erro
-
-## Inject e Provide
-
-```jinja
-{% inject theme %}
-{% provide theme %}
-```
-
-Uso esperado:
-
-* layout ou componente ancestral seta um valor provido
-* componentes filhos pedem `inject`
-
-Hoje isso funciona como contexto de render do servidor, nao como estado
-reativo no cliente.
-
-## Computed
-
-```jinja
-{% computed label %}
-{{ title }} - {{ count }}
-{% endcomputed %}
-```
-
-Isso vira um `set` no preamble do Jinja compilado.
+* props ausentes sem default geram `PropValidationError`
 
 ## Slots
 
 Declaracao:
 
-```jinja
-{% slot header %}{% endslot %}
-{% slot footer(actions) %}{% endslot %}
+```text
+@slot default
+@slot footer?
 ```
 
-Preenchimento no chamador:
+O `?` indica slot opcional. Preenchimento no chamador:
 
-```jinja
-<Card>
-  <Fill slot="header">
-    <h2>Header</h2>
-  </Fill>
-
-  Conteudo principal
+```text
+<Card title="Example">
+  Conteudo principal (slot default)
+  <:footer>
+    <Button label="Action" />
+  </:footer>
 </Card>
 ```
 
-O corpo default entre as tags continua sendo `content`.
+Teste de slot preenchido:
 
-## Signal e Action
-
-Sintaxe atual:
-
-```jinja
-{% signal count = signal(initial_count) %}
-
-{% action increment %}
-count = count + 1
-{% endaction %}
+```text
+<Show when="{{ @has_slot('footer') }}">
+  <div class="card-footer">
+    <slot name="footer" />
+  </div>
+</Show>
 ```
 
-Estado atual:
+## State
 
-* `signal` hoje vira principalmente preambulo compilado
-* `action` e reconhecido e registrado como metadado do componente
-* o runtime nativo completo para signals/actions ainda nao esta fechado
+```text
+@state { count: 0, items: [] }
+```
 
-Hoje o caminho funcional de interacao continua sendo:
+Serializado como JSON e passado para Alpine `x-data`.
 
-* HTMX para round-trip incremental
-* Alpine para estado local pequeno
+## Bind
+
+```text
+@bind from exemples.state import Counter
+```
+
+Associa o template a uma classe Python que mantem estado no servidor.
+
+## Let
+
+```text
+@let greeting = "Hello, " + name
+```
+
+Define uma variavel computada no preamble Jinja.
+
+## Component Definition
+
+Em modo multi-component:
+
+```text
+@component Button {
+  @props { label: str = "", variant: str = "default" }
+  @slot default
+  <button class="btn btn-{{ variant }}">
+    <Show when="{{ label }}">{{ label }}</Show>
+    <slot />
+  </button>
+}
+```
 
 ## Built-ins de Markup
 
-### If
+### Show
 
-```jinja
-<If when={{ count > 0 }}>
+```text
+<Show when="{{ count > 0 }}">
   <p>Tem itens</p>
   <Else>
     <p>Vazio</p>
   </Else>
-</If>
+</Show>
 ```
 
 ### For
 
-```jinja
-<For each={{ items }} as="item" index="index">
-  <li>{{ index }} - {{ item }}</li>
+```text
+<For each="{{ items }}" as="item">
+  <li>{{ item.name }}</li>
   <Empty>
     <li>Sem itens</li>
   </Empty>
@@ -230,8 +169,8 @@ Hoje o caminho funcional de interacao continua sendo:
 
 ### Switch
 
-```jinja
-<Switch value={{ status }}>
+```text
+<Switch value="{{ status }}">
   <Case when="ready">Pronto</Case>
   <Case when="building">Processando</Case>
   <Default>Desconhecido</Default>
@@ -240,19 +179,34 @@ Hoje o caminho funcional de interacao continua sendo:
 
 ## Component Calls
 
-Componentes importados com alias TitleCase podem ser usados como tags:
+Componentes importados com TitleCase podem ser usados como tags:
 
-```jinja
-<Button variant="primary">Salvar</Button>
-<StatusBadge status="ready" />
+```text
+<Button variant="primary" label="Salvar" />
+<Badge variant="ready" text="live" />
 ```
 
 O compiler transforma isso em chamadas para `__pjx_render_component(...)`.
 
+## Named Slots
+
+Slots nomeados usam a sintaxe `<:name>`:
+
+```text
+<Card title="Example">
+  <:header>
+    <strong>Custom header</strong>
+  </:header>
+  Body content
+  <:footer>
+    <Button label="Action" />
+  </:footer>
+</Card>
+```
+
 ## Attrs e Diretivas Core
 
-Attrs HTML normais passam direto. Alem disso, o Catalog trata algumas diretivas
-core:
+Attrs HTML normais passam direto. Alem disso, o Catalog trata diretivas core:
 
 * `jx-bind:name`
 * `jx-class`
@@ -261,35 +215,36 @@ core:
 * `jx-html`
 * `jx-on:event`
 
-Exemplo:
+HTMX e Alpine attrs no template:
 
-```jinja
-<div
-  jx-bind:data-id={{ user_id }}
-  jx-class={{ {"is-active": active} }}
-  jx-show={{ visible }}
-/>
+```text
+<button
+  @click.htmx="post:/actions/counter/inc"
+  @target="#counter-display"
+  @swap="outerHTML"
+>+</button>
 ```
 
-## Escolha Canonica de Expressao
+## Expressoes
 
-Hoje a forma principal para expressoes em attrs do PJX continua:
+A forma principal para expressoes em attrs:
 
-```jinja
-prop={{ expr }}
+```text
+prop="{{ expr }}"
 ```
 
-Isso vale para built-ins e componentes.
+Binding via `:prop`:
 
-O projeto ainda nao promove `:prop="expr"` como sintaxe de primeira classe.
+```text
+<Badge :variant="status" text="live" />
+```
 
 ## Formatacao Canonica
 
 `pjx format` reorganiza:
 
 * imports
-* alias de props
-* directives do preamble
-* espacos em branco do componente
+* @props, @slot, @state, @let
+* corpo do componente
 
 Ele tenta preservar o corpo o maximo possivel sem inventar layout novo.
