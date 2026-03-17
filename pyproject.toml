@@ -23,7 +23,9 @@ dependencies = [
 pjx = "pjx.cli:main"
 
 [project.optional-dependencies]
-minijinja = []
+minijinja = [
+    "minijinja>=2.18.0",
+]
 tailwind = []
 
 [dependency-groups]

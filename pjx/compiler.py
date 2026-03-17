@@ -66,18 +66,27 @@ _RE_ALPINE_EVENT = re.compile(r"^@([\w:.-]+)\.alpine$")
 # ── Public API ─────────────────────────────────────────────────────────────────
 
 
-def compile_pjx(ast: PjxFile, filename: str = "<string>") -> str:
+def compile_pjx(
+    ast: PjxFile, filename: str = "<string>", *, bundle: bool = False
+) -> str:
     """Compile a *PjxFile* AST to a Jinja2 template string."""
-    return Compiler(ast, filename).emit()
+    return Compiler(ast, filename, bundle=bundle).emit()
 
 
 # ── Compiler ──────────────────────────────────────────────────────────────────
 
 
 class Compiler:
-    def __init__(self, ast: PjxFile, filename: str = "<string>") -> None:
+    def __init__(
+        self,
+        ast: PjxFile,
+        filename: str = "<string>",
+        *,
+        bundle: bool = False,
+    ) -> None:
         self.ast = ast
         self.filename = filename
+        self.bundle = bundle
         self._local_components: set[str] = set()
         # name → (template_path, component_name_override | None)
         self._imported_components: dict[str, tuple[str, str | None]] = {}
@@ -95,6 +104,12 @@ class Compiler:
 
         if ast.is_multi_component:
             self._local_components = {c.name for c in ast.components}
+
+        # In bundle mode, treat all imported components as local macros
+        if bundle:
+            for comp_name in self._imported_components:
+                self._local_components.add(comp_name)
+            self._imported_components = {}
 
     # ── Top-level emit ────────────────────────────────────────────────────────
 

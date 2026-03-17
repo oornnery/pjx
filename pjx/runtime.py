@@ -27,6 +27,9 @@ from .compiler import compile_pjx
 from .exceptions import PropValidationError
 from .parser import parse
 
+# Lazy import to avoid circular dependency
+_bundle_resolver = None
+
 
 # ── Type-checking helpers ──────────────────────────────────────────────────────
 
@@ -97,6 +100,7 @@ class Runtime:
         globals_map["pjx_assets"] = self._pjx_assets
         self._template_cache: dict[str, ComponentInstance] = {}
         self._expr_cache: dict[str, Any] = {}
+        self._bundle_resolver: Any = None
 
     def _pjx_assets(self) -> Markup:
         tags: list[str] = []
@@ -123,7 +127,17 @@ class Runtime:
 
         source = source_path.read_text(encoding="utf-8")
         ast = parse(source, filename=str(source_path))
-        jinja_source = compile_pjx(ast, filename=str(source_path))
+
+        # Bundle mode: inline all imported component macros for page templates
+        if (
+            getattr(self.catalog, "bundle", False)
+            and not ast.is_multi_component
+            and ast.imports
+        ):
+            jinja_source = self._compile_bundled(ast, str(source_path))
+        else:
+            jinja_source = compile_pjx(ast, filename=str(source_path))
+
         template = self.environment.from_string(jinja_source)
         meta = _extract_meta(ast, str(source_path))
         instance = ComponentInstance(
@@ -133,6 +147,15 @@ class Runtime:
         )
         self._template_cache[cache_key] = instance
         return instance
+
+    def _compile_bundled(self, ast: PjxFile, filename: str) -> str:
+        """Compile a page template with all imported macros inlined."""
+        from .compile import _ImportResolver, _compile_bundled
+
+        if self._bundle_resolver is None:
+            self._bundle_resolver = _ImportResolver(self.catalog)
+        jinja_source, _ = _compile_bundled(ast, filename, self._bundle_resolver)
+        return jinja_source
 
     def evaluate_expr(self, expr: str, context: dict[str, Any]) -> Any:
         compiled = self._expr_cache.get(expr)
