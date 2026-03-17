@@ -7,20 +7,15 @@ rendering while maintaining full compatibility with compiled PJX output.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, field
-from pathlib import Path, PurePosixPath
-from typing import Any, Literal, Optional, Union, get_args, get_origin
+from typing import Any
 
 from markupsafe import Markup
 
-from .ast import ImportDirective, PjxFile
 from .compiler import compile_pjx
 from .exceptions import PropValidationError
 from .parser import parse
 from .runtime import (
     ComponentInstance,
-    ComponentMeta,
-    _PropSpec,
     _extract_meta,
     _event_url,
     _matches_type,
@@ -132,8 +127,14 @@ class MiniJinjaRuntime:
         self._inject_props(instance, ctx)
 
         # Set up __pjx_render_component as a function in the context
-        def render_component(template_path: str, props: dict, slots: dict, component_name: str = "") -> str:
-            return str(self._render_component(template_path, props, slots, component_name, parent_ctx=ctx))
+        def render_component(
+            template_path: str, props: dict, slots: dict, component_name: str = ""
+        ) -> str:
+            return str(
+                self._render_component(
+                    template_path, props, slots, component_name, parent_ctx=ctx
+                )
+            )
 
         ctx["__pjx_render_component"] = render_component
 
@@ -158,7 +159,9 @@ class MiniJinjaRuntime:
                     ctx[spec.name] = result
                 except Exception:
                     # Fallback: use Python eval for simple expressions
-                    ctx[spec.name] = eval(spec.default_expr, {"__builtins__": {}}, SAFE_TYPE_GLOBALS)  # noqa: S307
+                    ctx[spec.name] = eval(
+                        spec.default_expr, {"__builtins__": {}}, SAFE_TYPE_GLOBALS
+                    )  # noqa: S307
             else:
                 raise PropValidationError(
                     f"{instance.component.component_name}: "
@@ -191,9 +194,7 @@ class MiniJinjaRuntime:
             # For multi-component files, we render the full template and
             # call the macro via Jinja2 expression wrapping
             macro_source = self._compiled_sources.get(instance.template, "")
-            call_args = ", ".join(
-                f"{k}={_jinja_repr(v)}" for k, v in props.items()
-            )
+            call_args = ", ".join(f"{k}={_jinja_repr(v)}" for k, v in props.items())
             for sn, sv in slots.items():
                 call_args += f", __slot_{sn}={_jinja_repr(sv)}"
             call_template = f"{macro_source}\n{{{{ {macro_name}({call_args}) }}}}"

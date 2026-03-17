@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 
 from .compiler import compile_pjx
@@ -62,6 +61,7 @@ def run_bench(
     resolver = None
     if bundle:
         from .compile import _ImportResolver
+
         resolver = _ImportResolver(project.catalog)
 
     # Collect templates
@@ -89,6 +89,7 @@ def run_bench(
         is_bundled = False
         if bundle and not ast.is_multi_component and ast.imports:
             from .compile import _compile_bundled
+
             jinja_source, _ = _compile_bundled(ast, source_path, resolver)
             is_bundled = True
         else:
@@ -200,14 +201,16 @@ def render_bench_report(report: BenchReport) -> str:
         )
     elif report.overall_speedup > 0:
         lines.append(
-            f"Jinja2 is {1/report.overall_speedup:.1f}x faster than MiniJinja overall"
+            f"Jinja2 is {1 / report.overall_speedup:.1f}x faster than MiniJinja overall"
         )
 
     if report.bundle:
         bundled = [t for t in report.templates if t.bundled]
         if bundled:
             lines.append("")
-            lines.append("* = bundled (all component macros inlined, no Python callbacks)")
+            lines.append(
+                "* = bundled (all component macros inlined, no Python callbacks)"
+            )
 
     # Show breakdown if there's a mix
     faster = [t for t in report.templates if t.speedup >= 1.0]
@@ -219,10 +222,10 @@ def render_bench_report(report: BenchReport) -> str:
         s_mj = sum(t.minijinja_render_us for t in slower)
         lines.append("")
         lines.append(
-            f"  MiniJinja wins: {f_j2/f_mj:.1f}x faster ({f_j2:.0f}µs vs {f_mj:.0f}µs)"
+            f"  MiniJinja wins: {f_j2 / f_mj:.1f}x faster ({f_j2:.0f}µs vs {f_mj:.0f}µs)"
         )
         lines.append(
-            f"  Jinja2 wins: {s_mj/s_j2:.1f}x faster ({s_j2:.0f}µs vs {s_mj:.0f}µs)"
+            f"  Jinja2 wins: {s_mj / s_j2:.1f}x faster ({s_j2:.0f}µs vs {s_mj:.0f}µs)"
         )
 
     return "\n".join(lines)
@@ -245,7 +248,18 @@ def _build_dummy_context(ast: Any, *, bundled: bool = False) -> dict[str, Any]:
         for p in ast.props.props:
             if p.default_expr is not None:
                 try:
-                    ctx[p.name] = eval(p.default_expr, {"__builtins__": {}}, {"str": str, "int": int, "float": float, "bool": bool, "list": list, "dict": dict})  # noqa: S307
+                    ctx[p.name] = eval(
+                        p.default_expr,
+                        {"__builtins__": {}},
+                        {
+                            "str": str,
+                            "int": int,
+                            "float": float,
+                            "bool": bool,
+                            "list": list,
+                            "dict": dict,
+                        },
+                    )  # noqa: S307
                 except Exception:
                     ctx[p.name] = ""
             elif p.name not in ctx:

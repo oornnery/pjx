@@ -92,7 +92,8 @@ def compile_command(
     output: Annotated[
         str,
         typer.Option(
-            "--output", "-o",
+            "--output",
+            "-o",
             help="Output directory for compiled .jinja files",
         ),
     ] = "build",
@@ -102,7 +103,9 @@ def compile_command(
     ] = False,
     bundle: Annotated[
         bool,
-        typer.Option("--bundle", help="Inline imported component macros into page templates"),
+        typer.Option(
+            "--bundle", help="Inline imported component macros into page templates"
+        ),
     ] = False,
 ) -> None:
     """Compile all .pjx files to .jinja templates."""
@@ -125,7 +128,9 @@ def bench_command(
     ] = None,
     iterations: Annotated[
         int,
-        typer.Option("--iterations", "-n", help="Number of render iterations per template"),
+        typer.Option(
+            "--iterations", "-n", help="Number of render iterations per template"
+        ),
     ] = 100,
     warmup: Annotated[
         int,
@@ -133,7 +138,10 @@ def bench_command(
     ] = 5,
     bundle: Annotated[
         bool,
-        typer.Option("--bundle", help="Inline component macros into page templates before benchmarking"),
+        typer.Option(
+            "--bundle",
+            help="Inline component macros into page templates before benchmarking",
+        ),
     ] = False,
 ) -> None:
     """Benchmark Jinja2 vs MiniJinja rendering performance."""

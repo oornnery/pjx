@@ -280,5 +280,6 @@ def _create_runtime(renderer: str, catalog: Any) -> Any:
     """Factory for creating the appropriate runtime backend."""
     if renderer == "minijinja":
         from .runtime_minijinja import MiniJinjaRuntime
+
         return MiniJinjaRuntime(catalog)
     return Runtime(catalog)
