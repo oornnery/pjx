@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from fastapi import Form
 
-from pjx import PJXRouter
+from pjx import PjxRouter
 
 from exemples.state import Counter, Todo
 
 
-actions = PJXRouter()
+actions = PjxRouter()
 
 
 # ── Counter ───────────────────────────────────────────────────────────────────

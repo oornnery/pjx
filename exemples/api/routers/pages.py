@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from pjx import PJXRouter
+from pjx import PjxRouter
 
 from exemples.data import get_showcase_context
 from exemples.state import Counter, Todo
 
 
-pages = PJXRouter()
+pages = PjxRouter()
 
 
 @pages.page("/", template="pages/showcase.pjx")

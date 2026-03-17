@@ -45,16 +45,16 @@ from pjx import Pjx, PjxRouter
 
 ui = PjxRouter()
 
+@ui.page("/", template="pages/Home.pjx")
+def home() -> dict[str, object]:
+    return {"title": "Home"}
+
 pjx = Pjx(
     templates_dir="templates",
     browser=["htmx", "alpine"],
     css="pjx",
 )
 pjx.include_router(ui)
-
-@ui.page("/", template="pages/Home.pjx")
-def home() -> dict[str, object]:
-    return {"title": "Home"}
 
 app = FastAPI(title="My App")
 pjx.init_app(app)
@@ -148,7 +148,7 @@ pjx.include_router(ui)
 `render()` e uma factory de `Depends` que retorna `Page` ou `Template`:
 
 ```python
-from pjx import render
+from pjx import Page, render
 
 @app.get("/")
 async def home(page: Page = render("pages/home.pjx", layout="layouts/Layout.pjx")):
