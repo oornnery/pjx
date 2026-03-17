@@ -3,65 +3,63 @@
   @slot trigger
   @slot default
   @slot footer?
-  {% set _dlg_id = "__pjx_dlg_" ~ __pjx_id[:8] %}
-  <span onclick="document.getElementById('{{ _dlg_id }}').showModal()"><slot name="trigger" /></span>
-  <dialog id="{{ _dlg_id }}" class="dialog" onclick="if(event.target===this)this.close()">
-    <div>
-      <Show when="{{ title or description }}">
-        <header>
-          <Show when="{{ title }}"><h2>{{ title }}</h2></Show>
-          <Show when="{{ description }}"><p>{{ description }}</p></Show>
-        </header>
-      </Show>
-      <section><slot /></section>
-      <Show when="{{ @has_slot('footer') }}">
-        <footer><slot name="footer" /></footer>
-      </Show>
-      <button type="button" aria-label="Close dialog" onclick="this.closest('dialog').close()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
-    </div>
-  </dialog>
+  <div x-data style="display:contents">
+    <span x-on:click="$refs.dlg.showModal()" style="cursor:pointer"><slot name="trigger" /></span>
+    <dialog x-ref="dlg" class="dialog" onclick="if(event.target===this)this.close()">
+      <article>
+        <Show when="{{ title or description }}">
+          <header>
+            <Show when="{{ title }}"><h2>{{ title }}</h2></Show>
+            <Show when="{{ description }}"><p>{{ description }}</p></Show>
+          </header>
+        </Show>
+        <section><slot /></section>
+        <Show when="{{ @has_slot('footer') }}">
+          <footer><slot name="footer" /></footer>
+        </Show>
+        <button type="button" aria-label="Close dialog" onclick="this.closest('dialog').close()">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </article>
+    </dialog>
+  </div>
 }
 
 @component AlertDialog {
   @props { title: str = "Are you sure?", description: str = "", confirm_label: str = "Confirm", cancel_label: str = "Cancel" }
   @slot trigger
   @slot default
-  {% set _dlg_id = "__pjx_adlg_" ~ __pjx_id[:8] %}
-  <span onclick="document.getElementById('{{ _dlg_id }}').showModal()"><slot name="trigger" /></span>
-  <dialog id="{{ _dlg_id }}" class="dialog" onclick="if(event.target===this)this.close()">
-    <div>
-      <header>
-        <h2>{{ title }}</h2>
-        <Show when="{{ description }}"><p>{{ description }}</p></Show>
-      </header>
-      <section><slot /></section>
-      <footer>
-        <button class="btn-outline" onclick="this.closest('dialog').close()" type="button">{{ cancel_label }}</button>
-        <button class="btn-destructive" onclick="this.closest('dialog').close()" type="button">{{ confirm_label }}</button>
-      </footer>
-      <button type="button" aria-label="Close dialog" onclick="this.closest('dialog').close()">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-      </button>
-    </div>
-  </dialog>
+  <div x-data style="display:contents">
+    <span x-on:click="$refs.dlg.showModal()" style="cursor:pointer"><slot name="trigger" /></span>
+    <dialog x-ref="dlg" class="dialog">
+      <article>
+        <header>
+          <h2>{{ title }}</h2>
+          <Show when="{{ description }}"><p>{{ description }}</p></Show>
+        </header>
+        <section><slot /></section>
+        <footer>
+          <button class="btn-outline" onclick="this.closest('dialog').close()" type="button">{{ cancel_label }}</button>
+          <button class="btn-destructive" onclick="this.closest('dialog').close()" type="button">{{ confirm_label }}</button>
+        </footer>
+      </article>
+    </dialog>
+  </div>
 }
 
 @component Popover {
   @props { label: str = "", placement: str = "bottom" }
   @slot trigger
   @slot default
-  {% set _side_map = {"bottom": "bottom", "top": "top", "left": "left", "right": "right"} %}
   <div class="popover" x-data="{ open: false }" style="position:relative;display:inline-block">
-    <span x-on:click="open = !open" aria-expanded="false"><slot name="trigger" /></span>
+    <span x-on:click="open = !open" style="cursor:pointer"><slot name="trigger" /></span>
     <div
       data-popover
-      data-side="{{ _side_map.get(placement, 'bottom') }}"
+      data-side="{{ placement }}"
       x-show="open"
       x-on:click.outside="open = false"
       class="w-64"
-      style="display:none"
+      x-cloak
     >
       <Show when="{{ label }}"><p class="text-sm font-medium mb-2">{{ label }}</p></Show>
       <slot />
@@ -72,23 +70,11 @@
 @component Tooltip {
   @props { text: str = "", placement: str = "top" }
   @slot default
-  {% set _side_map = {"top": "top", "bottom": "bottom", "left": "left", "right": "right"} %}
-  <span data-tooltip="{{ text }}" data-side="{{ _side_map.get(placement, 'top') }}" style="display:inline-block">
+  <span data-tooltip="{{ text }}" data-side="{{ placement }}" style="display:inline-block">
     <slot />
   </span>
 }
 
 @component ToastContainer {
-  <div
-    id="toaster"
-    class="toaster"
-    data-align="end"
-    x-data="{ toasts: [] }"
-    x-on:pjx-toast.window="
-      const cat = {'success':'success','danger':'error','error':'error','warning':'warning','info':'info'};
-      document.dispatchEvent(new CustomEvent('basecoat:toast', {
-        detail: { config: { category: cat[$event.detail.type] || 'info', title: $event.detail.title, description: $event.detail.message } }
-      }))
-    "
-  ></div>
+  <div id="toaster" class="toaster" data-align="end"></div>
 }

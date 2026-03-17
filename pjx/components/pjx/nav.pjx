@@ -1,25 +1,22 @@
 @component Accordion {
   @props { title: str, description: str = "" }
   @slot default
-  <section class="accordion">
-    <details class="group border-b last:border-b-0">
-      <summary>
-        <h2 class="flex flex-1 items-start justify-between gap-4 py-4 text-left text-sm font-medium hover:underline">
-          {{ title }}
-          <Show when="{{ description }}">
-            <span class="text-sm text-muted-foreground font-normal">{{ description }}</span>
-          </Show>
-        </h2>
-      </summary>
-      <section class="pb-4"><slot /></section>
-    </details>
-  </section>
+  <details class="group border-b last:border-b-0">
+    <summary class="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-sm font-medium transition-all hover:underline [&::-webkit-details-marker]:hidden">
+      <span>{{ title }}</span>
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0 transition-transform duration-200 group-open:rotate-180"><path d="m6 9 6 6 6-6"/></svg>
+    </summary>
+    <div class="pb-4 text-sm">
+      <Show when="{{ description }}"><p class="text-muted-foreground mb-2">{{ description }}</p></Show>
+      <slot />
+    </div>
+  </details>
 }
 
 @component Tabs {
   @props { default_tab: str = "" }
   @slot default
-  <div x-data="{ activeTab: '{{ default_tab }}' }" class="tabs">
+  <div class="tabs" x-data="{ activeTab: '{{ default_tab }}' }">
     <slot />
   </div>
 }
@@ -35,6 +32,7 @@
     type="button"
     role="tab"
     x-bind:aria-selected="activeTab === '{{ id }}' ? 'true' : 'false'"
+    x-bind:tabindex="activeTab === '{{ id }}' ? '0' : '-1'"
     x-on:click="activeTab = '{{ id }}'"
   >{{ label }}</button>
 }
@@ -42,7 +40,12 @@
 @component TabPanel {
   @props { id: str }
   @slot default
-  <div role="tabpanel" x-show="activeTab === '{{ id }}'" style="display:none">
+  <div
+    role="tabpanel"
+    x-show="activeTab === '{{ id }}'"
+    x-bind:aria-selected="activeTab === '{{ id }}' ? 'true' : 'false'"
+    x-cloak
+  >
     <slot />
   </div>
 }
@@ -50,14 +53,14 @@
 @component DropdownMenu {
   @slot trigger
   @slot default
-  <div x-data="{ open: false }" class="dropdown-menu" style="position:relative;display:inline-block">
-    <span x-on:click="open = !open" aria-haspopup="menu"><slot name="trigger" /></span>
+  <div class="dropdown-menu" x-data="{ open: false }" style="position:relative;display:inline-block">
+    <span x-on:click="open = !open" aria-haspopup="menu" style="cursor:pointer"><slot name="trigger" /></span>
     <div
       x-show="open"
       x-on:click.outside="open = false"
       class="absolute z-50 mt-1 min-w-[12rem] rounded-md border bg-popover p-1 shadow-md"
       role="menu"
-      style="display:none"
+      x-cloak
     >
       <slot />
     </div>
@@ -65,16 +68,16 @@
 }
 
 @component DropdownItem {
-  @props { href: str = "", label: str = "", disabled: str = "" }
+  @props { href: str = "", label: str = "" }
   @slot default
   <Show when="{{ href }}">
-    <a href="{{ href }}" role="menuitem" class="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground{{ ' pointer-events-none opacity-50' if disabled else '' }}">
+    <a href="{{ href }}" role="menuitem">
       <Show when="{{ label }}">{{ label }}</Show>
       <slot />
     </a>
   </Show>
   <Show when="{{ not href }}">
-    <button role="menuitem" type="button" class="relative flex w-full cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground{{ ' pointer-events-none opacity-50' if disabled else '' }}">
+    <button role="menuitem" type="button">
       <Show when="{{ label }}">{{ label }}</Show>
       <slot />
     </button>
@@ -82,7 +85,7 @@
 }
 
 @component DropdownSeparator {
-  <hr role="separator" class="my-1 border-t" />
+  <hr role="separator" />
 }
 
 @component Breadcrumb {
@@ -99,9 +102,14 @@
       <a href="{{ href }}" class="hover:text-foreground transition-colors">{{ label }}</a>
     </Show>
     <Show when="{{ not href or active }}">
-      <span class="text-foreground font-normal">{{ label }}</span>
+      <span class="text-foreground font-normal" aria-current="page">{{ label }}</span>
     </Show>
   </li>
+  <Show when="{{ not active }}">
+    <li class="inline-flex items-center" aria-hidden="true">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </li>
+  </Show>
 }
 
 @component Pagination {
@@ -109,11 +117,11 @@
   <nav role="navigation" aria-label="pagination" class="mx-auto flex w-full justify-center">
     <ul class="flex flex-row items-center gap-1">
       <Show when="{{ page > 1 }}">
-        <li><a href="{{ href.format(page=page - 1) }}" class="btn-ghost-sm">&#8249; Previous</a></li>
+        <li><a href="{{ href.format(page=page - 1) }}" class="btn-ghost btn-sm">&#8249; Previous</a></li>
       </Show>
-      <li><span class="btn-icon-ghost text-sm tabular-nums">{{ page }} / {{ total }}</span></li>
+      <li><span class="btn-sm-ghost tabular-nums text-sm">{{ page }} / {{ total }}</span></li>
       <Show when="{{ page < total }}">
-        <li><a href="{{ href.format(page=page + 1) }}" class="btn-ghost-sm">Next &#8250;</a></li>
+        <li><a href="{{ href.format(page=page + 1) }}" class="btn-ghost btn-sm">Next &#8250;</a></li>
       </Show>
     </ul>
   </nav>
