@@ -12,16 +12,21 @@
     ];
   };
 
-  const reinitAlpine = (event) => {
-    if (!window.Alpine?.initTree || !event.target) {
-      return;
+  const reinitAfterSwap = (event) => {
+    if (!event.target) return;
+    // Re-initialize Alpine components in the swapped fragment
+    if (window.Alpine?.initTree) {
+      window.Alpine.initTree(event.target);
     }
-    window.Alpine.initTree(event.target);
+    // Re-initialize Basecoat components in the swapped fragment
+    if (window.basecoat?.init) {
+      window.basecoat.init();
+    }
   };
 
   const boot = () => {
     configureHtmx();
-    document.body.addEventListener("htmx:afterSwap", reinitAlpine);
+    document.body.addEventListener("htmx:afterSwap", reinitAfterSwap);
   };
 
   if (document.readyState === "loading") {

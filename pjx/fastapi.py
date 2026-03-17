@@ -284,6 +284,7 @@ class Pjx:
         browser: Sequence[str] | None = None,
         css: str | None = None,
         renderer: str = "jinja2",
+        bundle: bool = False,
         aliases: Mapping[str, str] | None = None,
         auto_reload: bool = True,
         cache: bool = True,
@@ -297,6 +298,7 @@ class Pjx:
         self.browser = tuple(browser or ())
         self.css = css
         self.renderer = renderer
+        self.bundle = bundle
         self.auto_reload = auto_reload
         self.cache = cache
         self.eager_compile = eager_compile
@@ -314,6 +316,8 @@ class Pjx:
             root=str(self.templates_dir),
             aliases=dict(resolved_aliases),
             auto_reload=auto_reload,
+            renderer=renderer,
+            bundle=bundle,
         )
 
         builtin_components = PACKAGE_ROOT / "components"
