@@ -8,8 +8,10 @@ repositorio.
 PJX e um miniframework server-first para Python com:
 
 * FastAPI como app host real
-* linguagem de componentes compilada para Jinja
-* `PJX` e `PJXRouter` como API publica
+* linguagem de componentes compilada para Jinja2 com sintaxe `@directive`
+* `Pjx` e `PjxRouter` como API publica
+* `pjx.init_app(app)` para registrar no FastAPI do usuario
+* `render()` como Depends, `Page`/`Template` como return types
 * HTMX e Alpine como enhancement
 * tooling proprio com `pjx check` e `pjx format`
 
@@ -17,58 +19,62 @@ PJX e um miniframework server-first para Python com:
 
 Hoje o projeto ja entrega:
 
-* parser estrutural para arquivos `.jinja`
-* compiler para built-ins e chamadas de componente
-* runtime com cache por `mtime`
+* parser estrutural para arquivos `.pjx` com sintaxe `@directive`
+* compiler para built-ins e chamadas de componente (com bundle mode)
+* runtime Jinja2 com cache por `mtime`
+* runtime MiniJinja (Rust) como backend alternativo via `renderer="minijinja"`
+* bundle mode: imports de componentes inlinados como macros, sem callbacks Python
+* `pjx compile` para batch compile `.pjx -> .jinja` (+ `--bundle`)
+* `pjx bench` para benchmark Jinja2 vs MiniJinja em todos os templates
 * template mounts com prefixo, como `@admin/...`
 * assets do framework em `/_pjx`
+* `context_processor` para injecao de contexto
+* `PropValidationError` com exceptions customizadas
 * app de exemplo funcional em `exemples/`
 * CLI validando templates e formatando estrutura
 
-Ainda nao considere o projeto “fechado” nestes pontos:
+Ainda nao considere o projeto "fechado" nestes pontos:
 
 * runtime nativo de `signal` e `action`
-* renderer backend alternativo a Jinja2
 * parser/token stream completo do markup
 * partial extraction mais forte que busca por `id`
+* scoped slot `let:` bindings
 
 ## Arquitetura resumida
 
 ```text
 FastAPI app
 |
-+-- API routes
-`-- mount("/", pjx.app(...))
-    |
-    +-- PJXRouter routes
-    +-- Catalog
-    +-- Parser
-    +-- Compiler
-    +-- Runtime
-    `-- framework assets
++-- JSON/API routes
++-- PJX routes (pages, actions) via pjx.init_app(app)
++-- /static (app static)
+`-- /_pjx (framework static)
 ```
 
 Fluxo principal:
 
 ```text
-.jinja
+.pjx
 |
-+-- parser.py
-+-- compiler.py
-`-- runtime.py
-    |
-    `-- Jinja Environment.render(...)
++-- parser.py -> parse() -> PjxFile
++-- compiler.py -> compile_pjx(bundle=False) -> str
++-- runtime.py -> Jinja2 Environment.render(...)
+`-- runtime_minijinja.py -> MiniJinja env.render_template(...)
 ```
 
 ## Arquivos mais importantes
 
-* `pjx/fastapi.py`: integracao com FastAPI, `PJX`, `PJXRouter`, routes HTML
-* `pjx/catalog.py`: template mounts, aliases, directives, facade de render
-* `pjx/parser.py`: parser estrutural do arquivo
-* `pjx/compiler.py`: transforma AST/markup em Jinja compilado
-* `pjx/runtime.py`: cache, props, slots, assets, partial render
+* `pjx/fastapi.py`: Pjx, PjxRouter, init_app, render, Page, Template
+* `pjx/catalog.py`: template mounts, aliases, directives, facade de render; `_create_runtime()`
+* `pjx/parser.py`: parser estrutural do arquivo `.pjx`
+* `pjx/compiler.py`: transforma AST em Jinja compilado (+ `bundle=` mode)
+* `pjx/runtime.py`: cache, props, slots, assets, partial render (Jinja2)
+* `pjx/runtime_minijinja.py`: MiniJinjaRuntime — drop-in backend Rust
+* `pjx/compile.py`: batch compile `.pjx -> .jinja`; `_ImportResolver`; bundle
+* `pjx/bench.py`: benchmark Jinja2 vs MiniJinja em todos os templates
+* `pjx/ast.py`: PjxFile, ComponentDef, PropDef, ForNode, etc.
 * `pjx/tooling.py`: `check`, `format` e carga de projeto
-* `pjx/cli.py`: CLI com Typer + Rich
+* `pjx/cli.py`: CLI com Typer + Rich (check, format, compile, bench)
 * `README.md`: guia de uso
 * `docs/`: arquitetura, linguagem, CLI e decisoes
 * `TODO.md`: roadmap do framework
@@ -78,11 +84,11 @@ Fluxo principal:
 ```text
 exemples/
 |-- main.py
+|-- data.py
+|-- state.py
 |-- api/routers/
-|-- directives/
 |-- static/css/
 `-- templates/
-    |-- components/
     |-- layouts/
     `-- pages/
 ```
@@ -93,29 +99,36 @@ exemples/
 
 Prefira:
 
-* `PJX(root=..., templates=..., routers=[...])`
-* `PJXRouter()` para pages, actions e directives
-* `app.mount("/", pjx.app(...))`
+* `Pjx(templates_dir=..., browser=..., css=...)`
+* `PjxRouter()` para pages e actions
+* `pjx.init_app(app)` para registrar no FastAPI
+* `render(template, layout=...)` como Depends
+* `@pjx.context_processor` para injecao de contexto
 
 Evite:
 
 * criar wrappers paralelos do FastAPI
 * reintroduzir `APIRouter` para pages HTML do PJX
 * reintroduzir `Catalog` manual no app host
+* usar `PJX` (alias backward compat) em codigo novo
 
 ### Templates
 
 Prefira:
 
+* sintaxe `@directive`: `@from`, `@import`, `@props`, `@component`
+* extensao `.pjx`
 * imports explicitos no topo
 * `templates/` como raiz
 * mounts extras com `@prefix/...`
-* `prop={{ expr }}` como forma principal de expressao
+* `prop="{{ expr }}"` como forma principal de expressao
+* named slots via `<:name>...</:name>`
 
 Evite:
 
 * sintaxe duplicada para a mesma feature
 * comportamento magico escondido em comments
+* usar `{% %}` para diretivas PJX (reservado para Jinja nativo)
 
 ### Frontend
 
@@ -123,8 +136,8 @@ Prefira:
 
 * HTMX para round-trips incrementais
 * Alpine para estado local pequeno
-* CSS em `static/css/...`
-* `assets.render()` no layout
+* `css="pjx"` para usar o CSS built-in do framework
+* `@click.htmx`, `@target`, `@swap` para HTMX
 
 Evite:
 
@@ -167,5 +180,3 @@ Se houver duvida sobre o projeto, consulte nesta ordem:
 3. `docs/template-language.md`
 4. `docs/decisions.md`
 5. `TODO.md`
-
-O antigo `idea.md` nao faz mais parte da base ativa do projeto.

@@ -1,25 +1,27 @@
 # PJX
 
 PJX e um miniframework server-first para Python que usa uma linguagem de
-componentes inspirada em Jinja, integra com FastAPI e trabalha bem com HTMX e
-Alpine.
+componentes compilada para Jinja2, integra com FastAPI e trabalha bem com HTMX
+e Alpine.
 
 Hoje o projeto ja entrega:
 
-* componentes `.jinja` com imports explicitos
-* `PJX` e `PJXRouter` para integrar UI ao FastAPI
+* componentes `.pjx` com imports explicitos e sintaxe `@directive`
+* `Pjx` e `PjxRouter` para integrar UI ao FastAPI
+* `pjx.init_app(app)` para registrar rotas e assets no app existente
+* `render()` como Depends, `Page` e `Template` como return types
 * template roots com prefixo, como `@admin/...`
-* assets automáticos do framework
+* assets automaticos do framework
 * `pjx check` e `pjx format`
-* app de exemplo com pages, actions, directives e primitives de UI
+* app de exemplo com pages, actions e primitives de UI
 
 Se voce quer entender a arquitetura interna, veja:
 
-* [docs/README.md](/home/oornnery/proj/pjx/docs/README.md)
-* [docs/architecture.md](/home/oornnery/proj/pjx/docs/architecture.md)
-* [docs/template-language.md](/home/oornnery/proj/pjx/docs/template-language.md)
-* [docs/cli.md](/home/oornnery/proj/pjx/docs/cli.md)
-* [docs/decisions.md](/home/oornnery/proj/pjx/docs/decisions.md)
+* [docs/README.md](docs/README.md)
+* [docs/architecture.md](docs/architecture.md)
+* [docs/template-language.md](docs/template-language.md)
+* [docs/cli.md](docs/cli.md)
+* [docs/decisions.md](docs/decisions.md)
 
 ## Instalacao
 
@@ -38,49 +40,38 @@ O app fica em `http://127.0.0.1:8000`.
 ## Uso Rapido
 
 ```python
-from pathlib import Path
-
 from fastapi import FastAPI
+from pjx import Pjx, PjxRouter
 
-from pjx import PJX, PJXRouter
+ui = PjxRouter()
 
-
-ui = PJXRouter()
-
-pjx = PJX(
-    root=Path(__file__).parent,
-    templates="templates",
-    routers=[ui],
-    browser=["htmx", "alpine"],
-    css="tailwind",
-)
-
-
-@ui.page("/", template="pages/HomePage.jinja")
+@ui.page("/", template="pages/Home.pjx")
 def home() -> dict[str, object]:
     return {"title": "Home"}
 
+pjx = Pjx(
+    templates_dir="templates",
+    browser=["htmx", "alpine"],
+    css="pjx",
+)
+pjx.include_router(ui)
 
 app = FastAPI(title="My App")
-app.mount("/", pjx.app(title="My App UI"))
+pjx.init_app(app)
 ```
 
 ## Mental Model
 
-O app principal continua sendo FastAPI. O PJX entra como um sub-app dedicado a
-templates, assets do framework e rotas HTML.
+O app principal continua sendo FastAPI. O PJX registra rotas e assets
+diretamente no app do usuario via `init_app`.
 
 ```text
 FastAPI app
 |
 +-- JSON/API routes
-|
-+-- mount("/", pjx.app(...))
-    |
-    +-- pages
-    +-- actions
-    +-- framework static (/_pjx)
-    +-- app static (/static)
++-- PJX routes (pages, actions)
++-- /static (app static)
+`-- /_pjx (framework static)
 ```
 
 ## Estrutura Recomendada
@@ -89,8 +80,7 @@ FastAPI app
 my_app/
 |-- main.py
 |-- static/
-|   |-- css/
-|   `-- js/
+|   `-- css/
 `-- templates/
     |-- components/
     |-- layouts/
@@ -99,62 +89,47 @@ my_app/
 
 Exemplo real do repositorio:
 
-* [exemples/main.py](/home/oornnery/proj/pjx/exemples/main.py)
-* [exemples/templates](/home/oornnery/proj/pjx/exemples/templates)
-* [exemples/api/routers/pages.py](/home/oornnery/proj/pjx/exemples/api/routers/pages.py)
-* [exemples/api/routers/actions.py](/home/oornnery/proj/pjx/exemples/api/routers/actions.py)
+* [exemples/main.py](exemples/main.py)
+* [exemples/templates](exemples/templates)
+* [exemples/api/routers/pages.py](exemples/api/routers/pages.py)
+* [exemples/api/routers/actions.py](exemples/api/routers/actions.py)
 
 ## Templates
 
 O root padrao e `templates/`.
 
 ```python
-pjx = PJX(root=BASE_DIR, templates="templates")
+pjx = Pjx(templates_dir="templates")
 ```
 
-Voce tambem pode registrar multiplos mounts:
+A extensao canonica e `.pjx`. Sintaxe de diretivas usa `@`:
 
-```python
-pjx = PJX(
-    root=BASE_DIR,
-    templates=[
-        "templates",
-        {"prefix": "admin", "path": "admin_templates"},
-    ],
-)
-```
+```text
+@from pjx.ui import Button, Badge
+@import "layouts/Layout.pjx"
 
-Nesse caso:
+@props { title: str = "Home" }
 
-* o mount principal continua usando caminhos como `pages/dashboard.jinja`
-* o mount prefixado usa `@admin/pages/dashboard.jinja`
-
-Tambem funciona depois da criacao:
-
-```python
-pjx.add_templates(
-    "templates/shared",
-    {"prefix": "admin", "path": "admin_templates"},
-)
+<Layout title="{{ title }}">
+  <Button label="Click me" />
+</Layout>
 ```
 
 ## Routers HTML
 
-`PJXRouter` segue a ideia de `APIRouter`: ele coleta pages, actions e
-directives antes de serem incluidos no `PJX`.
+`PjxRouter` segue a ideia de `APIRouter`: ele coleta pages e actions
+antes de serem incluidos no `Pjx`.
 
 ```python
-ui = PJXRouter(prefix="/admin")
+ui = PjxRouter(prefix="/admin")
 
-
-@ui.page("/dashboard", template="pages/admin_dashboard.jinja")
+@ui.page("/dashboard", template="pages/admin_dashboard.pjx")
 def dashboard() -> dict[str, object]:
     return {"title": "Admin"}
 
-
 @ui.action(
     "/users/search",
-    template="pages/admin_dashboard.jinja",
+    template="pages/admin_dashboard.pjx",
     target="users-table",
 )
 def search_users() -> dict[str, object]:
@@ -164,71 +139,54 @@ def search_users() -> dict[str, object]:
 E entao:
 
 ```python
-pjx = PJX(root=BASE_DIR, templates="templates")
+pjx = Pjx(templates_dir="templates")
 pjx.include_router(ui)
 ```
 
-Ou diretamente no construtor:
+## render() como Depends
+
+`render()` e uma factory de `Depends` que retorna `Page` ou `Template`:
 
 ```python
-pjx = PJX(root=BASE_DIR, templates="templates", routers=[ui])
+from pjx import Page, render
+
+@app.get("/")
+async def home(page: Page = render("pages/home.pjx", layout="layouts/Layout.pjx")):
+    return await page(title="Home")
 ```
 
-## Diretivas
-
-Diretivas customizadas sao registradas no router:
+## Context Processors
 
 ```python
-@ui.directive("tooltip")
-def tooltip(element, value, ctx):
-    element.attrs["data-tooltip"] = value
-    return element
+@pjx.context_processor
+async def add_user(request):
+    return {"user": get_current_user(request)}
 ```
-
-O `Catalog` aplica primeiro as diretivas core (`jx-bind:*`, `jx-class`,
-`jx-show`, `jx-on:*`) e depois as customizadas.
 
 ## HTMX e Alpine
 
-Ative browser integrations no `PJX`:
+Ative browser integrations no `Pjx`:
 
 ```python
-pjx = PJX(
-    root=BASE_DIR,
-    templates="templates",
+pjx = Pjx(
+    templates_dir="templates",
     browser=["htmx", "alpine"],
 )
 ```
 
 Os assets do framework sao servidos automaticamente em `/_pjx/js/...`.
 
-Nos templates:
+## CSS do Framework
 
-```jinja
-{{ assets.render() }}
-```
-
-Ou:
-
-```jinja
-{{ assets.render_css() }}
-{{ assets.render_js() }}
-```
-
-## Tailwind
-
-Tailwind continua tratado como integracao de build.
+Use `css="pjx"` para incluir o CSS built-in do framework:
 
 ```python
-globs = pjx.tailwind_content_globs()
+pjx = Pjx(templates_dir="templates", css="pjx")
 ```
-
-Isso expõe os globs base para `.pjx`, `.jinja` e `.py`, incluindo mounts extras
-de templates.
 
 ## CLI
 
-O projeto expõe um CLI com `Typer + Rich`:
+O projeto expoe um CLI com `Typer + Rich`:
 
 ```bash
 uv run pjx check exemples.main:pjx
@@ -236,35 +194,74 @@ uv run pjx check exemples.main:pjx --format json
 uv run pjx check . --strict
 
 uv run pjx format exemples.main:pjx --check
-uv run pjx format path/to/Button.jinja
+uv run pjx format path/to/Button.pjx
+
+uv run pjx compile exemples.main:pjx --output build/
+uv run pjx compile exemples.main:pjx --output build/ --bundle
+
+uv run pjx bench exemples.main:pjx
+uv run pjx bench exemples.main:pjx --iterations 200 --bundle
 ```
 
-`pjx check` valida o maximo que o framework consegue inferir hoje:
+`pjx check` valida:
 
 * parse estrutural
 * compilacao
 * imports ausentes
-* assets locais ausentes
 * alias de import duplicado
 * ciclos de import
 * templates sombreados
 * templates referenciados por pages e actions
 
+`pjx compile` compila todos os `.pjx` para `.jinja`. Com `--bundle`, as macros
+de componentes importados sao inlinadas em cada page template, gerando arquivos
+auto-contidos sem callbacks Python no render.
+
+`pjx bench` mede o tempo de compilacao e render comparando Jinja2 e MiniJinja
+em todos os templates do projeto.
+
 A saida textual usa codigos numericos estaveis no formato `[NNN] code`.
+
+## MiniJinja (Rust backend)
+
+Para usar o backend MiniJinja em vez do Jinja2:
+
+```python
+pjx = Pjx(
+    templates_dir="templates",
+    renderer="minijinja",
+)
+```
+
+Requer o extra:
+
+```bash
+uv add "pjx[minijinja]"
+```
+
+Com `bundle=True`, os macros de componentes sao inlinados antes do render,
+eliminando callbacks Python:
+
+```python
+pjx = Pjx(
+    templates_dir="templates",
+    renderer="minijinja",
+    bundle=True,
+)
+```
 
 ## Extras
 
-FastAPI faz parte do core do pacote. Hoje os extras publicos continuam:
+FastAPI faz parte do core do pacote. Extras publicos:
 
 ```bash
-uv add "pjx[tailwind,minijinja]"
+uv add "pjx[minijinja]"
 ```
 
-`htmx` e `alpine` nao sao extras Python; sao integrations servidas pelo proprio
-PJX.
+`htmx` e `alpine` nao sao extras Python; sao integrations servidas pelo
+proprio PJX.
 
 ## Estado Atual
 
 O projeto esta numa fase funcional, mas ainda em consolidacao de linguagem,
-runtime e tooling. O roadmap de evolucao esta em
-[TODO.md](/home/oornnery/proj/pjx/TODO.md).
+runtime e tooling. O roadmap de evolucao esta em [TODO.md](TODO.md).

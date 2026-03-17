@@ -4,25 +4,25 @@ from pathlib import Path
 
 from fastapi import FastAPI
 
-from exemples.api.routers.api import router as api_router
 from exemples.api.routers.actions import actions
 from exemples.api.routers.pages import pages
-from exemples.directives.tooltip import tooltips
-from pjx import PJX
-
+from pjx import Pjx
 
 BASE_DIR = Path(__file__).parent
 
-pjx = PJX(
-    root=BASE_DIR,
-    templates="templates",
-    routers=[pages, actions, tooltips],
+pjx = Pjx(
+    templates_dir=str(BASE_DIR / "templates"),
+    auto_reload=True,
+    cache=True,
     browser=["htmx", "alpine"],
-    css="tailwind",
+    css="pjx",
+    static_dir=str(BASE_DIR / "static"),
+    bundle=True,
 )
+pjx.include_router(pages)
+pjx.include_router(actions)
 
-app = FastAPI(title="PJX Example App")
-app.include_router(api_router)
-app.mount("/", pjx.app(title="PJX Example UI"))
+app = FastAPI(title="PJX Showcase")
+pjx.init_app(app)
 
 __all__ = ["app", "pjx"]

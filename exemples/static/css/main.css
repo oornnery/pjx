@@ -1,0 +1,49 @@
+/* PJX Showcase — main.css
+   Only styles that Basecoat does not provide. */
+
+[x-cloak] { display: none !important; }
+
+/* ── Layout helpers ── */
+.showcase-shell { display: grid; gap: 2rem; }
+
+.showcase-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .showcase-demo-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Counter widget ── */
+.counter {
+  display: inline-flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.625rem 1rem;
+  border-radius: var(--radius-lg, 0.75rem);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--muted));
+}
+.counter strong {
+  min-width: 3rem;
+  text-align: center;
+  font-size: 1.5rem;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+/* ── Code blocks ── */
+pre > code {
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  white-space: pre;
+}

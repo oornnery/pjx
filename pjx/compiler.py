@@ -1,342 +1,465 @@
+"""Compiler: transforms PjxFile AST to Jinja2 source.
+
+Design notes
+------------
+* Simple-mode files compile to a flat Jinja2 template with an optional
+  preamble (state, prop defaults, let bindings) followed by the body.
+* Multi-component files (containing @component blocks) compile to a set of
+  Jinja2 macros — one per @component.
+* Named slots are captured via ``{% set __slot_name %}...{% endset %}``
+  and passed as keyword arguments to local macros or as a dict to the
+  ``__pjx_render_component()`` Jinja2 global for imported templates.
+* HTMX shorthand attributes (``@event.htmx``, ``@swap``, etc.) are
+  lowered to ``hx-*`` attributes at compile time.
+* Alpine bindings (``@event.alpine``) and dynamic bindings (``:attr``)
+  are preserved as-is with ``{{ }}`` expression wrapping where needed.
+* ``{{ @id }}``, ``{{ @state }}``, ``{{ @has_slot('x') }}``, and
+  ``{{ @event_url(...) }}`` helpers are substituted to Jinja2 globals.
+"""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
+import json
+import re
+from pathlib import PurePosixPath
 from typing import Any
 
 from .ast import (
-    ActionDirectiveNode,
-    ComputedDirectiveNode,
-    InjectDirectiveNode,
-    PropDeclNode,
-    PropsDirectiveNode,
-    ProvideDirectiveNode,
-    SignalDirectiveNode,
-    SlotDirectiveNode,
+    Attribute,
+    ComponentCall,
+    ComponentDef,
+    ExprNode,
+    ForNode,
+    FromImport,
+    HtmlElement,
+    ImportDirective,
+    LetDirective,
+    NamedSlotContent,
+    PjxFile,
+    PropsBlock,
+    ShowNode,
+    SlotNode,
+    StateBlock,
+    SwitchNode,
+    TextNode,
 )
-from .markup import (
-    ElementNode,
-    RawNode,
-    attr_value_to_expr,
-    extract_named_slots,
-    parse_markup,
-    split_children_by_tag,
+from .exceptions import CompileError
+
+
+# ── @-helper regex ─────────────────────────────────────────────────────────────
+
+_RE_HELPER = re.compile(
+    r"\{\{\s*@(id|state|has_slot\([^)]*\)|event_url\([^)]*\))\s*\}\}"
 )
-from .models import AssetImport, CompiledComponent, PropSpec, SlotSpec
-from .parser import parse_component_source
+# Bare form — for use inside Jinja2 control expressions ({% if @has_slot('x') %})
+_RE_HELPER_BARE = re.compile(r"@(id|state|has_slot\([^)]*\)|event_url\([^)]*\))")
+
+# ── Attribute classification regexes ──────────────────────────────────────────
+
+_RE_HTMX_EVENT = re.compile(r"^@([\w-]+)\.htmx$")
+_RE_HTMX_MOD = re.compile(
+    r"^@(swap|target|confirm|indicator|push-url|push_url|select|vals|trigger)$"
+)
+_RE_ALPINE_EVENT = re.compile(r"^@([\w:.-]+)\.alpine$")
 
 
-@dataclass(slots=True)
-class TransformContext:
-    component_imports: dict[str, str]
-    counter: int = 0
-
-    def next_name(self, prefix: str) -> str:
-        self.counter += 1
-        return f"__pjx_{prefix}_{self.counter}"
+# ── Public API ─────────────────────────────────────────────────────────────────
 
 
-def compile_component_file(source: str, path: Path) -> CompiledComponent:
-    parsed = parse_component_source(source, path)
-    component_imports: dict[str, str] = {}
-    assets: list[AssetImport] = []
-
-    for import_node in parsed.imports:
-        if import_node.kind == "component":
-            component_imports[import_node.alias or ""] = import_node.path
-            continue
-        assets.append(AssetImport(kind=import_node.kind, path=import_node.path))
-
-    prop_aliases = {
-        alias.name: [_prop_spec_from_decl(item) for item in alias.props]
-        for alias in parsed.prop_aliases
-    }
-
-    (
-        prop_specs,
-        inject_names,
-        provide_names,
-        slot_specs,
-        action_names,
-        preamble,
-    ) = _compile_component_directives(parsed.component.directives, prop_aliases)
-
-    transform_ctx = TransformContext(component_imports=component_imports)
-    transformed_body = transform_markup(parsed.component.body, transform_ctx)
-    jinja_source = f"{preamble}{transformed_body}"
-
-    return CompiledComponent(
-        path=str(path),
-        component_name=parsed.component.name,
-        source_path=path,
-        assets=tuple(assets),
-        component_imports=component_imports,
-        prop_specs=tuple(prop_specs),
-        slot_specs={item.name: item for item in slot_specs},
-        inject_names=tuple(inject_names),
-        provide_names=tuple(provide_names),
-        action_names=tuple(action_names),
-        modifiers=frozenset(parsed.component.modifiers),
-        jinja_source=jinja_source,
-    )
-
-
-def transform_markup(source: str, ctx: TransformContext) -> str:
-    nodes = parse_markup(source)
-    return _emit_nodes(nodes, ctx)
-
-
-def _compile_component_directives(
-    directives: tuple[
-        PropsDirectiveNode
-        | InjectDirectiveNode
-        | ProvideDirectiveNode
-        | ComputedDirectiveNode
-        | SlotDirectiveNode
-        | SignalDirectiveNode
-        | ActionDirectiveNode,
-        ...,
-    ],
-    prop_aliases: dict[str, list[PropSpec]],
-) -> tuple[list[PropSpec], list[str], list[str], list[SlotSpec], list[str], str]:
-    props: list[PropSpec] = []
-    inject_names: list[str] = []
-    provide_names: list[str] = []
-    slot_specs: list[SlotSpec] = []
-    action_names: list[str] = []
-    preamble_chunks: list[str] = []
-    props_seen = False
-    slot_names: set[str] = set()
-
-    for directive in directives:
-        if isinstance(directive, PropsDirectiveNode):
-            if props_seen:
-                raise ValueError("Only one props block is allowed per component")
-            props = _resolve_props_directive(directive, prop_aliases)
-            props_seen = True
-            continue
-        if isinstance(directive, InjectDirectiveNode):
-            inject_names.extend(directive.names)
-            continue
-        if isinstance(directive, ProvideDirectiveNode):
-            provide_names.extend(directive.names)
-            continue
-        if isinstance(directive, ComputedDirectiveNode):
-            preamble_chunks.append(
-                f"{{% set {directive.name} %}}{directive.body}{{% endset %}}\n"
-            )
-            continue
-        if isinstance(directive, SlotDirectiveNode):
-            if directive.name in slot_names:
-                raise ValueError(f"Duplicate slot declaration: {directive.name}")
-            slot_names.add(directive.name)
-            slot_specs.append(SlotSpec(name=directive.name, params=directive.params))
-            continue
-        if isinstance(directive, SignalDirectiveNode):
-            preamble_chunks.append(f"{{% set {directive.name} = {directive.expr} %}}\n")
-            continue
-        if isinstance(directive, ActionDirectiveNode):
-            action_names.append(directive.name)
-            continue
-
-    return (
-        props,
-        inject_names,
-        provide_names,
-        slot_specs,
-        action_names,
-        "".join(preamble_chunks),
-    )
-
-
-def _emit_nodes(nodes: list[Any], ctx: TransformContext) -> str:
-    rendered: list[str] = []
-    for node in nodes:
-        if isinstance(node, RawNode):
-            rendered.append(node.source)
-            continue
-        if node.name == "If":
-            rendered.append(_emit_if(node, ctx))
-            continue
-        if node.name == "For":
-            rendered.append(_emit_for(node, ctx))
-            continue
-        if node.name == "Switch":
-            rendered.append(_emit_switch(node, ctx))
-            continue
-        if node.name and node.name[0].isupper():
-            rendered.append(_emit_component_call(node, ctx))
-            continue
-        rendered.append(_emit_html_element(node, ctx))
-    return "".join(rendered)
-
-
-def _emit_if(node: ElementNode, ctx: TransformContext) -> str:
-    when_expr = _lookup_attr(node.attrs, "when", force_expression=True)
-    truthy_children, else_children = split_children_by_tag(node.children, "Else")
-    rendered = [f"{{% if {when_expr} %}}", _emit_nodes(truthy_children, ctx)]
-    if else_children is not None:
-        rendered.extend(["{% else %}", _emit_nodes(else_children, ctx)])
-    rendered.append("{% endif %}")
-    return "".join(rendered)
-
-
-def _emit_for(node: ElementNode, ctx: TransformContext) -> str:
-    each_expr = _lookup_attr(node.attrs, "each", force_expression=True)
-    loop_var = _lookup_attr(node.attrs, "as", force_expression=False).strip("'\"")
-    index_name = _optional_attr(node.attrs, "index")
-    truthy_children, empty_children = split_children_by_tag(node.children, "Empty")
-
-    rendered = [f"{{% for {loop_var} in {each_expr} %}}"]
-    if index_name:
-        clean_index = index_name.strip("\"'")
-        rendered.append(f"{{% set {clean_index} = loop.index0 %}}")
-    rendered.append(_emit_nodes(truthy_children, ctx))
-    if empty_children is not None:
-        rendered.extend(["{% else %}", _emit_nodes(empty_children, ctx)])
-    rendered.append("{% endfor %}")
-    return "".join(rendered)
-
-
-def _emit_switch(node: ElementNode, ctx: TransformContext) -> str:
-    value_expr = _lookup_attr(node.attrs, "value", force_expression=True)
-    temp_name = ctx.next_name("switch")
-    chunks = [f"{{% set {temp_name} = {value_expr} %}}"]
-    first_case = True
-    default_children: list[Any] | None = None
-
-    for child in node.children:
-        if not isinstance(child, ElementNode):
-            continue
-        if child.name == "Case":
-            case_expr = _lookup_attr(child.attrs, "when", force_expression=True)
-            prefix = "{% if " if first_case else "{% elif "
-            chunks.append(prefix + f"{temp_name} == {case_expr}" + " %}")
-            chunks.append(_emit_nodes(child.children, ctx))
-            first_case = False
-        elif child.name == "Default":
-            default_children = child.children
-
-    if default_children is not None:
-        chunks.append("{% else %}")
-        chunks.append(_emit_nodes(default_children, ctx))
-    chunks.append("{% endif %}")
-    return "".join(chunks)
-
-
-def _emit_component_call(node: ElementNode, ctx: TransformContext) -> str:
-    template_path = ctx.component_imports.get(node.name)
-    if template_path is None:
-        raise ValueError(f"Unknown component import alias: {node.name}")
-
-    default_children, slot_entries = extract_named_slots(node.children)
-    content_name = ctx.next_name("content")
-    attrs_expr = _attrs_dict_expr(node.attrs)
-    slot_names: list[str] = []
-    chunks: list[str] = []
-
-    for slot_name, params, slot_children in slot_entries:
-        macro_name = ctx.next_name(f"slot_{slot_name}")
-        signature = ", ".join(params)
-        chunks.append(f"{{% macro {macro_name}({signature}) %}}")
-        chunks.append(_emit_nodes(slot_children, ctx))
-        chunks.append("{% endmacro %}")
-        slot_names.append(f"{slot_name!r}: {macro_name}")
-
-    chunks.append(f"{{% set {content_name} %}}")
-    chunks.append(_emit_nodes(default_children, ctx))
-    chunks.append("{% endset %}")
-    slots_expr = "{" + ", ".join(slot_names) + "}" if slot_names else "{}"
-    chunks.append(
-        "{{ __pjx_render_component("
-        f"{template_path!r}, "
-        f"{attrs_expr}, "
-        f"{content_name}, "
-        f"{slots_expr}"
-        ") }}"
-    )
-    return "".join(chunks)
-
-
-def _emit_html_element(node: ElementNode, ctx: TransformContext) -> str:
-    if _needs_raw_tag_passthrough(node):
-        if node.self_closing:
-            return node.raw_open
-        return node.raw_open + _emit_nodes(node.children, ctx) + f"</{node.name}>"
-
-    attrs_expr = _attrs_dict_expr(node.attrs)
-    if _optional_attr(node.attrs, "jx-text") is not None:
-        node_children = [
-            RawNode(
-                f"{{{{ {_lookup_attr(node.attrs, 'jx-text', force_expression=True)} }}}}"
-            )
-        ]
-    elif _optional_attr(node.attrs, "jx-html") is not None:
-        node_children = [
-            RawNode(
-                f"{{{{ {_lookup_attr(node.attrs, 'jx-html', force_expression=True)}|safe }}}}"
-            )
-        ]
-    else:
-        node_children = node.children
-
-    start = f"<{node.name}{{{{ __pjx_render_attrs({node.name!r}, {attrs_expr}) }}}}"
-    if node.self_closing:
-        return start + " />"
-    return start + ">" + _emit_nodes(node_children, ctx) + f"</{node.name}>"
-
-
-def _needs_raw_tag_passthrough(node: ElementNode) -> bool:
-    if "jx-" in node.raw_open:
-        return False
-    return "{%" in node.raw_open or "{{" in node.raw_open
-
-
-def _attrs_dict_expr(attrs: list[tuple[str, str | None]]) -> str:
-    items: list[str] = []
-    for key, value in attrs:
-        force_expression = (
-            key in {"when", "each"}
-            or key.startswith("jx-bind:")
-            or key in {"jx-class", "jx-show", "jx-text", "jx-html"}
-        )
-        items.append(
-            f"{key!r}: {attr_value_to_expr(value, force_expression=force_expression)}"
-        )
-    return "{" + ", ".join(items) + "}"
-
-
-def _lookup_attr(
-    attrs: list[tuple[str, str | None]], name: str, *, force_expression: bool
+def compile_pjx(
+    ast: PjxFile, filename: str = "<string>", *, bundle: bool = False
 ) -> str:
-    for key, value in attrs:
-        if key == name:
-            return attr_value_to_expr(value, force_expression=force_expression)
-    raise ValueError(f"Missing attribute {name!r}")
+    """Compile a *PjxFile* AST to a Jinja2 template string."""
+    return Compiler(ast, filename, bundle=bundle).emit()
 
 
-def _optional_attr(attrs: list[tuple[str, str | None]], name: str) -> str | None:
-    for key, value in attrs:
-        if key == name:
-            return value
-    return None
+# ── Compiler ──────────────────────────────────────────────────────────────────
 
 
-def _resolve_props_directive(
-    directive: PropsDirectiveNode,
-    prop_aliases: dict[str, list[PropSpec]],
-) -> list[PropSpec]:
-    if directive.alias_name is not None:
-        try:
-            return prop_aliases[directive.alias_name]
-        except KeyError as exc:
-            raise ValueError(f"Unknown props alias {directive.alias_name!r}") from exc
-    return [_prop_spec_from_decl(item) for item in directive.props]
+class Compiler:
+    def __init__(
+        self,
+        ast: PjxFile,
+        filename: str = "<string>",
+        *,
+        bundle: bool = False,
+    ) -> None:
+        self.ast = ast
+        self.filename = filename
+        self.bundle = bundle
+        self._local_components: set[str] = set()
+        # name → (template_path, component_name_override | None)
+        self._imported_components: dict[str, tuple[str, str | None]] = {}
+
+        for imp in ast.imports:
+            if isinstance(imp, ImportDirective):
+                stem = PurePosixPath(imp.path).stem
+                name = stem[0].upper() + stem[1:] if stem else stem
+                self._imported_components[name] = (imp.path, None)
+            elif isinstance(imp, FromImport):
+                # @from a.b.c import Comp1, Comp2 → "a/b/c.pjx"
+                tpl_path = imp.module.replace(".", "/") + ".pjx"
+                for comp_name in imp.names:
+                    self._imported_components[comp_name] = (tpl_path, comp_name)
+
+        if ast.is_multi_component:
+            self._local_components = {c.name for c in ast.components}
+
+        # In bundle mode, treat all imported components as local macros
+        if bundle:
+            for comp_name in self._imported_components:
+                self._local_components.add(comp_name)
+            self._imported_components = {}
+
+    # ── Top-level emit ────────────────────────────────────────────────────────
+
+    def emit(self) -> str:
+        if self.ast.is_multi_component:
+            return "".join(self._emit_component_def(c) for c in self.ast.components)
+
+        preamble = self._emit_preamble(
+            state=self.ast.state,
+            props=self.ast.props,
+            lets=self.ast.lets,
+        )
+        body = self._emit_nodes(self.ast.body)
+        return preamble + body
+
+    # ── Preamble ──────────────────────────────────────────────────────────────
+
+    def _emit_preamble(
+        self,
+        *,
+        state: StateBlock | None,
+        props: PropsBlock | None,
+        lets: tuple[LetDirective, ...],
+    ) -> str:
+        out: list[str] = []
+
+        if state:
+            pairs = ", ".join(f"{json.dumps(f.name)}: {f.value}" for f in state.fields)
+            out.append(f"{{% set __pjx_state = {{{pairs}}} %}}\n")
+
+        if props:
+            for p in props.props:
+                if p.default_expr is not None:
+                    out.append(
+                        f"{{% if {p.name} is not defined %}}"
+                        f"{{% set {p.name} = {p.default_expr} %}}"
+                        f"{{% endif %}}\n"
+                    )
+
+        for let in lets:
+            out.append(f"{{% set {let.name} = {let.expr} %}}\n")
+
+        return "".join(out)
+
+    # ── @component → Jinja2 macro ─────────────────────────────────────────────
+
+    def _emit_component_def(self, comp: ComponentDef) -> str:
+        params: list[str] = []
+
+        if comp.props:
+            for p in comp.props.props:
+                if p.default_expr is not None:
+                    params.append(f"{p.name}={p.default_expr}")
+                else:
+                    params.append(p.name)
+
+        # Default slot is always available; named slots are declared explicitly.
+        # Skip "default" in the loop since we always add it explicitly above.
+        params.append("__slot_default=''")
+        for s in comp.slots:
+            if s.name != "default":
+                params.append(f"__slot_{s.name}=''")
+
+        sig = ", ".join(params)
+        preamble = self._emit_preamble(state=comp.state, props=None, lets=comp.lets)
+        body = self._emit_nodes(comp.children)
+
+        return (
+            f"{{% macro {comp.name}({sig}) %}}\n{preamble}{body}\n{{% endmacro %}}\n\n"
+        )
+
+    # ── Node dispatch ─────────────────────────────────────────────────────────
+
+    def _emit_nodes(self, nodes: tuple[Any, ...] | list[Any]) -> str:
+        return "".join(self._emit_node(n) for n in nodes)
+
+    def _emit_node(self, node: Any) -> str:
+        if isinstance(node, TextNode):
+            return node.content
+        if isinstance(node, ExprNode):
+            return self._subst(node.content)
+        if isinstance(node, HtmlElement):
+            return self._emit_html(node)
+        if isinstance(node, ComponentCall):
+            return self._emit_call(node)
+        if isinstance(node, SlotNode):
+            return self._emit_slot(node)
+        if isinstance(node, ShowNode):
+            return self._emit_show(node)
+        if isinstance(node, ForNode):
+            return self._emit_for(node)
+        if isinstance(node, SwitchNode):
+            return self._emit_switch(node)
+        if isinstance(node, NamedSlotContent):
+            return ""  # consumed by _emit_call; never reached at top level
+        raise CompileError(
+            f"Unexpected AST node type: {type(node).__name__}", file=self.filename
+        )
+
+    # ── HTML element ──────────────────────────────────────────────────────────
+
+    def _emit_html(self, node: HtmlElement) -> str:
+        attrs = self._emit_attrs(node.attrs)
+        if node.self_closing:
+            return f"<{node.tag}{attrs} />"
+        body = self._emit_nodes(node.children)
+        return f"<{node.tag}{attrs}>{body}</{node.tag}>"
+
+    def _emit_attrs(self, attrs: tuple[Attribute, ...]) -> str:
+        out: list[str] = []
+        htmx_trigger: str | None = None
+        htmx_pending: list[str] = []
+
+        for a in attrs:
+            n, v = a.name, a.value
+
+            # @event.htmx="method:/url" → hx-{method}="/url" + hx-trigger="{event}"
+            m = _RE_HTMX_EVENT.match(n)
+            if m:
+                if v:
+                    method, _, url = v.partition(":")
+                    htmx_pending.append(f' hx-{method.lower()}="{self._subst(url)}"')
+                    htmx_trigger = m.group(1)
+                continue  # always skip, even if no value
+
+            # @swap, @target, @confirm, etc.
+            m = _RE_HTMX_MOD.match(n)
+            if m:
+                key = m.group(1).replace("_", "-")
+                htmx_pending.append(f' hx-{key}="{self._subst(v or "")}"')
+                continue
+
+            # @event.alpine="..." → @event="..."
+            m = _RE_ALPINE_EVENT.match(n)
+            if m:
+                out.append(f' @{m.group(1)}="{self._subst(v or "")}"')
+                continue
+
+            # :attr="expr" → attr="{{ expr }}"
+            if n.startswith(":") and len(n) > 1:
+                out.append(f' {n[1:]}="{self._to_jinja_expr(v)}"')
+                continue
+
+            # Boolean attribute
+            if v is None:
+                out.append(f" {n}")
+                continue
+
+            # Regular attribute (static string, possibly with {{ }} interpolation)
+            out.append(f' {n}="{self._subst(v)}"')
+
+        if htmx_trigger:
+            out.append(f' hx-trigger="{htmx_trigger}"')
+        out.extend(htmx_pending)
+        return "".join(out)
+
+    def _to_jinja_expr(self, raw: str | None) -> str:
+        """Wrap a binding value as a Jinja2 interpolation if not already one."""
+        if not raw:
+            return ""
+        raw = raw.strip()
+        if raw.startswith("{{") and raw.endswith("}}"):
+            return self._subst(raw)
+        return "{{ " + self._subst(raw) + " }}"
+
+    # ── Component call ────────────────────────────────────────────────────────
+
+    def _emit_call(self, node: ComponentCall) -> str:
+        out: list[str] = []
+        slot_vars: list[tuple[str, str]] = []  # (slot_name, jinja_var)
+
+        # Capture default slot content
+        if node.children:
+            out.append("{% set __slot_default %}")
+            out.append(self._emit_nodes(node.children))
+            out.append("{% endset %}")
+            slot_vars.append(("default", "__slot_default"))
+
+        # Capture named slot content
+        for sname, schildren in node.named_slots.items():
+            var = f"__slot_{sname}"
+            out.append(f"{{% set {var} %}}")
+            out.append(self._emit_nodes(schildren))
+            out.append("{% endset %}")
+            slot_vars.append((sname, var))
+
+        if node.name in self._local_components:
+            args = [self._attr_as_arg(a) for a in node.attrs]
+            args += [f"__slot_{sn}={sv}" for sn, sv in slot_vars]
+            out.append(f"{{{{ {node.name}({', '.join(args)}) }}}}")
+        else:
+            entry = self._imported_components.get(node.name)
+            if entry is None:
+                raise CompileError(
+                    f"Unknown component <{node.name}>; add @import or define @component {node.name}",
+                    file=self.filename,
+                    line=node.line,
+                )
+            tpl, comp_override = entry
+            props_expr = (
+                "{"
+                + ", ".join(
+                    f"{json.dumps(a.name.lstrip(':'))}: {self._attr_val_as_expr(a.value)}"
+                    for a in node.attrs
+                )
+                + "}"
+            )
+            slots_expr = (
+                "{" + ", ".join(f"{json.dumps(sn)}: {sv}" for sn, sv in slot_vars) + "}"
+            )
+            if comp_override:
+                out.append(
+                    f"{{{{ __pjx_render_component({tpl!r}, {props_expr}, {slots_expr}, {comp_override!r}) }}}}"
+                )
+            else:
+                out.append(
+                    f"{{{{ __pjx_render_component({tpl!r}, {props_expr}, {slots_expr}) }}}}"
+                )
+
+        return "".join(out)
+
+    def _attr_as_arg(self, attr: Attribute) -> str:
+        name = attr.name.lstrip(":")
+        return f"{name}={self._attr_val_as_expr(attr.value)}"
+
+    _INTERP_RE = re.compile(r"\{\{(.+?)\}\}")
+
+    def _attr_val_as_expr(self, raw: str | None) -> str:
+        """Return a bare Jinja2 expression string for a prop value in a macro call."""
+        if raw is None:
+            return "True"
+        raw = self._subst(raw)
+        if raw.startswith("{{") and raw.endswith("}}") and raw.count("{{") == 1:
+            return raw[2:-2].strip()
+        if "{{" in raw:
+            parts: list[str] = []
+            last = 0
+            for m in self._INTERP_RE.finditer(raw):
+                before = raw[last : m.start()]
+                if before:
+                    parts.append(json.dumps(before))
+                parts.append(f"({m.group(1).strip()})")
+                last = m.end()
+            after = raw[last:]
+            if after:
+                parts.append(json.dumps(after))
+            return " ~ ".join(parts) if parts else json.dumps(raw)
+        return json.dumps(raw)
+
+    # ── Slot output ───────────────────────────────────────────────────────────
+
+    def _emit_slot(self, node: SlotNode) -> str:
+        v = f"__slot_{node.name}"
+        if node.fallback:
+            return (
+                f"{{% if {v} %}}"
+                f"{{{{ {v} | safe }}}}"
+                "{% else %}" + self._emit_nodes(node.fallback) + "{% endif %}"
+            )
+        return f"{{{{ {v} | safe }}}}"
+
+    # ── Control structures ────────────────────────────────────────────────────
+
+    def _emit_show(self, node: ShowNode) -> str:
+        cond = self._subst_cond(node.condition)
+        out = [f"{{% if {cond} %}}", self._emit_nodes(node.children)]
+        if node.fallback:
+            out += ["{% else %}", self._emit_nodes(node.fallback)]
+        out.append("{% endif %}")
+        return "".join(out)
+
+    def _emit_for(self, node: ForNode) -> str:
+        iterable = self._subst_cond(node.iterable)
+        out = [f"{{% for {node.variable} in {iterable} %}}"]
+        if node.index_var:
+            out.append(f"{{% set {node.index_var} = loop.index0 %}}")
+        out.append(self._emit_nodes(node.children))
+        if node.empty:
+            out += ["{% else %}", self._emit_nodes(node.empty)]
+        out.append("{% endfor %}")
+        return "".join(out)
+
+    def _emit_switch(self, node: SwitchNode) -> str:
+        if not node.cases and not node.fallback:
+            return ""
+        expr = self._subst_cond(node.expression)
+        out: list[str] = []
+        for i, case in enumerate(node.cases):
+            kw = "if" if i == 0 else "elif"
+            val = self._case_val(case.value)
+            out.append(f"{{% {kw} {expr} == {val} %}}")
+            out.append(self._emit_nodes(case.children))
+        if node.fallback:
+            out += ["{% else %}", self._emit_nodes(node.fallback)]
+        out.append("{% endif %}")
+        return "".join(out)
+
+    def _case_val(self, v: str) -> str:
+        """Return a Jinja2 literal for a <Match value="..."> attribute."""
+        v = v.strip()
+        # Explicit Jinja2 expression — unwrap
+        if v.startswith("{{") and v.endswith("}}"):
+            return v[2:-2].strip()
+        # Numeric literal
+        if re.match(r"^-?\d+(\.\d+)?$", v):
+            return v
+        # Everything else is a string literal
+        return json.dumps(v)
+
+    # ── @-helper substitution ─────────────────────────────────────────────────
+
+    def _subst(self, s: str) -> str:
+        """Replace ``{{ @helper }}`` patterns with their Jinja2 equivalents."""
+        return _RE_HELPER.sub(_replace_helper, s)
+
+    def _subst_cond(self, s: str) -> str:
+        """Replace bare ``@helper`` patterns in control-flow expressions."""
+        return _RE_HELPER_BARE.sub(_replace_helper_bare, s)
 
 
-def _prop_spec_from_decl(prop: PropDeclNode) -> PropSpec:
-    return PropSpec(
-        name=prop.name,
-        type_expr=prop.type_expr,
-        default_expr=prop.default_expr,
-    )
+# ── Module-level helpers ───────────────────────────────────────────────────────
+
+
+def _replace_helper(m: re.Match) -> str:  # type: ignore[type-arg]
+    """Replaces ``{{ @helper }}`` — for use in text/attribute contexts."""
+    expr = m.group(1)
+    if expr == "id":
+        return "{{ __pjx_id }}"
+    if expr == "state":
+        return "{{ __pjx_state | tojson }}"
+    hs = re.match(r"has_slot\(['\"]?([\w-]+)['\"]?\)", expr)
+    if hs:
+        return f"{{{{ __slot_{hs.group(1)} }}}}"
+    eu = re.match(r"event_url\((.+)\)", expr)
+    if eu:
+        return f"{{{{ __pjx_event_url({eu.group(1)}) }}}}"
+    return m.group(0)
+
+
+def _replace_helper_bare(m: re.Match) -> str:  # type: ignore[type-arg]
+    """Replaces bare ``@helper`` — for use inside {% if %} / {% for %} expressions."""
+    expr = m.group(1)
+    if expr == "id":
+        return "__pjx_id"
+    if expr == "state":
+        return "__pjx_state"
+    hs = re.match(r"has_slot\(['\"]?([\w-]+)['\"]?\)", expr)
+    if hs:
+        return f"__slot_{hs.group(1)}"
+    eu = re.match(r"event_url\((.+)\)", expr)
+    if eu:
+        return f"__pjx_event_url({eu.group(1)})"
+    return m.group(0)

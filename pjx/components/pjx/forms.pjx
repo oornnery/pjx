@@ -1,0 +1,161 @@
+@component Label {
+  @props { for: str = "", required: str = "" }
+  @slot default
+  <label class="label" for="{{ for }}">
+    <slot />
+    <Show when="{{ required }}"><span class="text-destructive" aria-hidden="true">*</span></Show>
+  </label>
+}
+
+@component Field {
+  @props { label: str = "", help: str = "", required: str = "", error: str = "" }
+  @slot default
+  <div class="grid gap-2">
+    <Show when="{{ label }}">
+      <label class="label">
+        {{ label }}
+        <Show when="{{ required }}"><span class="text-destructive" aria-hidden="true">*</span></Show>
+      </label>
+    </Show>
+    <slot />
+    <Show when="{{ error }}"><p class="text-destructive text-sm" role="alert" aria-live="assertive">{{ error }}</p></Show>
+    <Show when="{{ help and not error }}"><p class="text-muted-foreground text-sm">{{ help }}</p></Show>
+  </div>
+}
+
+@component Input {
+  @props {
+    name: str,
+    type: str = "text",
+    label: str = "",
+    placeholder: str = "",
+    value: str = "",
+    required: str = "",
+    disabled: str = "",
+    error: str = "",
+    help: str = ""
+  }
+  <div class="grid gap-2">
+    <Show when="{{ label }}">
+      <label class="label" for="{{ name }}">
+        {{ label }}
+        <Show when="{{ required }}"><span class="text-destructive">*</span></Show>
+      </label>
+    </Show>
+    <input class="input" id="{{ name }}" name="{{ name }}" type="{{ type }}" placeholder="{{ placeholder }}" value="{{ value }}" />
+    <Show when="{{ error }}"><p class="text-destructive text-sm" role="alert" aria-live="assertive">{{ error }}</p></Show>
+    <Show when="{{ help and not error }}"><p class="text-muted-foreground text-sm">{{ help }}</p></Show>
+  </div>
+}
+
+@component TextArea {
+  @props {
+    name: str,
+    label: str = "",
+    placeholder: str = "",
+    rows: str = "4",
+    required: str = "",
+    disabled: str = "",
+    error: str = "",
+    help: str = ""
+  }
+  <div class="grid gap-2">
+    <Show when="{{ label }}">
+      <label class="label" for="{{ name }}">
+        {{ label }}
+        <Show when="{{ required }}"><span class="text-destructive">*</span></Show>
+      </label>
+    </Show>
+    <textarea class="textarea" id="{{ name }}" name="{{ name }}" placeholder="{{ placeholder }}" rows="{{ rows }}"></textarea>
+    <Show when="{{ error }}"><p class="text-destructive text-sm" role="alert" aria-live="assertive">{{ error }}</p></Show>
+    <Show when="{{ help and not error }}"><p class="text-muted-foreground text-sm">{{ help }}</p></Show>
+  </div>
+}
+
+@component Select {
+  @props { name: str, label: str = "", required: str = "", disabled: str = "", error: str = "", help: str = "" }
+  @slot default
+  <div class="grid gap-2">
+    <Show when="{{ label }}">
+      <label class="label" for="{{ name }}">
+        {{ label }}
+        <Show when="{{ required }}"><span class="text-destructive">*</span></Show>
+      </label>
+    </Show>
+    <select class="select" id="{{ name }}" name="{{ name }}">
+      <slot />
+    </select>
+    <Show when="{{ error }}"><p class="text-destructive text-sm" role="alert" aria-live="assertive">{{ error }}</p></Show>
+    <Show when="{{ help and not error }}"><p class="text-muted-foreground text-sm">{{ help }}</p></Show>
+  </div>
+}
+
+@component Checkbox {
+  @props { name: str, label: str = "", checked: str = "", value: str = "1", disabled: str = "" }
+  <label class="label gap-3 font-normal">
+    <input class="input" type="checkbox" id="{{ name }}" name="{{ name }}" value="{{ value }}" />
+    <Show when="{{ label }}">{{ label }}</Show>
+  </label>
+}
+
+@component RadioGroup {
+  @props { name: str, label: str = "" }
+  @slot default
+  <fieldset class="grid gap-3">
+    <Show when="{{ label }}">
+      <legend class="label">{{ label }}</legend>
+    </Show>
+    <slot />
+  </fieldset>
+}
+
+@component RadioItem {
+  @props { name: str, value: str, label: str = "", description: str = "", checked: str = "" }
+  <label class="label gap-3 font-normal">
+    <input class="input" type="radio" name="{{ name }}" value="{{ value }}" />
+    <div>
+      <span>{{ label }}</span>
+      <Show when="{{ description }}">
+        <p class="text-muted-foreground text-sm font-normal">{{ description }}</p>
+      </Show>
+    </div>
+  </label>
+}
+
+@component Combobox {
+  @props { name: str, label: str = "", placeholder: str = "Select...", options: str = "" }
+  <div
+    class="grid gap-2"
+    x-data="{ search: '', open: false, opts: '{{ options }}'.split(',').map(s => s.trim()).filter(Boolean), selected: '' }"
+  >
+    <Show when="{{ label }}">
+      <label class="label">{{ label }}</label>
+    </Show>
+    <div class="relative">
+      <input
+        class="input w-full"
+        type="text"
+        x-model="search"
+        x-on:focus="open = true"
+        x-on:blur="setTimeout(() => open = false, 150)"
+        placeholder="{{ placeholder }}"
+        autocomplete="off"
+        role="combobox"
+      />
+      <div
+        class="absolute z-50 mt-1 w-full rounded-md border bg-popover p-1 shadow-md max-h-60 overflow-y-auto"
+        x-show="open && opts.filter(o => o.toLowerCase().includes(search.toLowerCase())).length > 0"
+        x-cloak
+      >
+        <template x-for="opt in opts.filter(o => o.toLowerCase().includes(search.toLowerCase()))">
+          <div
+            class="relative flex cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent hover:text-accent-foreground"
+            x-text="opt"
+            x-on:mousedown.prevent="selected = opt; search = opt; open = false"
+          ></div>
+        </template>
+      </div>
+    </div>
+    <input type="hidden" x-bind:value="selected" name="{{ name }}" />
+  </div>
+}

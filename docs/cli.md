@@ -2,32 +2,26 @@
 
 ## Objetivo
 
-O CLI do PJX existe para duas tarefas:
+O CLI do PJX existe para quatro tarefas:
 
 * validar templates e rotas HTML
 * formatar templates no estilo canonico do projeto
+* compilar `.pjx` para `.jinja` (modo batch ou bundle)
+* benchmark de render: Jinja2 vs MiniJinja
 
 Implementacao atual:
 
-* interface: [pjx/cli.py](/home/oornnery/proj/pjx/pjx/cli.py)
-* nucleo: [pjx/tooling.py](/home/oornnery/proj/pjx/pjx/tooling.py)
+* interface: `pjx/cli.py`
+* nucleo: `pjx/tooling.py`, `pjx/compile.py`, `pjx/bench.py`
 
 ## Stack
 
 ```text
-Typer
-|
-`-- parsing de comandos e exit codes
-
-Rich
-|
-`-- output de terminal
-
-tooling.py
-|
-+-- load_project
-+-- check_project
-`-- format_project
+Typer -> parsing de comandos e exit codes
+Rich  -> output de terminal
+tooling.py -> load_project, check_project, format_project
+compile.py -> compile_project, _ImportResolver, _compile_bundled
+bench.py   -> run_bench, render_bench_report
 ```
 
 ## Comandos
@@ -44,15 +38,50 @@ Aceita:
 
 * import target, como `exemples.main:pjx`
 * pasta de projeto
-* arquivo `.jinja`
+* arquivo `.pjx`
 
 ### format
 
 ```bash
 uv run pjx format exemples.main:pjx --check
 uv run pjx format exemples.main:pjx
-uv run pjx format path/to/Button.jinja
+uv run pjx format path/to/Button.pjx
 ```
+
+### compile
+
+```bash
+uv run pjx compile exemples.main:pjx --output build/
+uv run pjx compile exemples.main:pjx --output build/ --clean
+uv run pjx compile exemples.main:pjx --output build/ --bundle
+```
+
+Opcoes:
+
+* `--output / -o` — diretorio de saida (default: `build`)
+* `--clean` — remove o diretorio de saida antes de compilar
+* `--bundle` — inlina macros de componentes importados em cada page template
+
+Em bundle mode, o output e auto-contido: nao precisa de callbacks Python no
+render. Util para pre-compilar templates que serao servidos via MiniJinja ou
+outro engine.
+
+### bench
+
+```bash
+uv run pjx bench exemples.main:pjx
+uv run pjx bench exemples.main:pjx --iterations 200 --warmup 10
+uv run pjx bench exemples.main:pjx --bundle
+```
+
+Opcoes:
+
+* `--iterations / -n` — iteracoes de render por template (default: 100)
+* `--warmup` — iteracoes de aquecimento antes de medir (default: 5)
+* `--bundle` — inlina componentes antes de medir (elimina callbacks Python)
+
+A saida e uma tabela com colunas `Compile`, `Jinja2`, `MiniJinja` e `Speedup`.
+Requer `minijinja` instalado (`uv add "pjx[minijinja]"`).
 
 ## Exit Codes
 
@@ -68,12 +97,8 @@ Hoje o `pjx check` cobre:
 
 * parse estrutural
 * compile step
-* alias de import ausente
-* alias de import duplicado
 * imports inexistentes
 * self-import
-* assets locais ausentes
-* nome de componente divergente do arquivo
 * nome de componente fora de TitleCase
 * nome de componente duplicado
 * template sombreado entre mounts
@@ -88,21 +113,13 @@ A saida textual usa codigos numericos estaveis:
 [101] parse_error
 [102] compile_error
 [105] missing_import
+[108] component_name_mismatch
+[109] component_name_style
+[110] duplicate_component_name
+[111] shadowed_template
+[112] import_cycle
+[113] missing_route_template
 ```
-
-Exemplo:
-
-```text
-Template issues:
-  components/ui/Broken.jinja
-    ERROR [105] missing_import [components/ui/Missing.jinja]: imported component "components/ui/Missing.jinja" does not exist
-```
-
-Objetivo:
-
-* facilitar leitura rapida
-* facilitar busca
-* manter automacao simples
 
 ## JSON Output
 
@@ -137,8 +154,8 @@ O formatter atual e estrutural, nao um pretty-printer completo de HTML.
 
 Ele:
 
-* reorganiza preambulo
-* estabiliza blocos de props
+* reorganiza imports
+* estabiliza blocos de @props, @slot, @state
 * normaliza quebras de linha do componente
 
 Ele nao:
@@ -149,6 +166,8 @@ Ele nao:
 
 ## Limites Atuais
 
-* o `check` valida bastante coisa, mas ainda nao cobre todos os contratos semanticos possiveis do runtime
+* o `check` valida bastante coisa, mas ainda nao cobre todos os contratos
+  semanticos possiveis do runtime
 * o formatter ainda nao trabalha com spans/token stream
-* a saida do `check` hoje e simples por design; ainda da para enriquecer com tabelas e agrupamentos do Rich
+* o `compile` em bundle mode depende do resolver encontrar todos os imports
+  corretamente; imports dinamicos ou condicionais nao sao suportados

@@ -12,31 +12,27 @@ Decisao:
 Motivo:
 
 * a API publica do PJX gira em torno de `FastAPI`, `Request`, `Response`,
-  `StaticFiles` e mount de sub-app
+  `StaticFiles` e rotas registradas via `init_app`
 * tratar FastAPI como extra deixava a historia do framework artificial
 
-Tradeoff:
-
-* o pacote fica menos agnostico a framework no curto prazo
-
-## 2. PJX como sub-app montado
+## 2. PJX registra no app via init_app
 
 Decisao:
 
-* o app principal continua sendo FastAPI
-* o PJX materializa um sub-app com `pjx.app(...)`
+* `Pjx.init_app(app)` registra rotas e assets diretamente no FastAPI do usuario
+* sem sub-app separado
 
 Motivo:
 
-* deixa a responsabilidade do app host no FastAPI
-* reduz o acoplamento da API publica
-* simplifica mount de static, pages e actions
+* simplifica middleware, CORS e static mounts
+* rotas PJX aparecem no mesmo OpenAPI schema
+* `app.state.pjx` e `app.state.pjx_catalog` ficam acessiveis
 
-## 3. PJXRouter no lugar de API declarativa genérica
+## 3. PjxRouter no lugar de API declarativa generica
 
 Decisao:
 
-* usar `PJXRouter` como coletor de `page`, `action` e `directive`
+* usar `PjxRouter` como coletor de `page` e `action`
 
 Motivo:
 
@@ -65,27 +61,18 @@ Motivo:
 
 * a raiz principal continua limpa
 * evita colisao entre paths relativos de mounts diferentes
-* reaproveita um modelo mental ja usado em alias de templates
 
-API atual:
-
-```python
-templates=[
-    "templates",
-    {"prefix": "admin", "path": "admin_templates"},
-]
-```
-
-## 6. Parser estrutural antes de runtime novo
+## 6. Sintaxe `@directive` canonica
 
 Decisao:
 
-* sair do modo puramente regex-first na estrutura do arquivo antes de atacar runtime reativo nativo
+* toda diretiva PJX usa `@` como prefixo: `@props`, `@from`, `@component`, etc.
+* extensao canonica e `.pjx`
 
 Motivo:
 
-* parser e AST sao a base para tooling, validacao, erros e evolucao de sintaxe
-* sem isso, cada feature nova custa caro demais
+* distingue claramente PJX de Jinja nativo
+* evita ambiguidade com `{% %}` que e passthrough para Jinja
 
 ## 7. HTMX + Alpine como enhancement
 
@@ -96,21 +83,21 @@ Decisao:
 
 Motivo:
 
-* isso entrega interatividade agora
+* entrega interatividade agora
 * mantem o projeto server-first
-* evita inventar um runtime pesado cedo demais
 
-## 8. Tailwind separado de browser integrations
+## 8. render() como Depends
 
 Decisao:
 
-* Tailwind e integracao de build
-* HTMX e Alpine sao integrations de runtime
+* `render(template, layout=None)` retorna `Page` ou `Template` via FastAPI Depends
+* `Page.__call__(**context)` e `Template.__call__(**context)` retornam `HTMLResponse`
 
 Motivo:
 
-* Tailwind depende de scanner, config e build/watch
-* nao faz sentido tratá-lo como simples script injetado
+* aproveita o sistema de DI do FastAPI
+* permite usar em rotas sem PjxRouter
+* context processors sao executados automaticamente
 
 ## 9. CLI primeiro como tooling do projeto
 
@@ -129,36 +116,49 @@ Decisao:
 
 * usar `Typer` para parsing e `Rich` para output
 
-Motivo:
-
-* API mais clara
-* bom suporte a testes
-* base melhor para crescer com mais comandos
-
 ## 11. Numeros estaveis nas validacoes
 
 Decisao:
 
 * o `check` usa codigos estaveis como `[101] parse_error`
 
-Motivo:
-
-* deixa a saida mais escaneavel
-* melhora a automacao
-* permite documentacao consistente dos erros
-
-## 12. Renderer continua Jinja2 por enquanto
+## 12. MiniJinja como backend alternativo
 
 Decisao:
 
-* manter Jinja2 como backend de render atual
+* `MiniJinjaRuntime` e um drop-in para `Runtime` usando `minijinja` (Rust)
+* selecionado via `Pjx(renderer="minijinja")`
+* requer extra: `pjx[minijinja]`
 
 Motivo:
 
-* o foco imediato e fechar linguagem, compiler, runtime e tooling
-* trocar backend cedo demais aumentaria a superficie de risco
+* MiniJinja oferece render significativamente mais rapido que Jinja2 em
+  templates simples (medido com `pjx bench`)
+* a API e identica: `render_root`, `_render_component`, cache por mtime
+* a coexistencia de backends permite comparar e migrar gradualmente
 
 Consequencia:
 
-* ainda existe acoplamento a Jinja2 no runtime
-* `minijinja` continua como proxima fase, nao como base atual
+* `catalog.py` expoe `_create_runtime(renderer, catalog)` como factory
+* `fastapi.py` aceita `renderer=` e `bundle=` no construtor de `Pjx`
+* o default continua sendo Jinja2
+
+## 13. Bundle mode para templates auto-contidos
+
+Decisao:
+
+* `compile_pjx(bundle=True)` emite chamadas diretas de macro em vez de
+  `__pjx_render_component`
+* `_ImportResolver` resolve imports recursivamente e gera macro preamble
+* `pjx compile --bundle` produz `.jinja` auto-contidos sem callbacks Python
+
+Motivo:
+
+* elimina o overhead de callbacks Python por componente no MiniJinja
+* permite auditoria do output compilado
+* habilita deploy estatico de templates pre-compilados
+
+Consequencia:
+
+* bundle mode e opt-in (`bundle=False` por default)
+* imports dinamicos ou condicionais nao sao suportados no bundle resolver

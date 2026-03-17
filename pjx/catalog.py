@@ -31,14 +31,18 @@ class Catalog:
         root: str,
         aliases: dict[str, str] | None = None,
         auto_reload: bool = True,
+        renderer: str = "jinja2",
+        bundle: bool = False,
     ) -> None:
         self.root = Path(root)
         self.aliases = aliases or {}
         self.auto_reload = auto_reload
+        self.renderer_name = renderer
+        self.bundle = bundle
         self.base_assets: list[AssetImport] = []
         self.directives: dict[str, Callable[..., Any]] = {}
         self._template_mounts: list[TemplateMount] = [TemplateMount(path=self.root)]
-        self.runtime = Runtime(self)
+        self.runtime = _create_runtime(renderer, self)
 
     @property
     def template_roots(self) -> list[Path]:
@@ -95,16 +99,17 @@ class Catalog:
     def list_components(self) -> list[str]:
         components: dict[str, Path] = {}
         for mount in self._template_mounts:
-            for path in mount.path.rglob("*.jinja"):
-                if not path.is_file():
-                    continue
-                relative_path = str(path.relative_to(mount.path))
-                normalized_prefix = _normalize_template_prefix(mount.prefix)
-                if normalized_prefix is None:
-                    import_path = relative_path
-                else:
-                    import_path = f"@{normalized_prefix}/{relative_path}"
-                components.setdefault(import_path, path)
+            for pattern in ("*.pjx",):
+                for path in mount.path.rglob(pattern):
+                    if not path.is_file():
+                        continue
+                    relative_path = str(path.relative_to(mount.path))
+                    normalized_prefix = _normalize_template_prefix(mount.prefix)
+                    if normalized_prefix is None:
+                        import_path = relative_path
+                    else:
+                        import_path = f"@{normalized_prefix}/{relative_path}"
+                    components.setdefault(import_path, path)
         return sorted(components)
 
     def import_path_for_file(self, path: str | Path) -> str:
@@ -208,7 +213,12 @@ class Catalog:
                 element.attrs[key.split(":", 1)[1]] = value
                 element.attrs.pop(key, None)
                 continue
-            if key in {"jx-text", "jx-html"}:
+            if key == "jx-text":
+                element.text_content = str(value)
+                element.attrs.pop(key, None)
+                continue
+            if key == "jx-html":
+                element.html_content = str(value)
                 element.attrs.pop(key, None)
                 continue
             if key == "jx-class":
@@ -264,3 +274,12 @@ def _normalize_template_prefix(prefix: str | None) -> str | None:
         return None
     normalized = normalized.lstrip("@").strip("/")
     return normalized or None
+
+
+def _create_runtime(renderer: str, catalog: Any) -> Any:
+    """Factory for creating the appropriate runtime backend."""
+    if renderer == "minijinja":
+        from .runtime_minijinja import MiniJinjaRuntime
+
+        return MiniJinjaRuntime(catalog)
+    return Runtime(catalog)

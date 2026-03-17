@@ -1,0 +1,125 @@
+@component Button {
+  @props { label: str = "", variant: str = "default", size: str = "md", type: str = "button" }
+  @slot default
+  @slot icon?
+  {% set _cls_map = {"default": "btn", "primary": "btn", "secondary": "btn-secondary", "outline": "btn-outline", "ghost": "btn-ghost", "danger": "btn-destructive", "destructive": "btn-destructive", "link": "btn-link"} %}
+  {% set _size_map = {"sm": "-sm", "lg": "-lg", "md": "", "xs": "-sm", "icon": "-icon"} %}
+  {% set _base = _cls_map.get(variant, "btn") %}
+  {% set _sz = _size_map.get(size, "") %}
+  <button class="{{ _base }}{{ _sz }}" type="{{ type }}">
+    <Show when="{{ @has_slot('icon') }}"><slot name="icon" /></Show>
+    <Show when="{{ label }}">{{ label }}</Show>
+    <slot />
+  </button>
+}
+
+@component Badge {
+  @props { text: str = "", variant: str = "neutral" }
+  @slot default
+  @slot icon?
+  {% set _cls_map = {"neutral": "badge-secondary", "primary": "badge", "secondary": "badge-secondary", "destructive": "badge-destructive", "outline": "badge-outline", "ready": "badge", "building": "badge-secondary", "draft": "badge-outline", "failed": "badge-destructive"} %}
+  <span class="{{ _cls_map.get(variant, 'badge-secondary') }}">
+    <Show when="{{ @has_slot('icon') }}"><slot name="icon" /></Show>
+    <Show when="{{ text }}">{{ text }}</Show>
+    <slot />
+  </span>
+}
+
+@component Alert {
+  @props { message: str = "", title: str = "", type: str = "info" }
+  @slot default
+  @slot icon?
+  {% set _cls = "alert-destructive" if type in ("danger", "error") else "alert" %}
+  <div class="{{ _cls }}" role="alert">
+    <Show when="{{ @has_slot('icon') }}"><slot name="icon" /></Show>
+    <Show when="{{ title }}"><h2>{{ title }}</h2></Show>
+    <Show when="{{ message }}"><section>{{ message }}</section></Show>
+    <slot />
+  </div>
+}
+
+@component Skeleton {
+  @props { variant: str = "text", width: str = "100%", height: str = "" }
+  {% set _map = {"text": "h-4 w-full rounded-md", "circle": "size-10 rounded-full", "rect": "h-24 w-full rounded-md"} %}
+  <div class="bg-accent animate-pulse {{ _map.get(variant, 'h-4 w-full rounded-md') }}"></div>
+}
+
+@component Toggle {
+  @props { name: str = "", label: str = "", checked: str = "", value: str = "1", disabled: str = "" }
+  <label class="label gap-3">
+    <input type="checkbox" role="switch" class="input" name="{{ name }}" value="{{ value }}" />
+    <Show when="{{ label }}">{{ label }}</Show>
+  </label>
+}
+
+@component Slider {
+  @props { name: str = "slider", min: str = "0", max: str = "100", value: str = "50", step: str = "1" }
+  <div class="flex items-center gap-4" x-data="{ val: {{ value }} }">
+    <input
+      type="range"
+      class="input w-full"
+      name="{{ name }}"
+      min="{{ min }}"
+      max="{{ max }}"
+      step="{{ step }}"
+      x-bind:value="val"
+      x-on:input="val = parseInt($event.target.value)"
+    />
+    <span class="text-sm text-muted-foreground tabular-nums min-w-[2ch] text-right" x-text="val"></span>
+  </div>
+}
+
+@component Spinner {
+  @props { size: str = "md" }
+  {% set _sz_map = {"xs": "size-3", "sm": "size-4", "md": "size-5", "lg": "size-6"} %}
+  <div role="status" aria-label="Loading">
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="{{ _sz_map.get(size, 'size-5') }} animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+  </div>
+}
+
+@component Tag {
+  @props { label: str = "" }
+  @slot default
+  <span class="badge-outline">
+    <Show when="{{ label }}">{{ label }}</Show>
+    <slot />
+  </span>
+}
+
+@component Stat {
+  @props { label: str = "", value: str = "", trend: str = "" }
+  <div class="flex flex-col gap-1">
+    <span class="text-2xl font-bold tracking-tight">{{ value }}</span>
+    <span class="text-sm text-muted-foreground">{{ label }}</span>
+    <Show when="{{ trend }}"><span class="text-xs text-emerald-500">{{ trend }}</span></Show>
+  </div>
+}
+
+@component Avatar {
+  @props { name: str = "", src: str = "", size: str = "md" }
+  {% set _sz_map = {"xs": "size-6", "sm": "size-8", "md": "size-10", "lg": "size-12", "xl": "size-14"} %}
+  {% set _sz = _sz_map.get(size, "size-10") %}
+  <Show when="{{ src }}">
+    <img src="{{ src }}" alt="{{ name }}" class="{{ _sz }} shrink-0 object-cover rounded-full" />
+  </Show>
+  <Show when="{{ not src and name }}">
+    <span class="{{ _sz }} shrink-0 rounded-full bg-muted flex items-center justify-center text-xs font-medium">{{ name[:2].upper() }}</span>
+  </Show>
+}
+
+@component AvatarGroup {
+  @slot default
+  <div class="flex -space-x-2 [&_img]:ring-background [&_img]:ring-2 [&_span]:ring-background [&_span]:ring-2"><slot /></div>
+}
+
+@component EmptyState {
+  @props { title: str = "Nothing here", description: str = "" }
+  @slot default
+  <div class="flex min-w-0 flex-1 flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-8 text-center">
+    <h3 class="text-lg font-medium tracking-tight">{{ title }}</h3>
+    <Show when="{{ description }}">
+      <p class="text-muted-foreground text-sm">{{ description }}</p>
+    </Show>
+    <slot />
+  </div>
+}

@@ -1,413 +1,982 @@
+"""Recursive descent parser for .pjx source files.
+
+Produces a PjxFile AST from raw source text.
+
+Design notes
+------------
+* No separate lexer — the parser operates directly on the source string via
+  a position cursor.  This avoids the dead-code problem identified in the
+  reviewed implementations.
+* `@component` blocks are parsed with a proper brace-depth tracker, not a
+  naive ``str.replace`` that fires on the first ``}`` it sees.
+* Every ``{{ }}`` expression is treated as an opaque token and preserved
+  verbatim; Jinja2 will evaluate it at render time.
+* Line / col tracking is used exclusively for error messages.
+"""
+
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from typing import Any
 
 from .ast import (
-    ActionDirectiveNode,
-    ComponentDirectiveNode,
-    ComponentNode,
-    ComputedDirectiveNode,
-    ImportNode,
-    InjectDirectiveNode,
-    PropDeclNode,
-    PropsAliasNode,
-    PropsDirectiveNode,
-    ProvideDirectiveNode,
-    SignalDirectiveNode,
-    SlotDirectiveNode,
-    SourceFileNode,
+    Attribute,
+    BindDirective,
+    ComponentCall,
+    ComponentDef,
+    ExprNode,
+    ForNode,
+    FromImport,
+    HtmlElement,
+    ImportDirective,
+    LetDirective,
+    MatchCase,
+    NamedSlotContent,
+    PjxFile,
+    PropDef,
+    PropsBlock,
+    ShowNode,
+    SlotDecl,
+    SlotNode,
+    StateBlock,
+    StateField,
+    SwitchNode,
+    TextNode,
+)
+from .exceptions import ParseError
+
+# ── Constants ─────────────────────────────────────────────────────────────────
+
+_VOID_ELEMENTS = frozenset(
+    "area base br col embed hr img input link meta param source track wbr".split()
 )
 
+_RE_IDENT = re.compile(r"[A-Za-z_]\w*")
+_RE_DOTTED = re.compile(r"[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*")
+_RE_TAG_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
+_RE_ATTR_NAME = re.compile(r"[@:A-Za-z_][\w.:-]*")
+_RE_SLOT_CLOSE = re.compile(r"</:([\w-]+)>")
+_RE_COMMENT = re.compile(r"\{#.*?#\}", re.DOTALL)
 
-_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_TAG_RE = re.compile(r"^\s*\{%\s*(.*?)\s*%\}\s*$", re.DOTALL)
-_SIGNAL_RE = re.compile(
-    r"^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*signal\((.*)\)\s*$",
-    re.DOTALL,
-)
+
+# ── Parser ────────────────────────────────────────────────────────────────────
 
 
-def parse_component_source(source: str, path: Path) -> SourceFileNode:
-    imports: list[ImportNode] = []
-    prop_aliases: list[PropsAliasNode] = []
-    component: ComponentNode | None = None
-    position = 0
+class Parser:
+    """Parse a .pjx source string into a ``PjxFile`` AST."""
 
-    while True:
-        position = _skip_whitespace(source, position)
-        if position >= len(source):
-            break
-        if not source.startswith("{%", position):
-            raise ValueError(f"{path}: unexpected content before component declaration")
+    def __init__(self, source: str, filename: str = "<string>") -> None:
+        self.source = source
+        self.filename = filename
+        self.pos = 0
+        self.line = 1
+        self.col = 1
 
-        raw_tag, next_position = _read_tag(source, position)
-        inner = _extract_tag_body(raw_tag)
-        keyword, remainder = _split_keyword(inner)
+    # ── Public entry ──────────────────────────────────────────────────────────
 
-        match keyword:
-            case "import":
-                position = _handle_top_level_import(remainder, imports, next_position)
-            case "set":
-                position = _handle_top_level_set(inner, prop_aliases, next_position)
-            case "component":
-                if component is not None:
-                    raise ValueError(
-                        f"{path}: multiple component declarations are not supported"
+    def parse(self) -> PjxFile:
+        self._skip_blanks()
+        imports: list[FromImport | ImportDirective] = []
+        bind: BindDirective | None = None
+        props: PropsBlock | None = None
+        slots: list[SlotDecl] = []
+        state: StateBlock | None = None
+        lets: list[LetDirective] = []
+        components: list[ComponentDef] = []
+
+        # Multi-component mode: all top-level content is @component blocks
+        if self._has_component_blocks():
+            while not self._at_end():
+                self._skip_blanks()
+                if self._at_end():
+                    break
+                if self._lookahead("@from"):
+                    imports.append(self._parse_from())
+                elif self._lookahead("@import"):
+                    imports.append(self._parse_import())
+                elif self._lookahead("@component"):
+                    components.append(self._parse_component_def())
+                else:
+                    ch = self.source[self.pos]
+                    raise ParseError(
+                        f"Unexpected character {ch!r} in multi-component file",
+                        file=self.filename,
+                        line=self.line,
                     )
-                component, position = _handle_top_level_component(
-                    source,
-                    next_position,
-                    remainder,
-                    path,
-                )
-                break
-            case _:
-                raise ValueError(f"{path}: unexpected top-level tag {keyword!r}")
-
-    if component is None:
-        raise ValueError(f"{path}: expected a component declaration")
-
-    position = _skip_whitespace(source, position)
-    if position != len(source):
-        raise ValueError(f"{path}: unexpected content after component declaration")
-
-    return SourceFileNode(
-        imports=tuple(imports),
-        prop_aliases=tuple(prop_aliases),
-        component=component,
-    )
-
-
-def _parse_component(
-    source: str,
-    position: int,
-    signature_source: str,
-    path: Path,
-) -> tuple[ComponentNode, int]:
-    name, modifiers = _parse_component_signature(signature_source, path)
-    body, end_position = _read_block(source, position, "endcomponent")
-    directives, remainder = _parse_component_directives(body)
-    return (
-        ComponentNode(
-            name=name,
-            modifiers=modifiers,
-            directives=tuple(directives),
-            body=remainder,
-        ),
-        end_position,
-    )
-
-
-def _parse_component_signature(source: str, path: Path) -> tuple[str, tuple[str, ...]]:
-    tokens = source.split()
-    if not tokens:
-        raise ValueError(f"{path}: component declaration requires a name")
-    name = tokens[0]
-    if not _IDENTIFIER_RE.fullmatch(name):
-        raise ValueError(f"{path}: invalid component name {name!r}")
-
-    modifiers = tuple(tokens[1:])
-    for modifier in modifiers:
-        if not _IDENTIFIER_RE.fullmatch(modifier):
-            raise ValueError(f"{path}: invalid component modifier {modifier!r}")
-    return name, modifiers
-
-
-def _parse_component_directives(body: str) -> tuple[list[ComponentDirectiveNode], str]:
-    directives: list[ComponentDirectiveNode] = []
-    position = 0
-
-    while True:
-        position = _skip_whitespace(body, position)
-        if not body.startswith("{%", position):
-            break
-
-        raw_tag, next_position = _read_tag(body, position)
-        inner = _extract_tag_body(raw_tag)
-        keyword, remainder = _split_keyword(inner)
-
-        match keyword:
-            case "props":
-                directive, position = _handle_props(remainder, next_position)
-            case "inject":
-                directive, position = _handle_inject(remainder, next_position)
-            case "provide":
-                directive, position = _handle_provide(remainder, next_position)
-            case "computed":
-                directive, position = _handle_computed(remainder, body, next_position)
-            case "slot":
-                directive, position = _handle_slot(remainder, body, next_position)
-            case "signal":
-                directive, position = _handle_signal(remainder, next_position)
-            case "action":
-                directive, position = _handle_action(remainder, body, next_position)
-            case _:
-                break
-
-        directives.append(directive)
-
-    return directives, body[position:]
-
-
-def _handle_top_level_import(
-    source: str,
-    imports: list[ImportNode],
-    next_position: int,
-) -> int:
-    imports.append(_parse_import(source))
-    return next_position
-
-
-def _handle_top_level_set(
-    tag_body: str,
-    prop_aliases: list[PropsAliasNode],
-    next_position: int,
-) -> int:
-    prop_aliases.append(_parse_props_alias(tag_body))
-    return next_position
-
-
-def _handle_top_level_component(
-    source: str,
-    position: int,
-    signature_source: str,
-    path: Path,
-) -> tuple[ComponentNode, int]:
-    return _parse_component(source, position, signature_source, path)
-
-
-def _handle_props(source: str, next_position: int) -> tuple[PropsDirectiveNode, int]:
-    return _parse_props_directive(source), next_position
-
-
-def _handle_inject(source: str, next_position: int) -> tuple[InjectDirectiveNode, int]:
-    return InjectDirectiveNode(names=_parse_name_list(source)), next_position
-
-
-def _handle_provide(
-    source: str, next_position: int
-) -> tuple[ProvideDirectiveNode, int]:
-    return ProvideDirectiveNode(names=_parse_name_list(source)), next_position
-
-
-def _handle_computed(
-    source: str,
-    body: str,
-    next_position: int,
-) -> tuple[ComputedDirectiveNode, int]:
-    block_body, position = _read_block(body, next_position, "endcomputed")
-    return ComputedDirectiveNode(name=source.strip(), body=block_body), position
-
-
-def _handle_slot(
-    source: str,
-    body: str,
-    next_position: int,
-) -> tuple[SlotDirectiveNode, int]:
-    slot_name, params = _parse_slot_signature(source)
-    _, position = _read_block(body, next_position, "endslot")
-    return SlotDirectiveNode(name=slot_name, params=params), position
-
-
-def _handle_signal(source: str, next_position: int) -> tuple[SignalDirectiveNode, int]:
-    signal_name, expr = _parse_signal(source)
-    return SignalDirectiveNode(name=signal_name, expr=expr), next_position
-
-
-def _handle_action(
-    source: str,
-    body: str,
-    next_position: int,
-) -> tuple[ActionDirectiveNode, int]:
-    block_body, position = _read_block(body, next_position, "endaction")
-    return ActionDirectiveNode(name=source.strip(), body=block_body), position
-
-
-def _parse_props_directive(source: str) -> PropsDirectiveNode:
-    if _IDENTIFIER_RE.fullmatch(source):
-        return PropsDirectiveNode(alias_name=source)
-    return PropsDirectiveNode(props=tuple(_parse_inline_props(source)))
-
-
-def _parse_name_list(source: str) -> tuple[str, ...]:
-    names = tuple(item for item in source.split() if item)
-    for name in names:
-        if not _IDENTIFIER_RE.fullmatch(name):
-            raise ValueError(f"Invalid identifier {name!r}")
-    return names
-
-
-def _parse_slot_signature(source: str) -> tuple[str, tuple[str, ...]]:
-    match = re.match(
-        r"^([A-Za-z_][A-Za-z0-9_]*)\s*(?:\((.*?)\))?$", source.strip(), re.DOTALL
-    )
-    if not match:
-        raise ValueError(f"Invalid slot signature: {source!r}")
-    params = tuple(
-        item.strip() for item in (match.group(2) or "").split(",") if item.strip()
-    )
-    return match.group(1), params
-
-
-def _parse_signal(source: str) -> tuple[str, str]:
-    match = _SIGNAL_RE.match(source)
-    if not match:
-        raise ValueError(f"Invalid signal declaration: {source!r}")
-    return match.group(1), match.group(2).strip()
-
-
-def _parse_props_alias(tag_body: str) -> PropsAliasNode:
-    match = re.match(
-        r"set\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\{.*\})", tag_body, re.DOTALL
-    )
-    if not match:
-        raise ValueError(f"Invalid props alias declaration: {tag_body!r}")
-    name = match.group(1)
-    payload = match.group(2).strip()
-    if not name.endswith("Props"):
-        raise ValueError(f"Props alias must end with 'Props': {name}")
-    return PropsAliasNode(name=name, props=tuple(_parse_alias_entries(payload[1:-1])))
-
-
-def _parse_alias_entries(source: str) -> list[PropDeclNode]:
-    specs: list[PropDeclNode] = []
-    for entry in _split_top_level_commas(source):
-        item = entry.strip()
-        if not item:
-            continue
-        key_match = re.match(r'["\']([^"\']+)["\']\s*:\s*(.*)$', item, re.DOTALL)
-        if not key_match:
-            raise ValueError(f"Invalid props alias entry: {entry!r}")
-        type_expr, default_expr = _parse_type_and_default(key_match.group(2).strip())
-        specs.append(
-            PropDeclNode(
-                name=key_match.group(1),
-                type_expr=type_expr,
-                default_expr=default_expr,
+            return PjxFile(
+                imports=tuple(imports),
+                components=tuple(components),
             )
-        )
-    return specs
 
+        # Simple mode: optional directives followed by template body
+        while not self._at_end():
+            self._skip_blanks()
+            if self._at_end():
+                break
+            if self._lookahead("@from"):
+                imports.append(self._parse_from())
+            elif self._lookahead("@import"):
+                imports.append(self._parse_import())
+            elif self._lookahead("@bind"):
+                bind = self._parse_bind()
+            elif self._lookahead("@props"):
+                props = self._parse_props_block()
+            elif self._lookahead("@slot"):
+                slots.append(self._parse_slot_decl())
+            elif self._lookahead("@state"):
+                state = self._parse_state_block()
+            elif self._lookahead("@let"):
+                lets.append(self._parse_let())
+            else:
+                break  # start of template body
 
-def _parse_inline_props(source: str) -> list[PropDeclNode]:
-    specs: list[PropDeclNode] = []
-    for entry in _split_top_level_commas(source):
-        item = entry.strip()
-        if not item:
-            continue
-        if ":" not in item:
-            raise ValueError(f"Invalid prop declaration: {item!r}")
-        name, remainder = item.split(":", 1)
-        prop_name = name.strip()
-        if not _IDENTIFIER_RE.fullmatch(prop_name):
-            raise ValueError(f"Invalid prop name: {prop_name!r}")
-        type_expr, default_expr = _parse_type_and_default(remainder.strip())
-        specs.append(
-            PropDeclNode(name=prop_name, type_expr=type_expr, default_expr=default_expr)
-        )
-    return specs
-
-
-def _parse_type_and_default(source: str) -> tuple[str | None, str | None]:
-    depth = 0
-    in_quote: str | None = None
-    for index, char in enumerate(source):
-        if in_quote:
-            if char == in_quote:
-                in_quote = None
-            continue
-        if char in {'"', "'"}:
-            in_quote = char
-            continue
-        if char in "([{":
-            depth += 1
-            continue
-        if char in ")]}":
-            depth -= 1
-            continue
-        if char == "=" and depth == 0:
-            return source[:index].strip(), source[index + 1 :].strip()
-    return source.strip() or None, None
-
-
-def _split_top_level_commas(source: str) -> list[str]:
-    parts: list[str] = []
-    depth = 0
-    in_quote: str | None = None
-    start = 0
-
-    for index, char in enumerate(source):
-        if in_quote:
-            if char == in_quote:
-                in_quote = None
-            continue
-        if char in {'"', "'"}:
-            in_quote = char
-            continue
-        if char in "([{":
-            depth += 1
-            continue
-        if char in ")]}":
-            depth -= 1
-            continue
-        if char == "," and depth == 0:
-            parts.append(source[start:index])
-            start = index + 1
-
-    parts.append(source[start:])
-    return parts
-
-
-def _parse_import(source: str) -> ImportNode:
-    asset_match = re.match(r'(css|js)\s+["\']([^"\']+)["\']$', source)
-    if asset_match:
-        return ImportNode(kind=asset_match.group(1), path=asset_match.group(2))
-
-    component_match = re.match(
-        r'["\']([^"\']+)["\']\s+as\s+([A-Za-z_][A-Za-z0-9_]*)$', source
-    )
-    if component_match:
-        return ImportNode(
-            kind="component",
-            path=component_match.group(1),
-            alias=component_match.group(2),
+        body = self._parse_body(stop_tags=set())
+        return PjxFile(
+            imports=tuple(imports),
+            bind=bind,
+            props=props,
+            slots=tuple(slots),
+            state=state,
+            lets=tuple(lets),
+            body=tuple(body),
         )
 
-    raise ValueError(f"Invalid import declaration: {source!r}")
+    # ── Heuristic: multi-component detection ──────────────────────────────────
+
+    def _has_component_blocks(self) -> bool:
+        """Return True if this file is in multi-component mode.
+
+        A file is multi-component when the first substantive top-level line
+        (after ``@import`` / ``@from`` and blank lines) is a ``@component``
+        directive.  This avoids false positives from ``@component`` text
+        that appears inside ``<pre><code>`` blocks in showcase templates.
+        """
+        for line in self.source.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue  # blank line
+            if stripped.startswith("@import ") or stripped.startswith("@from "):
+                continue  # allowed before @component blocks
+            return stripped.startswith("@component ")
+        return False
+
+    # ── Directive parsers ─────────────────────────────────────────────────────
+
+    def _parse_from(self) -> FromImport:
+        line, col = self.line, self.col
+        self._expect("@from")
+        self._skip_ws()
+        module = self._consume_re(_RE_DOTTED) or self._err(
+            "Expected module path after @from"
+        )
+        self._skip_ws()
+        self._expect("import")
+        self._skip_ws()
+        names: list[str] = []
+        while True:
+            name = self._consume_re(_RE_IDENT)
+            if name:
+                names.append(name)
+            self._skip_ws()
+            if self._peek() == ",":
+                self._advance()
+                self._skip_ws()
+            else:
+                break
+        self._skip_line()
+        return FromImport(module=module, names=tuple(names), line=line, col=col)
+
+    def _parse_import(self) -> ImportDirective:
+        line, col = self.line, self.col
+        self._expect("@import")
+        self._skip_ws()
+        path = self._parse_string()
+        self._skip_line()
+        return ImportDirective(path=path, line=line, col=col)
+
+    def _parse_bind(self) -> BindDirective:
+        line, col = self.line, self.col
+        self._expect("@bind")
+        self._skip_ws()
+        self._expect("from")
+        self._skip_ws()
+        module = self._consume_re(_RE_DOTTED) or self._err(
+            "Expected module path after @bind from"
+        )
+        self._skip_ws()
+        self._expect("import")
+        self._skip_ws()
+        class_name = self._consume_re(_RE_IDENT) or self._err("Expected class name")
+        self._skip_line()
+        return BindDirective(module=module, class_name=class_name, line=line, col=col)
+
+    def _parse_props_block(self) -> PropsBlock:
+        line, col = self.line, self.col
+        self._expect("@props")
+        self._skip_ws()
+        self._expect("{")
+        props: list[PropDef] = []
+        while True:
+            self._skip_blanks()
+            # Skip optional trailing comma between props
+            if self._peek() == ",":
+                self._advance()
+                self._skip_blanks()
+            if self._lookahead("}"):
+                self._advance()
+                break
+            if self._at_end():
+                self._err("Unclosed @props block")
+            props.append(self._parse_prop_def())
+        return PropsBlock(props=tuple(props), line=line, col=col)
+
+    def _parse_prop_def(self) -> PropDef:
+        line, col = self.line, self.col
+        name = self._consume_re(_RE_IDENT) or self._err("Expected prop name")
+        self._skip_ws()
+        self._expect(":")
+        self._skip_ws()
+        type_expr, default_expr = self._parse_type_and_default()
+        return PropDef(
+            name=name,
+            type_expr=type_expr or None,
+            default_expr=default_expr,
+            line=line,
+            col=col,
+        )
+
+    def _parse_type_and_default(self) -> tuple[str, str | None]:
+        """Parse ``TypeExpr = default`` up to newline, ``,``, or ``}``."""
+        type_parts: list[str] = []
+        depth = 0
+        in_quote: str | None = None
+
+        while not self._at_end():
+            ch = self._peek()
+            if in_quote:
+                type_parts.append(self._advance())
+                if ch == in_quote:
+                    in_quote = None
+                continue
+            if ch in ('"', "'"):
+                in_quote = ch
+                type_parts.append(self._advance())
+                continue
+            if ch in "([":
+                depth += 1
+                type_parts.append(self._advance())
+            elif ch in ")]":
+                depth -= 1
+                type_parts.append(self._advance())
+            elif ch == "=" and depth == 0:
+                self._advance()
+                self._skip_ws()
+                default_val = self._parse_default_value()
+                return "".join(type_parts).strip(), default_val
+            elif ch in ("\n", ",") and depth == 0:
+                # Consume newlines; leave commas for _parse_props_block to skip
+                if ch == "\n":
+                    self._advance()
+                break
+            elif ch == "}" and depth == 0:
+                break
+            else:
+                type_parts.append(self._advance())
+
+        return "".join(type_parts).strip(), None
+
+    def _parse_default_value(self) -> str:
+        """Consume a default value until newline, ``,``, or ``}`` at depth 0."""
+        parts: list[str] = []
+        depth = 0
+        in_quote: str | None = None
+
+        while not self._at_end():
+            ch = self._peek()
+            if in_quote:
+                parts.append(self._advance())
+                if ch == in_quote:
+                    in_quote = None
+                continue
+            if ch in ('"', "'"):
+                in_quote = ch
+                parts.append(self._advance())
+                continue
+            if ch in "([{":
+                depth += 1
+                parts.append(self._advance())
+            elif ch in ")]}":
+                if depth == 0:
+                    break
+                depth -= 1
+                parts.append(self._advance())
+            elif ch in ("\n", ",") and depth == 0:
+                # Consume newlines; leave commas for the parent to skip
+                if ch == "\n":
+                    self._advance()
+                break
+            else:
+                parts.append(self._advance())
+
+        return "".join(parts).strip()
+
+    def _parse_slot_decl(self) -> SlotDecl:
+        line, col = self.line, self.col
+        self._expect("@slot")
+        self._skip_ws()
+        raw = self._consume_re(re.compile(r"[A-Za-z_][\w]*\??")) or self._err(
+            "Expected slot name"
+        )
+        optional = raw.endswith("?")
+        name = raw.rstrip("?")
+        self._skip_line()
+        return SlotDecl(name=name, optional=optional, line=line, col=col)
+
+    def _parse_state_block(self) -> StateBlock:
+        line, col = self.line, self.col
+        self._expect("@state")
+        self._skip_ws()
+        self._expect("{")
+        fields: list[StateField] = []
+        while True:
+            self._skip_blanks()
+            # Skip optional trailing comma between fields
+            if self._peek() == ",":
+                self._advance()
+                self._skip_blanks()
+            if self._lookahead("}"):
+                self._advance()
+                break
+            if self._at_end():
+                self._err("Unclosed @state block")
+            fields.append(self._parse_state_field())
+        return StateBlock(fields=tuple(fields), line=line, col=col)
+
+    def _parse_state_field(self) -> StateField:
+        line, col = self.line, self.col
+        name = self._consume_re(_RE_IDENT) or self._err("Expected state field name")
+        self._skip_ws()
+        self._expect(":")
+        self._skip_ws()
+        value = self._parse_default_value()
+        return StateField(name=name, value=value or "null", line=line, col=col)
+
+    def _parse_let(self) -> LetDirective:
+        line, col = self.line, self.col
+        self._expect("@let")
+        self._skip_ws()
+        name = self._consume_re(_RE_IDENT) or self._err(
+            "Expected variable name after @let"
+        )
+        self._skip_ws()
+        self._expect("=")
+        self._skip_ws()
+        expr = self._consume_until_newline()
+        return LetDirective(name=name, expr=expr.strip(), line=line, col=col)
+
+    # ── @component block ──────────────────────────────────────────────────────
+
+    def _parse_component_def(self) -> ComponentDef:
+        line, col = self.line, self.col
+        self._expect("@component")
+        self._skip_ws()
+        name = self._consume_re(_RE_IDENT) or self._err("Expected component name")
+        self._skip_ws()
+        self._expect("{")
+
+        bind: BindDirective | None = None
+        props: PropsBlock | None = None
+        slots: list[SlotDecl] = []
+        state: StateBlock | None = None
+        lets: list[LetDirective] = []
+
+        # Parse inner directives until we hit the body or closing brace
+        while not self._at_end():
+            self._skip_blanks()
+            if self._lookahead("}"):
+                self._advance()
+                return ComponentDef(
+                    name=name,
+                    bind=bind,
+                    props=props,
+                    slots=tuple(slots),
+                    state=state,
+                    lets=tuple(lets),
+                    children=(),
+                    line=line,
+                    col=col,
+                )
+            if self._lookahead("@bind"):
+                bind = self._parse_bind()
+            elif self._lookahead("@props"):
+                props = self._parse_props_block()
+            elif self._lookahead("@slot"):
+                slots.append(self._parse_slot_decl())
+            elif self._lookahead("@state"):
+                state = self._parse_state_block()
+            elif self._lookahead("@let"):
+                lets.append(self._parse_let())
+            else:
+                break  # start of body
+
+        # Parse template body until the matching closing brace
+        children = self._parse_body(stop_tags={"}"})
+        self._skip_blanks()
+        if self._lookahead("}"):
+            self._advance()
+
+        return ComponentDef(
+            name=name,
+            bind=bind,
+            props=props,
+            slots=tuple(slots),
+            state=state,
+            lets=tuple(lets),
+            children=tuple(children),
+            line=line,
+            col=col,
+        )
+
+    # ── Template body ─────────────────────────────────────────────────────────
+
+    def _parse_body(self, stop_tags: set[str]) -> list[Any]:
+        """Parse template nodes until EOF, a close tag, or a stop marker."""
+        nodes: list[Any] = []
+        while not self._at_end():
+            self._skip_jinja_comments()
+            if self._at_end():
+                break
+
+            # Stop markers (used inside @component blocks)
+            for marker in stop_tags:
+                if self._lookahead(marker):
+                    return nodes
+
+            # Named slot close tag — parent handles it
+            if self._lookahead("</"):
+                break
+
+            node = self._parse_node()
+            if node is not None:
+                nodes.append(node)
+
+        return nodes
+
+    def _parse_node(self) -> Any:
+        self._skip_inline_comments()
+        if self._at_end():
+            return None
+
+        # Jinja2 expression {{ ... }}
+        if self._lookahead("{{"):
+            return self._parse_expr()
+
+        # Named slot content <:name>
+        if self._lookahead("<:"):
+            return self._parse_named_slot_content()
+
+        # Close tag — signals end of parent's child scope
+        if self._lookahead("</"):
+            return None
+
+        # HTML declaration <!DOCTYPE html> or comment <!-- --> — pass through
+        if self._lookahead("<!"):
+            return self._parse_html_raw()
+
+        # HTML / component element
+        if self._peek() == "<":
+            return self._parse_element()
+
+        # Plain text
+        return self._parse_text()
+
+    def _parse_expr(self) -> ExprNode:
+        line, col = self.line, self.col
+        start = self.pos
+        self._expect("{{")
+        # Consume until }}; handle nested {{ }} via depth counting
+        depth = 1
+        while not self._at_end() and depth > 0:
+            if self._lookahead("{{"):
+                depth += 1
+                self._advance(2)
+            elif self._lookahead("}}"):
+                depth -= 1
+                self._advance(2)
+            else:
+                self._advance()
+        content = self.source[start : self.pos]
+        return ExprNode(content=content, line=line, col=col)
+
+    def _parse_html_raw(self) -> TextNode:
+        """Consume ``<!DOCTYPE ...>`` declarations and ``<!-- -->`` comments as raw text."""
+        line, col = self.line, self.col
+        start = self.pos
+        self._advance(2)  # <!
+        if self._lookahead("--"):
+            self._advance(2)  # --
+            while not self._at_end():
+                if self._lookahead("-->"):
+                    self._advance(3)
+                    break
+                self._advance()
+        else:
+            while not self._at_end() and self._peek() != ">":
+                self._advance()
+            if not self._at_end():
+                self._advance()  # >
+        return TextNode(content=self.source[start : self.pos], line=line, col=col)
+
+    def _parse_text(self) -> TextNode | None:
+        line, col = self.line, self.col
+        parts: list[str] = []
+        while not self._at_end():
+            ch = self._peek()
+            if ch == "<":
+                break
+            if self._lookahead("{{"):
+                break
+            # Consume {# ... #} inline Jinja comments (no text output)
+            if self._lookahead("{#"):
+                m = _RE_COMMENT.match(self.source, self.pos)
+                if m:
+                    self._advance(len(m.group()))
+                    continue
+                break
+            # Stop at brace-only stop markers (inside @component)
+            if ch == "}" and col == 1:
+                break
+            parts.append(self._advance())
+
+        text = "".join(parts)
+        if not text:
+            return None
+        return TextNode(content=text, line=line, col=col)
+
+    def _parse_element(self) -> Any:
+        line, col = self.line, self.col
+        self._expect("<")
+
+        tag = self._consume_re(_RE_TAG_NAME)
+        if not tag:
+            self._err("Expected tag name after '<'")
+
+        attrs = self._parse_attributes()
+        self._skip_ws()
+
+        self_closing = False
+        if self._lookahead("/>"):
+            self._advance(2)
+            self_closing = True
+        elif self._lookahead(">"):
+            self._advance()
+        else:
+            self._err(f"Expected '>' or '/>' after <{tag}>")
+
+        if tag.lower() in _VOID_ELEMENTS:
+            self_closing = True
+
+        # ── Control structures ────────────────────────────────────────────────
+        if tag == "Show":
+            return self._build_show(attrs, self_closing, line, col)
+        if tag == "For":
+            return self._build_for(attrs, self_closing, line, col)
+        if tag == "Switch":
+            return self._build_switch(attrs, self_closing, line, col)
+        if tag == "slot":
+            return self._build_slot(attrs, self_closing, line, col)
+
+        # ── Component or HTML ─────────────────────────────────────────────────
+        children: list[Any] = []
+        named_slots: dict[str, tuple[Any, ...]] = {}
+
+        if not self_closing:
+            children, named_slots = self._parse_element_children(tag)
+            self._skip_jinja_comments()
+            self._expect(f"</{tag}>")
+
+        if tag[0].isupper():
+            return ComponentCall(
+                name=tag,
+                attrs=tuple(attrs),
+                children=tuple(children),
+                named_slots=named_slots,
+                self_closing=self_closing,
+                line=line,
+                col=col,
+            )
+        return HtmlElement(
+            tag=tag,
+            attrs=tuple(attrs),
+            children=tuple(children),
+            self_closing=self_closing,
+            line=line,
+            col=col,
+        )
+
+    def _parse_element_children(
+        self, parent_tag: str
+    ) -> tuple[list[Any], dict[str, tuple[Any, ...]]]:
+        """Return (default_children, named_slots_dict)."""
+        children: list[Any] = []
+        named_slots: dict[str, tuple[Any, ...]] = {}
+
+        while not self._at_end():
+            self._skip_inline_comments()
+            if self._at_end():
+                break
+            if self._lookahead(f"</{parent_tag}>"):
+                break
+            # Named slot content <:name>
+            if self._lookahead("<:"):
+                slot_node = self._parse_named_slot_content()
+                if isinstance(slot_node, NamedSlotContent):
+                    named_slots[slot_node.name] = slot_node.children
+                continue
+            # Any other close tag means we've over-shot — stop
+            if self._lookahead("</"):
+                break
+            node = self._parse_node()
+            if node is None:
+                break
+            children.append(node)
+
+        return children, named_slots
+
+    def _parse_named_slot_content(self) -> NamedSlotContent:
+        line, col = self.line, self.col
+        self._expect("<:")
+        name = self._consume_re(re.compile(r"[A-Za-z_][\w-]*")) or self._err(
+            "Expected slot name after '<:'"
+        )
+        # Optional let: bindings
+        let_bindings: list[str] = []
+        self._skip_ws()
+        while self._lookahead("let:"):
+            self._expect("let:")
+            binding = self._consume_re(_RE_IDENT)
+            if binding:
+                let_bindings.append(binding)
+            self._skip_ws()
+        self._skip_ws()
+        self._expect(">")
+
+        children = self._parse_body(stop_tags=set())
+        self._skip_jinja_comments()
+        self._expect(f"</:{name}>")
+
+        return NamedSlotContent(
+            name=name,
+            let_bindings=tuple(let_bindings),
+            children=tuple(children),
+            line=line,
+            col=col,
+        )
+
+    # ── Attribute parsing ─────────────────────────────────────────────────────
+
+    def _parse_attributes(self) -> list[Attribute]:
+        attrs: list[Attribute] = []
+        while not self._at_end():
+            self._skip_blanks()
+            if self._peek() in (">", "/") or self._lookahead("/>"):
+                break
+            line, col = self.line, self.col
+            name = self._consume_re(_RE_ATTR_NAME)
+            if not name:
+                break
+            value: str | None = None
+            self._skip_blanks()
+            if self._peek() == "=":
+                self._advance()
+                self._skip_blanks()
+                value = self._parse_attr_value()
+            attrs.append(Attribute(name=name, value=value, line=line, col=col))
+        return attrs
+
+    def _parse_attr_value(self) -> str:
+        if self._peek() == '"':
+            return self._parse_dq_string()
+        if self._peek() == "'":
+            return self._parse_sq_string()
+        if self._lookahead("{{"):
+            return self._parse_expr().content
+        # Unquoted
+        parts: list[str] = []
+        while not self._at_end() and self._peek() not in (" ", "\t", "\n", ">", "/"):
+            parts.append(self._advance())
+        return "".join(parts)
+
+    def _parse_dq_string(self) -> str:
+        self._expect('"')
+        parts: list[str] = []
+        while not self._at_end() and self._peek() != '"':
+            if self._lookahead("{{"):
+                expr = self._parse_expr()
+                parts.append(expr.content)
+            elif self._peek() == "\\":
+                self._advance()
+                if not self._at_end():
+                    parts.append(self._advance())
+            else:
+                parts.append(self._advance())
+        self._expect('"')
+        return "".join(parts)
+
+    def _parse_sq_string(self) -> str:
+        self._expect("'")
+        parts: list[str] = []
+        while not self._at_end() and self._peek() != "'":
+            parts.append(self._advance())
+        self._expect("'")
+        return "".join(parts)
+
+    # ── Control structure builders ────────────────────────────────────────────
+
+    def _get_attr(self, attrs: list[Attribute], name: str) -> str | None:
+        for a in attrs:
+            if a.name == name:
+                return a.value
+        return None
+
+    def _strip_expr(self, val: str | None) -> str:
+        """Strip ``{{ }}`` delimiters from an attribute value."""
+        if val is None:
+            return ""
+        val = val.strip()
+        if val.startswith("{{") and val.endswith("}}"):
+            return val[2:-2].strip()
+        return val.strip('"').strip("'")
+
+    def _build_show(
+        self, attrs: list[Attribute], self_closing: bool, line: int, col: int
+    ) -> ShowNode:
+        condition = self._strip_expr(self._get_attr(attrs, "when"))
+        if not condition:
+            self._err("<Show> requires a 'when' attribute", line=line)
+        children: list[Any] = []
+        fallback: list[Any] = []
+        if not self_closing:
+            raw_children, named = self._parse_element_children("Show")
+            children = raw_children
+            fallback = list(named.get("fallback", ()))
+            self._skip_jinja_comments()
+            self._expect("</Show>")
+        return ShowNode(
+            condition=condition,
+            children=tuple(children),
+            fallback=tuple(fallback),
+            line=line,
+            col=col,
+        )
+
+    def _build_for(
+        self, attrs: list[Attribute], self_closing: bool, line: int, col: int
+    ) -> ForNode:
+        iterable = self._strip_expr(self._get_attr(attrs, "each"))
+        if not iterable:
+            self._err("<For> requires an 'each' attribute", line=line)
+        variable = (self._get_attr(attrs, "as") or "item").strip("\"'")
+        index_var_raw = self._get_attr(attrs, "index")
+        index_var = index_var_raw.strip("\"'") if index_var_raw else None
+        children: list[Any] = []
+        empty: list[Any] = []
+        if not self_closing:
+            raw_children, named = self._parse_element_children("For")
+            children = raw_children
+            empty = list(named.get("empty", ()))
+            self._skip_jinja_comments()
+            self._expect("</For>")
+        return ForNode(
+            iterable=iterable,
+            variable=variable,
+            index_var=index_var,
+            children=tuple(children),
+            empty=tuple(empty),
+            line=line,
+            col=col,
+        )
+
+    def _build_switch(
+        self, attrs: list[Attribute], self_closing: bool, line: int, col: int
+    ) -> SwitchNode:
+        expression = self._strip_expr(self._get_attr(attrs, "on"))
+        if not expression:
+            self._err("<Switch> requires an 'on' attribute", line=line)
+        cases: list[MatchCase] = []
+        fallback: list[Any] = []
+        if not self_closing:
+            while not self._at_end():
+                self._skip_jinja_comments()
+                if self._lookahead("</Switch>"):
+                    break
+                if self._lookahead("<:fallback>"):
+                    slot = self._parse_named_slot_content()
+                    # _parse_named_slot_content already consumed </fallback>
+                    fallback = list(slot.children)
+                    continue
+                if self._lookahead("<Match"):
+                    cases.append(self._parse_match_case())
+                else:
+                    node = self._parse_node()
+                    if node is None:
+                        break
+            self._skip_jinja_comments()
+            self._expect("</Switch>")
+        return SwitchNode(
+            expression=expression,
+            cases=tuple(cases),
+            fallback=tuple(fallback),
+            line=line,
+            col=col,
+        )
+
+    def _parse_match_case(self) -> MatchCase:
+        line, col = self.line, self.col
+        self._expect("<Match")
+        attrs = self._parse_attributes()
+        self._skip_ws()
+        self_closing = False
+        if self._lookahead("/>"):
+            self._advance(2)
+            self_closing = True
+        else:
+            self._expect(">")
+        value = (self._get_attr(attrs, "value") or "").strip("\"'")
+        children: list[Any] = []
+        if not self_closing:
+            children = self._parse_body(stop_tags=set())
+            self._skip_jinja_comments()
+            self._expect("</Match>")
+        return MatchCase(value=value, children=tuple(children), line=line, col=col)
+
+    def _build_slot(
+        self, attrs: list[Attribute], self_closing: bool, line: int, col: int
+    ) -> SlotNode:
+        name = (self._get_attr(attrs, "name") or "default").strip("\"'")
+        scope_bindings: dict[str, str] = {}
+        for attr in attrs:
+            if attr.name.startswith(":") and attr.name != ":data":
+                key = attr.name[1:]
+                scope_bindings[key] = self._strip_expr(attr.value) or key
+        fallback: list[Any] = []
+        if not self_closing:
+            fallback = self._parse_body(stop_tags=set())
+            self._skip_jinja_comments()
+            self._expect("</slot>")
+        return SlotNode(
+            name=name,
+            scope_bindings=scope_bindings,
+            fallback=tuple(fallback),
+            line=line,
+            col=col,
+        )
+
+    # ── String helpers ────────────────────────────────────────────────────────
+
+    def _parse_string(self) -> str:
+        if self._peek() == '"':
+            return self._parse_dq_string()
+        if self._peek() == "'":
+            return self._parse_sq_string()
+        self._err("Expected a quoted string")
+
+    # ── Cursor helpers ────────────────────────────────────────────────────────
+
+    def _at_end(self) -> bool:
+        return self.pos >= len(self.source)
+
+    def _peek(self, n: int = 1) -> str:
+        return self.source[self.pos : self.pos + n]
+
+    def _lookahead(self, text: str) -> bool:
+        return self.source[self.pos :].startswith(text)
+
+    def _advance(self, n: int = 1) -> str:
+        text = self.source[self.pos : self.pos + n]
+        for ch in text:
+            if ch == "\n":
+                self.line += 1
+                self.col = 1
+            else:
+                self.col += 1
+        self.pos += n
+        return text
+
+    def _expect(self, text: str) -> str:
+        if not self.source[self.pos :].startswith(text):
+            got = repr(self.source[self.pos : self.pos + len(text) + 8])
+            raise ParseError(
+                f"Expected {text!r}, got {got}",
+                file=self.filename,
+                line=self.line,
+            )
+        return self._advance(len(text))
+
+    def _consume_re(self, pattern: re.Pattern[str]) -> str | None:
+        m = pattern.match(self.source, self.pos)
+        if m:
+            self._advance(len(m.group()))
+            return m.group()
+        return None
+
+    def _skip_ws(self) -> None:
+        """Skip inline whitespace (spaces and tabs, not newlines)."""
+        while not self._at_end() and self._peek() in (" ", "\t"):
+            self._advance()
+
+    def _skip_blanks(self) -> None:
+        """Skip all whitespace including newlines."""
+        while not self._at_end() and self._peek() in (" ", "\t", "\n", "\r"):
+            self._advance()
+
+    def _skip_line(self) -> None:
+        """Skip to the end of the current line."""
+        while not self._at_end() and self._peek() != "\n":
+            self._advance()
+        if not self._at_end():
+            self._advance()  # consume the newline
+
+    def _skip_jinja_comments(self) -> None:
+        """Skip whitespace and {# ... #} Jinja comments (block-level use only).
+
+        Suitable between top-level nodes and before/after close tags.
+        Do NOT use inside inline element content — it eats meaningful whitespace.
+        """
+        while True:
+            self._skip_blanks()
+            m = _RE_COMMENT.match(self.source, self.pos)
+            if m:
+                self._advance(len(m.group()))
+            else:
+                break
+
+    def _skip_inline_comments(self) -> None:
+        """Skip {# ... #} Jinja comments WITHOUT consuming surrounding whitespace.
+
+        Safe to use inside element children where inline whitespace is significant.
+        """
+        while True:
+            m = _RE_COMMENT.match(self.source, self.pos)
+            if m:
+                self._advance(len(m.group()))
+            else:
+                break
+
+    def _consume_until_newline(self) -> str:
+        parts: list[str] = []
+        while not self._at_end() and self._peek() != "\n":
+            parts.append(self._advance())
+        if not self._at_end():
+            self._advance()  # consume newline
+        return "".join(parts)
+
+    def _err(self, msg: str, line: int | None = None) -> None:
+        raise ParseError(msg, file=self.filename, line=line or self.line)
 
 
-def _skip_whitespace(source: str, position: int) -> int:
-    while position < len(source) and source[position].isspace():
-        position += 1
-    return position
+# ── Public API ────────────────────────────────────────────────────────────────
 
 
-def _read_tag(source: str, position: int) -> tuple[str, int]:
-    end = source.find("%}", position)
-    if end == -1:
-        raise ValueError("Unclosed Jinja tag")
-    end += 2
-    return source[position:end], end
-
-
-def _read_block(source: str, position: int, end_tag: str) -> tuple[str, int]:
-    pattern = re.compile(rf"\{{%\s*{re.escape(end_tag)}\s*%\}}")
-    match = pattern.search(source, position)
-    if not match:
-        raise ValueError(f"Missing closing block for {end_tag}")
-    return source[position : match.start()], match.end()
-
-
-def _extract_tag_body(raw_tag: str) -> str:
-    match = _TAG_RE.match(raw_tag)
-    if not match:
-        raise ValueError(f"Invalid Jinja tag: {raw_tag!r}")
-    return match.group(1).strip()
-
-
-def _split_keyword(source: str) -> tuple[str, str]:
-    parts = source.split(None, 1)
-    keyword = parts[0]
-    remainder = parts[1].strip() if len(parts) > 1 else ""
-    return keyword, remainder
+def parse(source: str, filename: str = "<string>") -> PjxFile:
+    return Parser(source, filename).parse()

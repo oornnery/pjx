@@ -1,0 +1,95 @@
+@component Card {
+  @props { title: str = "" }
+  @slot default
+  @slot header?
+  @slot footer?
+  <div class="card">
+    <Show when="{{ title or @has_slot('header') }}">
+      <header>
+        <Show when="{{ title }}"><h2>{{ title }}</h2></Show>
+        <slot name="header" />
+      </header>
+    </Show>
+    <section><slot /></section>
+    <Show when="{{ @has_slot('footer') }}">
+      <footer><slot name="footer" /></footer>
+    </Show>
+  </div>
+}
+
+@component Container {
+  @props { max: str = "lg" }
+  @slot default
+  {% set _max_map = {"sm": "max-w-sm", "md": "max-w-2xl", "lg": "max-w-4xl", "xl": "max-w-6xl"} %}
+  <div class="{{ _max_map.get(max, 'max-w-4xl') }} mx-auto w-full"><slot /></div>
+}
+
+@component Stack {
+  @props { gap: str = "md" }
+  @slot default
+  {% set _gap_map = {"xs": "gap-1", "sm": "gap-2", "md": "gap-4", "lg": "gap-6", "xl": "gap-8"} %}
+  <div class="flex flex-col {{ _gap_map.get(gap, 'gap-4') }}"><slot /></div>
+}
+
+@component Row {
+  @props { gap: str = "md", align: str = "center" }
+  @slot default
+  {% set _gap_map = {"xs": "gap-1", "sm": "gap-2", "md": "gap-4", "lg": "gap-6"} %}
+  {% set _align_map = {"center": "items-center", "start": "items-start", "end": "items-end"} %}
+  <div class="flex flex-wrap {{ _gap_map.get(gap, 'gap-4') }} {{ _align_map.get(align, 'items-center') }}"><slot /></div>
+}
+
+@component Grid {
+  @props { cols: str = "3", gap: str = "md" }
+  @slot default
+  {% set _gap_map = {"sm": "gap-2", "md": "gap-4", "lg": "gap-6"} %}
+  <div class="grid grid-cols-{{ cols }} {{ _gap_map.get(gap, 'gap-4') }}"><slot /></div>
+}
+
+@component Spacer {
+  @props { size: str = "md" }
+  {% set _sz_map = {"xs": "h-2", "sm": "h-4", "md": "h-6", "lg": "h-8", "xl": "h-12"} %}
+  <div class="{{ _sz_map.get(size, 'h-6') }}"></div>
+}
+
+@component Divider {
+  @props { label: str = "" }
+  <Show when="{{ label }}">
+    <div class="relative flex items-center py-4">
+      <div class="flex-1 border-t"></div>
+      <span class="mx-4 text-sm text-muted-foreground">{{ label }}</span>
+      <div class="flex-1 border-t"></div>
+    </div>
+  </Show>
+  <Show when="{{ not label }}">
+    <hr class="border-t" />
+  </Show>
+}
+
+@component Section {
+  @props { title: str = "", description: str = "" }
+  @slot default
+  <section class="space-y-4">
+    <Show when="{{ title or description }}">
+      <div class="space-y-1">
+        <Show when="{{ title }}"><h2 class="text-xl font-semibold tracking-tight">{{ title }}</h2></Show>
+        <Show when="{{ description }}"><p class="text-sm text-muted-foreground">{{ description }}</p></Show>
+      </div>
+    </Show>
+    <slot />
+  </section>
+}
+
+@component Page {
+  @props { title: str = "" }
+  @slot default
+  @slot head?
+  <div class="space-y-6">
+    <Show when="{{ title }}">
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight">{{ title }}</h1>
+      </div>
+    </Show>
+    <div><slot /></div>
+  </div>
+}
