@@ -122,13 +122,43 @@ Decisao:
 
 * o `check` usa codigos estaveis como `[101] parse_error`
 
-## 12. Renderer continua Jinja2 por enquanto
+## 12. MiniJinja como backend alternativo
 
 Decisao:
 
-* manter Jinja2 como backend de render atual
+* `MiniJinjaRuntime` e um drop-in para `Runtime` usando `minijinja` (Rust)
+* selecionado via `Pjx(renderer="minijinja")`
+* requer extra: `pjx[minijinja]`
+
+Motivo:
+
+* MiniJinja oferece render significativamente mais rapido que Jinja2 em
+  templates simples (medido com `pjx bench`)
+* a API e identica: `render_root`, `_render_component`, cache por mtime
+* a coexistencia de backends permite comparar e migrar gradualmente
 
 Consequencia:
 
-* ainda existe acoplamento a Jinja2 no runtime
-* `minijinja` continua como proxima fase, nao como base atual
+* `catalog.py` expoe `_create_runtime(renderer, catalog)` como factory
+* `fastapi.py` aceita `renderer=` e `bundle=` no construtor de `Pjx`
+* o default continua sendo Jinja2
+
+## 13. Bundle mode para templates auto-contidos
+
+Decisao:
+
+* `compile_pjx(bundle=True)` emite chamadas diretas de macro em vez de
+  `__pjx_render_component`
+* `_ImportResolver` resolve imports recursivamente e gera macro preamble
+* `pjx compile --bundle` produz `.jinja` auto-contidos sem callbacks Python
+
+Motivo:
+
+* elimina o overhead de callbacks Python por componente no MiniJinja
+* permite auditoria do output compilado
+* habilita deploy estatico de templates pre-compilados
+
+Consequencia:
+
+* bundle mode e opt-in (`bundle=False` por default)
+* imports dinamicos ou condicionais nao sao suportados no bundle resolver

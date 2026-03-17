@@ -34,16 +34,19 @@ PJX
 
 ```text
 pjx/
-|-- fastapi.py    -> Pjx, PjxRouter, init_app, render, Page, Template
-|-- catalog.py    -> roots, mounts, aliases, directives, render facade
-|-- parser.py     -> parser estrutural do arquivo .pjx
-|-- ast.py        -> AST: PjxFile, ComponentDef, PropDef, ForNode, etc.
-|-- compiler.py   -> AST -> Jinja source compilado
-|-- runtime.py    -> cache, render, props, slots, assets, partials
-|-- assets.py     -> render de CSS/JS e view de assets
-|-- models.py     -> modelos compilados, attrs, render state
-|-- tooling.py    -> check/format/load_project
-`-- cli.py        -> Typer + Rich
+|-- fastapi.py           -> Pjx, PjxRouter, init_app, render, Page, Template
+|-- catalog.py           -> roots, mounts, aliases, directives, render facade
+|-- parser.py            -> parser estrutural do arquivo .pjx
+|-- ast.py               -> AST: PjxFile, ComponentDef, PropDef, ForNode, etc.
+|-- compiler.py          -> AST -> Jinja source compilado (+ bundle mode)
+|-- runtime.py           -> cache, render, props, slots, assets, partials (Jinja2)
+|-- runtime_minijinja.py -> MiniJinjaRuntime: drop-in backend Rust
+|-- compile.py           -> batch compile .pjx -> .jinja; _ImportResolver; bundle
+|-- bench.py             -> benchmark Jinja2 vs MiniJinja em todos os templates
+|-- assets.py            -> render de CSS/JS e view de assets
+|-- models.py            -> modelos compilados, attrs, render state
+|-- tooling.py           -> check/format/load_project
+`-- cli.py               -> Typer + Rich (check, format, compile, bench)
 ```
 
 ## Fluxo de Boot
@@ -109,19 +112,71 @@ HTTP request
 |   +-- @component blocks (multi-component)
 |   `-- body markup (HTML, component calls, control flow)
 |
-+-- compiler.py -> compile_pjx(ast) -> str
++-- compiler.py -> compile_pjx(ast, bundle=False) -> str
 |   |
 |   +-- compila imports
 |   +-- compila props/slots/state
 |   +-- transforma <Show>, <For>, <Switch>
 |   +-- transforma component calls
+|   |   +-- bundle=False: __pjx_render_component(path, props, slots)
+|   |   `-- bundle=True:  chamada direta de macro Jinja
 |   `-- gera jinja_source final
 |
-`-- runtime.py
++-- runtime.py / runtime_minijinja.py
+|   |
+|   +-- Environment.from_string(jinja_source)  [Jinja2]
+|   +-- env.add_template(key, jinja_source)    [MiniJinja]
+|   `-- template.render(...)
+|
+`-- compile.py (batch / bundle)
     |
-    +-- Environment.from_string(jinja_source)
-    `-- template.render(...)
+    +-- _ImportResolver.resolve_macros(ast) -> (macro_preamble, count)
+    |   `-- resolve recursivo + cache
+    `-- _compile_bundled(ast, filename, resolver) -> (jinja_source, deps_inlined)
+        `-- macro_preamble + compile_pjx(bundle=True)
 ```
+
+## MiniJinja Backend
+
+`MiniJinjaRuntime` e um drop-in para `Runtime` usando o engine Rust via
+`minijinja`.
+
+```text
+Pjx(renderer="minijinja")
+|
++-- Catalog._create_runtime("minijinja", catalog)
+`-- MiniJinjaRuntime(catalog)
+    |
+    +-- minijinja.Environment
+    +-- env.add_function(...)  <- globals como funcoes
+    +-- get_component_instance() <- compile + cache
+    |   `-- bundle mode: _compile_bundled() antes de add_template
+    +-- render_root(...) <- env.render_template(key, **ctx)
+    `-- _render_component(...) <- chamada recursiva para nested components
+```
+
+Selecao do backend via `Pjx`:
+
+```python
+pjx = Pjx(
+    templates_dir="templates",
+    renderer="minijinja",  # ou "jinja2" (default)
+    bundle=True,           # inlina macros de componentes
+)
+```
+
+## Bundle Mode
+
+Em bundle mode, `_ImportResolver` percorre todos os imports recursivamente,
+compila cada componente como macro Jinja e concatena como preamble antes da
+page compilada. O resultado e um template `.jinja` auto-contido, sem
+`__pjx_render_component`.
+
+Util para:
+
+* pre-compilar com `pjx compile --bundle` para deploy estatico
+* maximizar velocidade do MiniJinja eliminando callbacks Python
+* auditar output compilado
 
 ## Parser e Compiler
 
@@ -195,18 +250,17 @@ HTMX POST
 
 ## CLI
 
-O CLI usa `tooling.py` como nucleo puro e `cli.py` apenas como interface.
+O CLI usa `tooling.py`, `compile.py` e `bench.py` como nucleo puro e `cli.py`
+apenas como interface.
 
 ```text
 pjx cli
 |
 +-- Typer parsing
 +-- Rich output
-`-- tooling.py
-    |
-    +-- load_project
-    +-- check_project
-    `-- format_project
++-- tooling.py  -> check, format
++-- compile.py  -> compile_project, _ImportResolver
+`-- bench.py    -> run_bench, render_bench_report
 ```
 
 ## Estado Atual
@@ -219,12 +273,14 @@ Pontos fortes:
 * `@pjx.context_processor` para injecao de contexto
 * sintaxe `@directive` canonica com extensao `.pjx`
 * parser estrutural do arquivo
-* runtime simples e previsivel
+* runtime Jinja2 e MiniJinja (Rust) disponiveis via `renderer=`
+* bundle mode para templates auto-contidos sem callbacks Python
+* `pjx compile` para batch compile + bundle
+* `pjx bench` para comparar Jinja2 vs MiniJinja
 * CLI util e automatizavel
 
 Pontos ainda abertos:
 
 * markup parser ainda merece evolucao para lexer/token stream
 * `signal` e `action` sao mais semantica de compilacao do que runtime nativo
-* renderer backend ainda esta acoplado ao Jinja2
 * extracao de fragmento por `id` ainda pode evoluir

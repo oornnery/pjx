@@ -195,6 +195,12 @@ uv run pjx check . --strict
 
 uv run pjx format exemples.main:pjx --check
 uv run pjx format path/to/Button.pjx
+
+uv run pjx compile exemples.main:pjx --output build/
+uv run pjx compile exemples.main:pjx --output build/ --bundle
+
+uv run pjx bench exemples.main:pjx
+uv run pjx bench exemples.main:pjx --iterations 200 --bundle
 ```
 
 `pjx check` valida:
@@ -207,11 +213,46 @@ uv run pjx format path/to/Button.pjx
 * templates sombreados
 * templates referenciados por pages e actions
 
+`pjx compile` compila todos os `.pjx` para `.jinja`. Com `--bundle`, as macros
+de componentes importados sao inlinadas em cada page template, gerando arquivos
+auto-contidos sem callbacks Python no render.
+
+`pjx bench` mede o tempo de compilacao e render comparando Jinja2 e MiniJinja
+em todos os templates do projeto.
+
 A saida textual usa codigos numericos estaveis no formato `[NNN] code`.
+
+## MiniJinja (Rust backend)
+
+Para usar o backend MiniJinja em vez do Jinja2:
+
+```python
+pjx = Pjx(
+    templates_dir="templates",
+    renderer="minijinja",
+)
+```
+
+Requer o extra:
+
+```bash
+uv add "pjx[minijinja]"
+```
+
+Com `bundle=True`, os macros de componentes sao inlinados antes do render,
+eliminando callbacks Python:
+
+```python
+pjx = Pjx(
+    templates_dir="templates",
+    renderer="minijinja",
+    bundle=True,
+)
+```
 
 ## Extras
 
-FastAPI faz parte do core do pacote. Hoje os extras publicos continuam:
+FastAPI faz parte do core do pacote. Extras publicos:
 
 ```bash
 uv add "pjx[minijinja]"

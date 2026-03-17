@@ -20,8 +20,12 @@ PJX e um miniframework server-first para Python com:
 Hoje o projeto ja entrega:
 
 * parser estrutural para arquivos `.pjx` com sintaxe `@directive`
-* compiler para built-ins e chamadas de componente
-* runtime com cache por `mtime`
+* compiler para built-ins e chamadas de componente (com bundle mode)
+* runtime Jinja2 com cache por `mtime`
+* runtime MiniJinja (Rust) como backend alternativo via `renderer="minijinja"`
+* bundle mode: imports de componentes inlinados como macros, sem callbacks Python
+* `pjx compile` para batch compile `.pjx -> .jinja` (+ `--bundle`)
+* `pjx bench` para benchmark Jinja2 vs MiniJinja em todos os templates
 * template mounts com prefixo, como `@admin/...`
 * assets do framework em `/_pjx`
 * `context_processor` para injecao de contexto
@@ -32,7 +36,6 @@ Hoje o projeto ja entrega:
 Ainda nao considere o projeto "fechado" nestes pontos:
 
 * runtime nativo de `signal` e `action`
-* renderer backend alternativo a Jinja2
 * parser/token stream completo do markup
 * partial extraction mais forte que busca por `id`
 * scoped slot `let:` bindings
@@ -54,20 +57,24 @@ Fluxo principal:
 .pjx
 |
 +-- parser.py -> parse() -> PjxFile
-+-- compiler.py -> compile_pjx() -> str
-`-- runtime.py -> Jinja Environment.render(...)
++-- compiler.py -> compile_pjx(bundle=False) -> str
++-- runtime.py -> Jinja2 Environment.render(...)
+`-- runtime_minijinja.py -> MiniJinja env.render_template(...)
 ```
 
 ## Arquivos mais importantes
 
 * `pjx/fastapi.py`: Pjx, PjxRouter, init_app, render, Page, Template
-* `pjx/catalog.py`: template mounts, aliases, directives, facade de render
+* `pjx/catalog.py`: template mounts, aliases, directives, facade de render; `_create_runtime()`
 * `pjx/parser.py`: parser estrutural do arquivo `.pjx`
-* `pjx/compiler.py`: transforma AST em Jinja compilado
-* `pjx/runtime.py`: cache, props, slots, assets, partial render
+* `pjx/compiler.py`: transforma AST em Jinja compilado (+ `bundle=` mode)
+* `pjx/runtime.py`: cache, props, slots, assets, partial render (Jinja2)
+* `pjx/runtime_minijinja.py`: MiniJinjaRuntime — drop-in backend Rust
+* `pjx/compile.py`: batch compile `.pjx -> .jinja`; `_ImportResolver`; bundle
+* `pjx/bench.py`: benchmark Jinja2 vs MiniJinja em todos os templates
 * `pjx/ast.py`: PjxFile, ComponentDef, PropDef, ForNode, etc.
 * `pjx/tooling.py`: `check`, `format` e carga de projeto
-* `pjx/cli.py`: CLI com Typer + Rich
+* `pjx/cli.py`: CLI com Typer + Rich (check, format, compile, bench)
 * `README.md`: guia de uso
 * `docs/`: arquitetura, linguagem, CLI e decisoes
 * `TODO.md`: roadmap do framework
