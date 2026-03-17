@@ -15,7 +15,7 @@ actions = PJXRouter()
 
 @actions.action(
     "/actions/counter/inc",
-    template="pages/counter.pjx",
+    template="pages/apps.pjx",
     target="counter-display",
 )
 def increment_counter_action() -> dict:
@@ -25,7 +25,7 @@ def increment_counter_action() -> dict:
 
 @actions.action(
     "/actions/counter/dec",
-    template="pages/counter.pjx",
+    template="pages/apps.pjx",
     target="counter-display",
 )
 def decrement_counter_action() -> dict:

@@ -8,7 +8,6 @@ from exemples.api.routers.actions import actions
 from exemples.api.routers.pages import pages
 from pjx import Pjx
 
-
 BASE_DIR = Path(__file__).parent
 
 pjx = Pjx(
@@ -18,6 +17,7 @@ pjx = Pjx(
     browser=["htmx", "alpine"],
     css="pjx",
     static_dir=str(BASE_DIR / "static"),
+    bundle=True,
 )
 pjx.include_router(pages)
 pjx.include_router(actions)

@@ -92,26 +92,6 @@ _SNIPPET_HTMX = _code("""
 </div>
 """)
 
-_SNIPPET_MULTICOMP = _code("""
-// ui.pjx — multiple components in one file
-
-@component Stat {
-  @props { label: str, value: str }
-  <div class="stat-card">...</div>
-}
-
-@component Tag {
-  @props { label: str, color: str = "neutral" }
-  <span class="tag tag-{{ color }}">{{ label }}</span>
-}
-
-// Usage in another file:
-@from components.ui.ui import Stat, Tag
-
-<Stat label="Templates" value="6" />
-<Tag label="ready" color="ready" />
-""")
-
 _SNIPPET_BIND = _code("""
 # exemples/state.py
 class Counter:
@@ -138,20 +118,10 @@ class Counter:
 
 def get_showcase_context() -> dict[str, object]:
     return {
-        "status": "ready",
-        "items": [
-            {"name": "parse()", "desc": "Parses .pjx source into a PjxFile AST"},
-            {
-                "name": "compile_pjx()",
-                "desc": "Compiles AST to a Jinja2 template string",
-            },
-            {"name": "Runtime", "desc": "Renders templates with prop validation"},
-        ],
         "snippet_props": _SNIPPET_PROPS,
         "snippet_control": _SNIPPET_CONTROL,
         "snippet_slots": _SNIPPET_SLOTS,
         "snippet_alpine": _SNIPPET_ALPINE,
         "snippet_htmx": _SNIPPET_HTMX,
-        "snippet_multicomp": _SNIPPET_MULTICOMP,
         "snippet_bind": _SNIPPET_BIND,
     }

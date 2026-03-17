@@ -14,18 +14,8 @@ def showcase_page() -> dict:
     return get_showcase_context()
 
 
-@pages.page("/counter", template="pages/counter.pjx")
-def counter_page() -> dict:
-    return Counter.context()
-
-
 @pages.page("/components", template="pages/components.pjx")
 def components_page() -> dict:
-    return {}
-
-
-@pages.page("/kitchen-sink", template="pages/kitchen.pjx")
-def kitchen_page() -> dict:
     return {}
 
 

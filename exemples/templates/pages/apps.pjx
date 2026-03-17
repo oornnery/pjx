@@ -1,10 +1,9 @@
 @bind from exemples.state import Counter, Todo
 
 @import "layouts/Layout.pjx"
-@from pjx.layout import Card, Grid, Stack, Row, Divider
-@from pjx.ui import Button, Badge, Stat
-@from pjx.forms import Input, Field
-@from pjx.nav import Table, TableHead, TableRow, TableCell
+@from pjx.layout import Card, Stack, Row
+@from pjx.ui import Button, Badge
+@from pjx.forms import Input
 
 @props {
   count: int = 0,
@@ -30,14 +29,14 @@
       </p>
       <div id="counter-display" class="counter">
         <button
-          class="btn-secondary"
+          class="btn-secondary btn-sm"
           @click.htmx="post:/actions/counter/dec"
           @target="#counter-display"
           @swap="outerHTML"
         >−</button>
         <strong>{{ count }}</strong>
         <button
-          class="btn"
+          class="btn btn-sm"
           @click.htmx="post:/actions/counter/inc"
           @target="#counter-display"
           @swap="outerHTML"
@@ -52,19 +51,12 @@
 
     <!-- Todo App -->
     <Card title="Todo App">
-      <:header>
-        <strong>Todo App</strong>
-        <Row gap="sm">
-          <Badge text="{{ todo_done }}/{{ todo_total }} done" variant="neutral" />
-        </Row>
-      </:header>
-
       <form
         hx-post="/actions/todo/add"
         hx-target="#todo-list"
-        hx-swap="innerHTML"
-        class="flex gap-2"
-        onsubmit="this.reset()"
+        hx-swap="outerHTML"
+        class="flex gap-2 mb-3"
+        hx-on::after-request="this.reset()"
       >
         <input
           class="input flex-1"
@@ -77,13 +69,16 @@
       </form>
 
       <div id="todo-list" class="flex flex-col gap-1">
+        <div class="flex items-center justify-between mb-2">
+          <Badge text="{{ todo_done }}/{{ todo_total }} done" variant="neutral" />
+        </div>
         <For each="{{ todos }}" as="item">
           <div class="flex items-center gap-3 px-3 py-2.5 border rounded-lg transition-colors{{ ' opacity-60' if item.done else '' }}">
             <button
-              class="btn-icon-ghost size-7 text-sm shrink-0"
+              class="btn-ghost btn-sm"
               hx-post="/actions/todo/toggle/{{ item.id }}"
               hx-target="#todo-list"
-              hx-swap="innerHTML"
+              hx-swap="outerHTML"
               type="button"
               title="Toggle"
             >{{ '✓' if item.done else '○' }}</button>
@@ -91,10 +86,10 @@
               {{ item.text }}
             </span>
             <button
-              class="btn-icon-ghost size-7 text-muted-foreground ml-auto shrink-0"
+              class="btn-ghost btn-sm text-muted-foreground ml-auto"
               hx-post="/actions/todo/delete/{{ item.id }}"
               hx-target="#todo-list"
-              hx-swap="innerHTML"
+              hx-swap="outerHTML"
               type="button"
               title="Delete"
             >×</button>
@@ -115,56 +110,163 @@
     </Card>
 
     <!-- Data Table -->
-    <Card title="Data Table">
+    <Card title="User Table">
       <p class="text-sm text-muted-foreground mb-3">
-        Static user table. In a real app, use HTMX for pagination and sorting.
+        Click to edit. Type to filter columns. Uses Alpine.js for client-side interactivity.
       </p>
-      <Table>
-        <:head>
-          <TableHead>
-            <TableCell header="true">Name</TableCell>
-            <TableCell header="true">Email</TableCell>
-            <TableCell header="true">Status</TableCell>
-            <TableCell header="true">Role</TableCell>
-            <TableCell header="true">Joined</TableCell>
-          </TableHead>
-        </:head>
-        <TableRow>
-          <TableCell>Alice Martin</TableCell>
-          <TableCell>alice@example.com</TableCell>
-          <TableCell><Badge text="Active" variant="ready" /></TableCell>
-          <TableCell>Admin</TableCell>
-          <TableCell>Jan 2024</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>Bob Chen</TableCell>
-          <TableCell>bob@example.com</TableCell>
-          <TableCell><Badge text="Pending" variant="building" /></TableCell>
-          <TableCell>User</TableCell>
-          <TableCell>Mar 2024</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>Carol White</TableCell>
-          <TableCell>carol@example.com</TableCell>
-          <TableCell><Badge text="Active" variant="ready" /></TableCell>
-          <TableCell>Editor</TableCell>
-          <TableCell>Feb 2024</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>Dan Lopez</TableCell>
-          <TableCell>dan@example.com</TableCell>
-          <TableCell><Badge text="Inactive" variant="neutral" /></TableCell>
-          <TableCell>User</TableCell>
-          <TableCell>Jun 2023</TableCell>
-        </TableRow>
-        <TableRow>
-          <TableCell>Eva Brown</TableCell>
-          <TableCell>eva@example.com</TableCell>
-          <TableCell><Badge text="Active" variant="ready" /></TableCell>
-          <TableCell>User</TableCell>
-          <TableCell>Oct 2024</TableCell>
-        </TableRow>
-      </Table>
+      <div
+        x-data="{
+          users: [
+            { id: 1, name: 'Alice Martin', email: 'alice@example.com', status: 'active', role: 'Admin', joined: 'Jan 2024' },
+            { id: 2, name: 'Bob Chen', email: 'bob@example.com', status: 'pending', role: 'User', joined: 'Mar 2024' },
+            { id: 3, name: 'Carol White', email: 'carol@example.com', status: 'active', role: 'Editor', joined: 'Feb 2024' },
+            { id: 4, name: 'Dan Lopez', email: 'dan@example.com', status: 'inactive', role: 'User', joined: 'Jun 2023' },
+            { id: 5, name: 'Eva Brown', email: 'eva@example.com', status: 'active', role: 'User', joined: 'Oct 2024' }
+          ],
+          editingId: null,
+          editField: null,
+          filters: { name: '', email: '', status: '', role: '' },
+          get filteredUsers() {
+            return this.users.filter(u =>
+              (!this.filters.name || u.name.toLowerCase().includes(this.filters.name.toLowerCase())) &&
+              (!this.filters.email || u.email.toLowerCase().includes(this.filters.email.toLowerCase())) &&
+              (!this.filters.status || u.status === this.filters.status) &&
+              (!this.filters.role || u.role.toLowerCase().includes(this.filters.role.toLowerCase()))
+            );
+          },
+          startEdit(id, field) {
+            this.editingId = id;
+            this.editField = field;
+          },
+          saveEdit(user, field, value) {
+            user[field] = value;
+            this.editingId = null;
+            this.editField = null;
+          },
+          badgeCls(status) {
+            return { 'active': 'badge', 'pending': 'badge-secondary', 'inactive': 'badge-outline' }[status] || 'badge-secondary';
+          }
+        }"
+      >
+        <div class="overflow-x-auto">
+          <table class="table w-full">
+            <thead>
+              <tr>
+                <th>
+                  <div class="space-y-1">
+                    <span class="text-sm font-semibold">Name</span>
+                    <input type="text" class="input w-full text-xs" placeholder="Filter…" x-model="filters.name" />
+                  </div>
+                </th>
+                <th>
+                  <div class="space-y-1">
+                    <span class="text-sm font-semibold">Email</span>
+                    <input type="text" class="input w-full text-xs" placeholder="Filter…" x-model="filters.email" />
+                  </div>
+                </th>
+                <th>
+                  <div class="space-y-1">
+                    <span class="text-sm font-semibold">Status</span>
+                    <select class="select w-full text-xs" x-model="filters.status">
+                      <option value="">All</option>
+                      <option value="active">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                </th>
+                <th>
+                  <div class="space-y-1">
+                    <span class="text-sm font-semibold">Role</span>
+                    <input type="text" class="input w-full text-xs" placeholder="Filter…" x-model="filters.role" />
+                  </div>
+                </th>
+                <th class="text-sm font-semibold">Joined</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template x-for="user in filteredUsers" x-bind:key="user.id">
+                <tr>
+                  <td>
+                    <template x-if="editingId === user.id && editField === 'name'">
+                      <input
+                        type="text"
+                        class="input w-full"
+                        x-bind:value="user.name"
+                        @blur="saveEdit(user, 'name', $event.target.value)"
+                        @keydown.enter="saveEdit(user, 'name', $event.target.value)"
+                        @keydown.escape="editingId = null; editField = null"
+                      />
+                    </template>
+                    <template x-if="!(editingId === user.id && editField === 'name')">
+                      <span class="cursor-pointer hover:underline" @click="startEdit(user.id, 'name')" x-text="user.name"></span>
+                    </template>
+                  </td>
+                  <td>
+                    <template x-if="editingId === user.id && editField === 'email'">
+                      <input
+                        type="email"
+                        class="input w-full"
+                        x-bind:value="user.email"
+                        @blur="saveEdit(user, 'email', $event.target.value)"
+                        @keydown.enter="saveEdit(user, 'email', $event.target.value)"
+                        @keydown.escape="editingId = null; editField = null"
+                      />
+                    </template>
+                    <template x-if="!(editingId === user.id && editField === 'email')">
+                      <span class="cursor-pointer hover:underline text-sm" @click="startEdit(user.id, 'email')" x-text="user.email"></span>
+                    </template>
+                  </td>
+                  <td>
+                    <template x-if="editingId === user.id && editField === 'status'">
+                      <select
+                        class="select w-full"
+                        x-bind:value="user.status"
+                        @change="saveEdit(user, 'status', $event.target.value)"
+                        @blur="editingId = null; editField = null"
+                        @keydown.escape="editingId = null; editField = null"
+                      >
+                        <option value="active">Active</option>
+                        <option value="pending">Pending</option>
+                        <option value="inactive">Inactive</option>
+                      </select>
+                    </template>
+                    <template x-if="!(editingId === user.id && editField === 'status')">
+                      <span class="cursor-pointer inline-flex" @click="startEdit(user.id, 'status')">
+                        <span x-bind:class="badgeCls(user.status)" x-text="user.status.charAt(0).toUpperCase() + user.status.slice(1)"></span>
+                      </span>
+                    </template>
+                  </td>
+                  <td>
+                    <template x-if="editingId === user.id && editField === 'role'">
+                      <input
+                        type="text"
+                        class="input w-full"
+                        x-bind:value="user.role"
+                        @blur="saveEdit(user, 'role', $event.target.value)"
+                        @keydown.enter="saveEdit(user, 'role', $event.target.value)"
+                        @keydown.escape="editingId = null; editField = null"
+                      />
+                    </template>
+                    <template x-if="!(editingId === user.id && editField === 'role')">
+                      <span class="cursor-pointer hover:underline" @click="startEdit(user.id, 'role')" x-text="user.role"></span>
+                    </template>
+                  </td>
+                  <td class="text-sm text-muted-foreground" x-text="user.joined"></td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-3 text-xs text-muted-foreground">
+          <p class="m-0">
+            <strong x-text="filteredUsers.length"></strong> user(s) shown
+            <template x-if="filteredUsers.length !== users.length">
+              <span>(filtered from <span x-text="users.length"></span> total)</span>
+            </template>
+          </p>
+        </div>
+      </div>
     </Card>
 
     <!-- Contact Form -->
@@ -181,7 +283,7 @@
         >
           <Input name="cf_name" label="Full name" placeholder="Your name" required="true" />
           <Input name="cf_email" type="email" label="Email" placeholder="you@example.com" required="true" />
-          <div role="group" class="field">
+          <div class="grid gap-2">
             <label class="label" for="cf_msg">Message</label>
             <textarea
               class="textarea"
