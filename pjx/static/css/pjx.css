@@ -1,8 +1,0 @@
-/* PJX Built-in — pjx.css
-   Minimal helpers for PJX framework.
-   Basecoat UI provides the design system.
-   Served at /_pjx/css/pjx.css */
-
-[x-cloak] {
-  display: none !important;
-}
