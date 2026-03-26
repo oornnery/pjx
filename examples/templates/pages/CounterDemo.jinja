@@ -1,0 +1,23 @@
+---
+import Layout from "../layouts/Base.jinja"
+import Counter from "../components/Counter.jinja"
+import ServerCounter from "../components/ServerCounter.jinja"
+---
+
+<Layout>
+  <div class="page">
+    <h1>Counter Demo</h1>
+    <div class="counter-grid">
+      <div class="counter-section">
+        <h2>Client-side (Alpine.js)</h2>
+        <p>State lives in the browser. No server requests — instant updates.</p>
+        <Counter />
+      </div>
+      <div class="counter-section">
+        <h2>Server-side (HTMX)</h2>
+        <p>State lives on the server. Each click sends a request and swaps HTML.</p>
+        <ServerCounter count="{{ server_count }}" />
+      </div>
+    </div>
+  </div>
+</Layout>

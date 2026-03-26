@@ -1,0 +1,19 @@
+---
+state query = ""
+state results = []
+---
+
+<div class="search" reactive>
+  <input
+    bind:model="query"
+    action:get="/api/search"
+    trigger="keyup changed delay:300ms"
+    target="#search-results"
+    placeholder="Search..."
+  />
+  <div id="search-results" class="search__results">
+    <For each="results" as="item">
+      <p>{{ item }}</p>
+    </For>
+  </div>
+</div>

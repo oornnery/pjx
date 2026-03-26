@@ -1,0 +1,27 @@
+---
+props ServerCounterProps = {
+  count: int = 0,
+}
+---
+
+<div class="counter" id="server-counter">
+  <button class="btn"
+    action:post="/htmx/counter/decrement"
+    target="#server-counter"
+    swap="outerHTML">
+    −
+  </button>
+  <span class="counter__value">{{ props.count }}</span>
+  <button class="btn"
+    action:post="/htmx/counter/increment"
+    target="#server-counter"
+    swap="outerHTML">
+    +
+  </button>
+  <button class="btn btn-secondary"
+    action:post="/htmx/counter/reset"
+    target="#server-counter"
+    swap="outerHTML">
+    Reset
+  </button>
+</div>

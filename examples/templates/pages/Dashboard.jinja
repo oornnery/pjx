@@ -1,0 +1,30 @@
+---
+import Layout from "../layouts/Base.jinja"
+import UserCard from "../components/UserCard.jinja"
+
+props DashboardProps = {
+  title: str = "Dashboard",
+  users: list = [],
+}
+---
+
+<Layout>
+  <div class="dashboard">
+    <h1>{{ props.title }}</h1>
+    <div id="toast-container" class="toast-container"></div>
+    <div class="dashboard__grid">
+      <For each="users" as="user">
+        <UserCard name="{{ user.name }}" email="{{ user.email }}" avatar="{{ user.avatar }}">
+          <Slot:actions>
+            <button class="btn btn-primary"
+              action:post="/htmx/message/{{ user.id }}"
+              target="#toast-container"
+              swap="beforeend">
+              Message
+            </button>
+          </Slot:actions>
+        </UserCard>
+      </For>
+    </div>
+  </div>
+</Layout>

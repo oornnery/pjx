@@ -1,0 +1,88 @@
+---
+import Navbar from "../components/Navbar.jinja"
+
+props BaseLayoutProps = {
+  title: str = "PJX App",
+  favicon: str = "/static/images/favicon.svg",
+}
+
+slot default
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ seo.title|default(props.title) }}</title>
+
+  <link rel="icon" href="{{ props.favicon }}" type="image/svg+xml" />
+
+  <Show when="seo is defined and seo.description">
+    <meta name="description" content="{{ seo.description }}" />
+  </Show>
+  <Show when="seo is defined and seo.keywords">
+    <meta name="keywords" content="{{ seo.keywords }}" />
+  </Show>
+  <Show when="seo is defined and seo.robots">
+    <meta name="robots" content="{{ seo.robots }}" />
+  </Show>
+  <Show when="seo is defined and seo.canonical">
+    <link rel="canonical" href="{{ seo.canonical }}" />
+  </Show>
+
+  <Show when="seo is defined and (seo.og_title or seo.title)">
+    <meta property="og:title" content="{{ seo.og_title|default(seo.title) }}" />
+  </Show>
+  <Show when="seo is defined and (seo.og_description or seo.description)">
+    <meta property="og:description" content="{{ seo.og_description|default(seo.description) }}" />
+  </Show>
+  <Show when="seo is defined and seo.og_image">
+    <meta property="og:image" content="{{ seo.og_image }}" />
+  </Show>
+  <Show when="seo is defined">
+    <meta property="og:type" content="{{ seo.og_type|default('website') }}" />
+  </Show>
+  <Show when="seo is defined and seo.og_url">
+    <meta property="og:url" content="{{ seo.og_url }}" />
+  </Show>
+
+  <Show when="seo is defined">
+    <meta name="twitter:card" content="{{ seo.twitter_card|default('summary_large_image') }}" />
+  </Show>
+  <Show when="seo is defined and (seo.twitter_title or seo.og_title or seo.title)">
+    <meta name="twitter:title" content="{{ seo.twitter_title|default(seo.og_title)|default(seo.title) }}" />
+  </Show>
+  <Show when="seo is defined and (seo.twitter_description or seo.og_description or seo.description)">
+    <meta name="twitter:description" content="{{ seo.twitter_description|default(seo.og_description)|default(seo.description) }}" />
+  </Show>
+  <Show when="seo is defined and (seo.twitter_image or seo.og_image)">
+    <meta name="twitter:image" content="{{ seo.twitter_image|default(seo.og_image) }}" />
+  </Show>
+
+  <link rel="stylesheet" href="/static/css/base.css" />
+  <link rel="stylesheet" href="/static/css/components.css" />
+  <For each="head_css|default([])" as="css">
+    <link rel="stylesheet" href="{{ css }}" />
+  </For>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
+  <For each="head_scripts|default([])" as="js">
+    <script src="{{ js }}"></script>
+  </For>
+</head>
+<body>
+  <div class="layout">
+    <Navbar />
+    <main class="layout__main">
+      <Slot />
+    </main>
+  </div>
+
+  <For each="body_scripts|default([])" as="js">
+    <script src="{{ js }}"></script>
+  </For>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

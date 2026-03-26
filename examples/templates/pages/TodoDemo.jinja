@@ -1,0 +1,39 @@
+---
+import Layout from "../layouts/Base.jinja"
+---
+
+<Layout>
+  <div class="page" x-data="{ filter: 'all' }">
+    <h1>Todo List</h1>
+    <form class="todo-add" action:post="/htmx/todos/add" target="#todo-list" swap="innerHTML">
+      <input type="text" name="text" placeholder="What needs to be done?" required />
+      <button type="submit" class="btn btn-primary">Add</button>
+    </form>
+    <div class="todo-filters">
+      <button class="btn btn-filter"
+        bind:class="filter === 'all' && 'active'"
+        on:click="filter = 'all'"
+        action:get="/htmx/todos/filter?status=all"
+        target="#todo-list" swap="innerHTML">
+        All
+      </button>
+      <button class="btn btn-filter"
+        bind:class="filter === 'pending' && 'active'"
+        on:click="filter = 'pending'"
+        action:get="/htmx/todos/filter?status=pending"
+        target="#todo-list" swap="innerHTML">
+        Pending
+      </button>
+      <button class="btn btn-filter"
+        bind:class="filter === 'done' && 'active'"
+        on:click="filter = 'done'"
+        action:get="/htmx/todos/filter?status=done"
+        target="#todo-list" swap="innerHTML">
+        Done
+      </button>
+    </div>
+    <div id="todo-list" class="todo-list">
+      {{ todo_list }}
+    </div>
+  </div>
+</Layout>

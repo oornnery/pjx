@@ -1,0 +1,10 @@
+---
+state count = 0
+---
+
+<div class="counter" reactive>
+  <button on:click="count--" class="btn">−</button>
+  <span class="counter__value" x-text="count">0</span>
+  <button on:click="count++" class="btn">+</button>
+  <button on:click="count = 0" class="btn btn-secondary">Reset</button>
+</div>

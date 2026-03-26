@@ -1,0 +1,15 @@
+---
+props TodoStatsProps = {
+  done: int = 0,
+  total: int = 0,
+}
+---
+
+<Show when="props.total > 0">
+  <div class="todo-stats">
+    <span class="todo-stats__text">{{ props.done }}/{{ props.total }} completed</span>
+    <div class="todo-stats__bar">
+      <div class="todo-stats__fill" style="width: {{ (props.done / props.total * 100)|round|int }}%"></div>
+    </div>
+  </div>
+</Show>

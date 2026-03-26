@@ -1,0 +1,21 @@
+---
+import TodoStats from "./TodoStats.jinja"
+import TodoItem from "./TodoItem.jinja"
+
+props TodoListProps = {
+  todos: list = [],
+  empty_message: str = "No todos yet. Add one above!",
+  done_count: int = 0,
+  total_count: int = 0,
+}
+---
+
+<TodoStats done="{{ props.done_count }}" total="{{ props.total_count }}" />
+<Show when="props.todos">
+  <For each="props.todos" as="todo">
+    <TodoItem idx="{{ todo.idx }}" text="{{ todo.text }}" done="{{ todo.done }}" />
+  </For>
+  <Fallback>
+    <p class="todo-list__empty">{{ props.empty_message }}</p>
+  </Fallback>
+</Show>

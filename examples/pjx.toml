@@ -1,0 +1,5 @@
+engine = "jinja2"
+debug = true
+
+template_dirs = ["templates"]
+static_dir = "static"
