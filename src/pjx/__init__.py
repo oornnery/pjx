@@ -10,13 +10,14 @@ __version__ = "0.0.1"
 
 from pjx.compiler import Compiler
 from pjx.config import PJXConfig
-from pjx.engine import Jinja2Engine, MiniJinjaEngine, create_engine
+from pjx.engine import HybridEngine, Jinja2Engine, MiniJinjaEngine, create_engine
 from pjx.integration import PJX, SEO, FormData
 from pjx.parser import parse, parse_file
 
 __all__ = [
     "Compiler",
     "FormData",
+    "HybridEngine",
     "Jinja2Engine",
     "MiniJinjaEngine",
     "PJX",

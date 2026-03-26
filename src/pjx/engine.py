@@ -78,16 +78,43 @@ class MiniJinjaEngine:
         return name in self._templates
 
 
-def create_engine(engine_type: str = "jinja2") -> EngineProtocol:
+class HybridEngine:
+    """Best-of-both: Jinja2 for ``render()``, MiniJinja for ``render_string()``."""
+
+    def __init__(self) -> None:
+        self._jinja2 = Jinja2Engine()
+        self._minijinja = MiniJinjaEngine()
+
+    def render(self, template_name: str, context: dict[str, Any]) -> str:
+        return self._jinja2.render(template_name, context)
+
+    def render_string(self, source: str, context: dict[str, Any]) -> str:
+        return self._minijinja.render_string(source, context)
+
+    def add_template(self, name: str, source: str) -> None:
+        self._jinja2.add_template(name, source)
+        self._minijinja.add_template(name, source)
+
+    def add_global(self, name: str, value: Any) -> None:
+        self._jinja2.add_global(name, value)
+        self._minijinja.add_global(name, value)
+
+    def has_template(self, name: str) -> bool:
+        return self._jinja2.has_template(name)
+
+
+def create_engine(engine_type: str = "hybrid") -> EngineProtocol:
     """Create a template engine instance.
 
     Args:
-        engine_type: One of ``"jinja2"``, ``"minijinja"``, or ``"auto"``.
+        engine_type: One of ``"hybrid"``, ``"jinja2"``, ``"minijinja"``, or ``"auto"``.
 
     Returns:
         An engine implementing :class:`EngineProtocol`.
     """
-    if engine_type in ("jinja2", "auto"):
+    if engine_type in ("hybrid", "auto"):
+        return HybridEngine()
+    if engine_type == "jinja2":
         return Jinja2Engine()
     if engine_type == "minijinja":
         return MiniJinjaEngine()

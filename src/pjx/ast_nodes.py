@@ -58,10 +58,10 @@ class PropField:
 
 @dataclass(frozen=True, slots=True)
 class PropsDecl:
-    """``props UserProps = { name: str, age: int = 0 }``."""
+    """``props { name: str }`` or ``props UserProps = { name: str }``."""
 
-    name: str
     fields: tuple[PropField, ...]
+    name: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +78,14 @@ class StoreDecl:
 
     name: str
     value: str  # raw JS object literal
+
+
+@dataclass(frozen=True, slots=True)
+class AssetDecl:
+    """``css "styles/button.css"`` or ``js "scripts/dropdown.js"``."""
+
+    kind: str  # "css" or "js"
+    path: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +320,7 @@ class CompiledComponent:
     css: ScopedStyle | None = None
     alpine_data: str | None = None
     scope_hash: str = ""
+    assets: tuple[AssetDecl, ...] = ()
 
 
 # ---------------------------------------------------------------------------
@@ -333,5 +342,6 @@ class Component:
     variables: tuple[LetDecl | ConstDecl, ...] = ()
     states: tuple[StateDecl, ...] = ()
     computed: tuple[ComputedDecl, ...] = ()
+    assets: tuple[AssetDecl, ...] = ()
     body: tuple[Node, ...] = ()
     style: str | None = None

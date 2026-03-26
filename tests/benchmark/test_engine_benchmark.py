@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from pjx.engine import Jinja2Engine, MiniJinjaEngine
+from pjx.engine import HybridEngine, Jinja2Engine, MiniJinjaEngine
 
 # ---------------------------------------------------------------------------
 # Template sources (shared across benchmarks)
@@ -232,11 +232,13 @@ MINIMAL_CTX = {"name": "x"}
 # Fixtures
 # ---------------------------------------------------------------------------
 
-ENGINE_IDS = ["jinja2", "minijinja"]
+ENGINE_IDS = ["jinja2", "minijinja", "hybrid"]
 
 
-@pytest.fixture(params=[Jinja2Engine, MiniJinjaEngine], ids=ENGINE_IDS)
-def engine(request: pytest.FixtureRequest) -> Jinja2Engine | MiniJinjaEngine:
+@pytest.fixture(params=[Jinja2Engine, MiniJinjaEngine, HybridEngine], ids=ENGINE_IDS)
+def engine(
+    request: pytest.FixtureRequest,
+) -> Jinja2Engine | MiniJinjaEngine | HybridEngine:
     """Parametrized engine fixture — each benchmark runs for both engines."""
     return request.param()
 
@@ -355,12 +357,12 @@ def _make_engine_with_templates(
 
 
 @pytest.fixture(
-    params=[Jinja2Engine, MiniJinjaEngine],
+    params=[Jinja2Engine, MiniJinjaEngine, HybridEngine],
     ids=ENGINE_IDS,
 )
 def preloaded_engine(
     request: pytest.FixtureRequest,
-) -> Jinja2Engine | MiniJinjaEngine:
+) -> Jinja2Engine | MiniJinjaEngine | HybridEngine:
     """Engine with all templates pre-registered."""
     return _make_engine_with_templates(request.param)
 

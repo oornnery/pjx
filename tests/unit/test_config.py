@@ -8,7 +8,7 @@ from pjx.config import PJXConfig
 class TestPJXConfig:
     def test_defaults(self) -> None:
         config = PJXConfig()
-        assert config.engine == "jinja2"
+        assert config.engine == "hybrid"
         assert config.debug is False
         assert config.host == "127.0.0.1"
         assert config.port == 8000
@@ -38,6 +38,6 @@ class TestPJXConfig:
             os.environ.pop("PJX_PORT", None)
 
     def test_engine_choices(self) -> None:
-        for engine in ("jinja2", "minijinja", "auto"):
+        for engine in ("hybrid", "jinja2", "minijinja", "auto"):
             config = PJXConfig(engine=engine)
             assert config.engine == engine

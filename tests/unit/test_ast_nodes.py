@@ -292,7 +292,7 @@ class TestComponent:
             extends=ExtendsDecl("layouts/Base.jinja"),
             from_imports=(FromImportDecl("pydantic", ("EmailStr",)),),
             imports=(ImportDecl(("Button",), "./Button.jinja"),),
-            props=PropsDecl("TodoProps", (PropField("text", "str"),)),
+            props=PropsDecl(name="TodoProps", fields=(PropField("text", "str"),)),
             slots=(SlotDecl("actions"),),
             stores=(StoreDecl("theme", "{ dark: false }"),),
             variables=(LetDecl("x", "1"), ConstDecl("Y", "2")),

@@ -122,6 +122,14 @@ class TestParseProps:
         assert comp.props.fields[0].type_expr == "str"
         assert comp.props.fields[1].default == "0"
 
+    def test_props_anonymous(self) -> None:
+        src = "---\nprops {\n  name: str,\n  age: int = 0,\n}\n---\n<div></div>"
+        comp = parse(src)
+        assert comp.props is not None
+        assert comp.props.name == ""
+        assert len(comp.props.fields) == 2
+        assert comp.props.fields[0].name == "name"
+
     def test_props_pydantic_types(self) -> None:
         src = '---\nprops P = {\n  role: Literal["admin", "user"] = "user",\n}\n---\n<div></div>'
         comp = parse(src)
@@ -230,7 +238,7 @@ class TestParseBodyShow:
         assert len(node.body) > 0
 
     def test_show_fallback(self) -> None:
-        src = '<Show when="visible"><p>yes</p><Fallback><p>no</p></Fallback></Show>'
+        src = '<Show when="visible"><p>yes</p><Else><p>no</p></Else></Show>'
         comp = parse(src)
         node = comp.body[0]
         assert isinstance(node, ShowNode)
@@ -399,6 +407,39 @@ const MAX = 100
 # ---------------------------------------------------------------------------
 # Error cases
 # ---------------------------------------------------------------------------
+
+
+class TestAssetDeclarations:
+    def test_css_declaration(self) -> None:
+        comp = parse('---\ncss "styles/card.css"\n---\n<div></div>')
+        assert len(comp.assets) == 1
+        assert comp.assets[0].kind == "css"
+        assert comp.assets[0].path == "styles/card.css"
+
+    def test_js_declaration(self) -> None:
+        comp = parse('---\njs "scripts/modal.js"\n---\n<div></div>')
+        assert len(comp.assets) == 1
+        assert comp.assets[0].kind == "js"
+        assert comp.assets[0].path == "scripts/modal.js"
+
+    def test_multiple_assets(self) -> None:
+        comp = parse('---\ncss "a.css"\ncss "b.css"\njs "app.js"\n---\n<div></div>')
+        assert len(comp.assets) == 3
+        assert comp.assets[0].path == "a.css"
+        assert comp.assets[1].path == "b.css"
+        assert comp.assets[2].path == "app.js"
+
+    def test_assets_with_other_declarations(self) -> None:
+        comp = parse(
+            '---\nimport Button from "./Button.jinja"\n'
+            'css "/static/css/page.css"\n'
+            "props P = { title: str }\n"
+            "---\n<div>{{ props.title }}</div>"
+        )
+        assert len(comp.assets) == 1
+        assert comp.assets[0].path == "/static/css/page.css"
+        assert len(comp.imports) == 1
+        assert comp.props is not None
 
 
 class TestParseErrors:

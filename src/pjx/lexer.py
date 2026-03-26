@@ -33,6 +33,8 @@ class TokenKind(StrEnum):
     CONST = "const"
     STATE = "state"
     COMPUTED = "computed"
+    CSS = "css"
+    JS = "js"
 
     # Literals / identifiers
     IDENT = "IDENT"
@@ -73,8 +75,27 @@ _KEYWORDS.update(
         "const": TokenKind.CONST,
         "state": TokenKind.STATE,
         "computed": TokenKind.COMPUTED,
+        "css": TokenKind.CSS,
+        "js": TokenKind.JS,
     }
 )
+
+_SINGLE: dict[str, TokenKind] = {
+    "{": TokenKind.LBRACE,
+    "}": TokenKind.RBRACE,
+    "[": TokenKind.LBRACKET,
+    "]": TokenKind.RBRACKET,
+    "(": TokenKind.LPAREN,
+    ")": TokenKind.RPAREN,
+    ",": TokenKind.COMMA,
+    ":": TokenKind.COLON,
+    "=": TokenKind.EQUALS,
+    "|": TokenKind.PIPE,
+    "*": TokenKind.STAR,
+    ".": TokenKind.DOT,
+}
+
+_ESCAPES: dict[str, str] = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,20 +162,6 @@ def tokenize(source: str) -> list[Token]:
             continue
 
         # Single-char punctuation
-        _SINGLE: dict[str, TokenKind] = {
-            "{": TokenKind.LBRACE,
-            "}": TokenKind.RBRACE,
-            "[": TokenKind.LBRACKET,
-            "]": TokenKind.RBRACKET,
-            "(": TokenKind.LPAREN,
-            ")": TokenKind.RPAREN,
-            ",": TokenKind.COMMA,
-            ":": TokenKind.COLON,
-            "=": TokenKind.EQUALS,
-            "|": TokenKind.PIPE,
-            "*": TokenKind.STAR,
-            ".": TokenKind.DOT,
-        }
         if ch in _SINGLE:
             tokens.append(Token(_SINGLE[ch], ch, line, col))
             pos += 1
@@ -182,7 +189,6 @@ def tokenize(source: str) -> list[Token]:
                             "unterminated string literal", line=line, col=start_col
                         )
                     esc = source[pos]
-                    _ESCAPES = {"n": "\n", "t": "\t", "\\": "\\", '"': '"', "'": "'"}
                     buf.append(_ESCAPES.get(esc, f"\\{esc}"))
                     pos += 1
                     col += 1

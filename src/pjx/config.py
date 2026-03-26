@@ -5,7 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, TomlConfigSettingsSource
+from pydantic_settings import (
+    BaseSettings,
+    PydanticBaseSettingsSource,
+    TomlConfigSettingsSource,
+)
 
 
 # Module-level holder so settings_customise_sources can access toml_path
@@ -34,7 +38,7 @@ class PJXConfig(BaseSettings):
 
     model_config = {"env_prefix": "PJX_"}
 
-    engine: Literal["jinja2", "minijinja", "auto"] = "jinja2"
+    engine: Literal["hybrid", "jinja2", "minijinja", "auto"] = "hybrid"
     debug: bool = False
     template_dirs: list[Path] = [Path("templates")]
     static_dir: Path = Path("static")
@@ -49,6 +53,8 @@ class PJXConfig(BaseSettings):
     alpine: bool = True
     htmx: bool = True
     tailwind: bool = False
+    validate_props: bool = True
+    render_mode: Literal["include", "inline"] = "include"
 
     def __init__(self, toml_path: Path | str = "pjx.toml", **kwargs: Any) -> None:
         toml = Path(toml_path)

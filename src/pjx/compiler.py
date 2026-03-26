@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from pjx.ast_nodes import (
@@ -29,9 +30,10 @@ from pjx.ast_nodes import (
 )
 from pjx.css import generate_scope_hash, scope_css
 from pjx.errors import CompileError
+from pjx.props import separate_attrs
 
 if TYPE_CHECKING:
-    pass
+    from pjx.registry import ComponentRegistry
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +113,14 @@ def _compile_attr(name: str, value: str | bool) -> list[tuple[str, str | bool]]:
         verb = name[7:]
         return [(f"hx-{verb}", sval)]
 
+    # into= shorthand → hx-target + hx-swap
+    if name == "into":
+        if ":" in sval:
+            target, swap = sval.rsplit(":", 1)
+        else:
+            target, swap = sval, "innerHTML"
+        return [("hx-target", target), ("hx-swap", swap)]
+
     # HTMX shorthand attrs
     if name in _HTMX_ATTRS:
         return [(f"hx-{name}", sval)]
@@ -153,7 +163,7 @@ class Compiler:
             Can be ``None`` for standalone compilation.
     """
 
-    def __init__(self, registry: object | None = None) -> None:
+    def __init__(self, registry: ComponentRegistry | None = None) -> None:
         self._registry = registry
 
     def compile(self, component: Component) -> CompiledComponent:
@@ -205,6 +215,7 @@ class Compiler:
             css=scoped_style,
             alpine_data=alpine_data,
             scope_hash=scope_hash,
+            assets=component.assets,
         )
 
     def _compile_preamble(self, component: Component) -> str:
@@ -470,8 +481,24 @@ class Compiler:
         """Compile a component usage to ``{% set %}`` + ``{% include %}``."""
         lines: list[str] = []
 
-        # Set props from attrs
-        for name, value in node.attrs.items():
+        # Find template path from imports (needed for child lookup)
+        template_path = f"{node.name}.jinja"
+        for imp in component.imports:
+            if node.name in imp.names:
+                template_path = imp.source
+                break
+
+        # Separate declared props from extra passthrough attrs
+        child_props_decl = None
+        if self._registry is not None:
+            child = self._registry.get(node.name)
+            if child is not None:
+                child_props_decl = child.props
+
+        props_attrs, extra_attrs = separate_attrs(child_props_decl, node.attrs)
+
+        # Set declared props
+        for name, value in props_attrs.items():
             if value is True:
                 lines.append(f"{{% set {name} = true %}}")
             elif "{{" in str(value):
@@ -480,6 +507,24 @@ class Compiler:
                 lines.append(f"{{% set {name} = {expr} %}}")
             else:
                 lines.append(f'{{% set {name} = "{value}" %}}')
+
+        # Extra attrs → pre-rendered string via {% set attrs %}...{% endset %}
+        # Jinja evaluates expressions inside the block at render time.
+        if extra_attrs:
+            attr_parts: list[str] = []
+            for name, value in extra_attrs.items():
+                for out_name, out_value in _compile_attr(name, value):
+                    if out_value is True:
+                        attr_parts.append(out_name)
+                    elif "{{" in str(out_value):
+                        # Jinja expression — keep raw so it evaluates at render
+                        attr_parts.append(f'{out_name}="{out_value}"')
+                    else:
+                        attr_parts.append(f'{out_name}="{out_value}"')
+            attrs_str = " ".join(attr_parts)
+            lines.append(f"{{% set attrs %}}{attrs_str}{{% endset %}}")
+        else:
+            lines.append('{% set attrs = "" %}')
 
         # Spread
         if node.spread:
@@ -516,12 +561,44 @@ class Compiler:
                 )
                 lines.append(f"{{% set slot_default %}}{children_html}{{% endset %}}")
 
-        # Find template path from imports
-        template_path = f"{node.name}.jinja"
-        for imp in component.imports:
-            if node.name in imp.names:
-                template_path = imp.source
-                break
-
         lines.append(f'{{% include "{template_path}" %}}')
         return "".join(lines)
+
+    # -- On-the-fly rendering helpers ----------------------------------------
+
+    _INCLUDE_RE = re.compile(r'\{%[-\s]*include\s+"([^"]+)"\s*[-]?%}')
+
+    @staticmethod
+    def inline_includes(
+        source: str,
+        compiled_templates: dict[str, str],
+        *,
+        max_depth: int = 50,
+    ) -> str:
+        """Replace ``{% include "X" %}`` with the template source, recursively.
+
+        Produces a single flat template string with no includes, suitable for
+        ``engine.render_string()``.
+
+        Args:
+            source: Compiled Jinja2 source with include directives.
+            compiled_templates: Map of template name → compiled Jinja2 source.
+            max_depth: Maximum recursion depth (prevents infinite loops).
+
+        Returns:
+            Flattened template source.
+        """
+        if max_depth <= 0:
+            return source
+
+        def _replace(match: re.Match[str]) -> str:
+            name = match.group(1)
+            child_source = compiled_templates.get(name)
+            if child_source is None:
+                return match.group(0)  # keep original if not found
+            # Recursively inline nested includes
+            return Compiler.inline_includes(
+                child_source, compiled_templates, max_depth=max_depth - 1
+            )
+
+        return Compiler._INCLUDE_RE.sub(_replace, source)

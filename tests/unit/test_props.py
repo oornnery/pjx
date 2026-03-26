@@ -4,7 +4,7 @@ import pytest
 
 from pjx.ast_nodes import PropField, PropsDecl
 from pjx.errors import PropValidationError
-from pjx.props import generate_props_model, validate_props
+from pjx.props import generate_props_model, separate_attrs, validate_props
 
 
 class TestGeneratePropsModel:
@@ -80,3 +80,58 @@ class TestInvalidTypeExpr:
         decl = PropsDecl(name="P", fields=(PropField("x", "InvalidType123"),))
         with pytest.raises(PropValidationError, match="invalid type"):
             generate_props_model(decl)
+
+
+class TestSeparateAttrs:
+    def test_no_props_decl_all_to_props(self) -> None:
+        attrs = {"class": "btn", "id": "x"}
+        props, extras = separate_attrs(None, attrs)
+        assert props == {"class": "btn", "id": "x"}
+        assert extras == {}
+
+    def test_separates_declared_from_extras(self) -> None:
+        decl = PropsDecl(
+            name="P",
+            fields=(
+                PropField("variant", "str", default='"primary"'),
+                PropField("size", "str", default='"md"'),
+            ),
+        )
+        attrs = {"variant": "danger", "size": "lg", "class": "extra", "id": "btn1"}
+        props, extras = separate_attrs(decl, attrs)
+        assert props == {"variant": "danger", "size": "lg"}
+        assert extras == {"class": "extra", "id": "btn1"}
+
+    def test_all_declared_no_extras(self) -> None:
+        decl = PropsDecl(name="P", fields=(PropField("title", "str"),))
+        attrs = {"title": "Hello"}
+        props, extras = separate_attrs(decl, attrs)
+        assert props == {"title": "Hello"}
+        assert extras == {}
+
+    def test_all_extras_no_declared(self) -> None:
+        decl = PropsDecl(name="P", fields=())
+        attrs = {"class": "btn", "on:click": "go()"}
+        props, extras = separate_attrs(decl, attrs)
+        assert props == {}
+        assert extras == {"class": "btn", "on:click": "go()"}
+
+    def test_empty_attrs(self) -> None:
+        decl = PropsDecl(name="P", fields=(PropField("x", "str"),))
+        props, extras = separate_attrs(decl, {})
+        assert props == {}
+        assert extras == {}
+
+    def test_generate_props_model_anonymous(self) -> None:
+        decl = PropsDecl(fields=(PropField("name", "str"),))
+        model = generate_props_model(decl)
+        assert model.__name__ == "Props"
+        instance = model(name="test")
+        assert instance.name == "test"
+
+    def test_boolean_attrs_separated(self) -> None:
+        decl = PropsDecl(name="P", fields=(PropField("active", "bool"),))
+        attrs = {"active": True, "disabled": True}
+        props, extras = separate_attrs(decl, attrs)
+        assert props == {"active": True}
+        assert extras == {"disabled": True}

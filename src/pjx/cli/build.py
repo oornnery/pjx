@@ -57,27 +57,49 @@ def build(
 def check(
     directory: Path = typer.Argument(Path("."), help="Project directory"),
 ) -> None:
-    """Parse all .jinja files and report errors."""
+    """Parse all .jinja files, validate imports, props, and slots."""
+    from pjx.checker import check_all
+
     config = PJXConfig()
-    errors = 0
+    registry = ComponentRegistry([Path(d) for d in config.template_dirs])
+    parse_errors = 0
+    check_errors: list[PJXError] = []
     count = 0
 
+    # Phase 1: parse all components and register them
+    components = []
     for tpl_dir in config.template_dirs:
         tpl_path = Path(tpl_dir)
         if not tpl_path.exists():
             continue
         for jinja_file in sorted(tpl_path.rglob("*.jinja")):
             try:
-                parse_file(jinja_file)
+                component = parse_file(jinja_file)
+                registry.register(jinja_file.stem, component)
+                components.append(component)
                 count += 1
             except PJXError as e:
                 typer.echo(f"ERROR: {e}", err=True)
-                errors += 1
+                parse_errors += 1
 
-    if errors:
-        typer.echo(f"Found {errors} error(s) in {count + errors} files.", err=True)
-        raise typer.Exit(1)
-    typer.echo(f"Checked {count} files — no errors.")
+    # Phase 2: run static checks on all components
+    for component in components:
+        check_errors.extend(check_all(component, registry))
+
+    for err in check_errors:
+        typer.echo(f"WARNING: {err}", err=True)
+
+    total_errors = parse_errors + len(check_errors)
+    if total_errors:
+        typer.echo(
+            f"Found {parse_errors} parse error(s) and {len(check_errors)} "
+            f"check warning(s) in {count + parse_errors} files.",
+            err=True,
+        )
+        if parse_errors:
+            raise typer.Exit(1)
+    else:
+        typer.echo(f"Checked {count} files — no errors.")
 
 
 @app.command(name="format")

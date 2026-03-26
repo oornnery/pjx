@@ -72,7 +72,36 @@ def generate_props_model(
         else:
             field_definitions[field.name] = (field_type, ...)
 
-    return create_model(decl.name, **field_definitions)
+    return create_model(decl.name or "Props", **field_definitions)
+
+
+def separate_attrs(
+    props_decl: PropsDecl | None,
+    all_attrs: dict[str, str | bool],
+) -> tuple[dict[str, str | bool], dict[str, str | bool]]:
+    """Split component attributes into declared props and extra passthrough attrs.
+
+    Args:
+        props_decl: The component's props declaration. If ``None``, all
+            attributes are treated as props (backwards compatible).
+        all_attrs: All attributes passed on the component tag.
+
+    Returns:
+        A ``(props, extras)`` tuple. *props* contains attributes matching
+        declared prop names; *extras* contains the rest.
+    """
+    if props_decl is None:
+        return dict(all_attrs), {}
+
+    declared = {f.name for f in props_decl.fields}
+    props: dict[str, str | bool] = {}
+    extras: dict[str, str | bool] = {}
+    for name, value in all_attrs.items():
+        if name in declared:
+            props[name] = value
+        else:
+            extras[name] = value
+    return props, extras
 
 
 def validate_props(model: type[BaseModel], data: dict[str, Any]) -> BaseModel:

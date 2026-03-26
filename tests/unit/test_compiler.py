@@ -10,6 +10,7 @@ from pjx.ast_nodes import (
     ComputedDecl,
     ConstDecl,
     ElementNode,
+    ErrorBoundaryNode,
     ExtendsDecl,
     ForNode,
     FragmentNode,
@@ -24,6 +25,7 @@ from pjx.ast_nodes import (
     TeleportNode,
     TextNode,
     TransitionGroupNode,
+    TransitionNode,
 )
 from pjx.compiler import Compiler
 
@@ -197,16 +199,6 @@ class TestPortal:
         assert 'hx-swap="innerHTML"' in result
 
 
-class TestAwait:
-    def test_compile_await(self) -> None:
-        comp = _minimal_component(
-            body=(AwaitNode(src="/api/data", trigger="load"),),
-        )
-        result = _compile(comp)
-        assert 'hx-get="/api/data"' in result
-        assert 'hx-trigger="load"' in result
-
-
 class TestFragment:
     def test_compile_fragment(self) -> None:
         comp = _minimal_component(
@@ -354,6 +346,22 @@ class TestAttrs:
         result = _compile(comp)
         assert 'x-data="{ count: 0 }"' in result
 
+    def test_compile_attrs_into_default_swap(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"into": "#target"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-target="#target"' in result
+        assert 'hx-swap="innerHTML"' in result
+
+    def test_compile_attrs_into_custom_swap(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"into": "#target:outerHTML"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-target="#target"' in result
+        assert 'hx-swap="outerHTML"' in result
+
     def test_compile_attrs_boost(self) -> None:
         comp = _minimal_component(
             body=(ElementNode(tag="a", attrs={"boost": True}),),
@@ -385,10 +393,161 @@ class TestComponents:
         result = _compile(comp)
         assert "{% set _spread = my_props %}" in result
 
+    def test_compile_component_attrs_empty_default(self) -> None:
+        """Without registry, attrs defaults to empty string."""
+        comp = _minimal_component(
+            imports=(ImportDecl(names=("Button",), source="./Button.jinja"),),
+            body=(ComponentNode(name="Button"),),
+        )
+        result = _compile(comp)
+        assert '{% set attrs = "" %}' in result
+
+
+class TestComponentAttrsPassthrough:
+    """Test attrs separation when compiler has access to a registry."""
+
+    def _make_registry_with_child(
+        self, child_name: str, child_component: Component
+    ) -> "ComponentRegistry":  # noqa: F821
+        from pjx.registry import ComponentRegistry
+
+        registry = ComponentRegistry()
+        # Directly populate the cache to avoid stat() on non-existent files
+        registry._by_name[child_name] = child_component
+        return registry
+
+    def test_attrs_passthrough_separates_props_from_extras(self) -> None:
+        """Extra attrs not in child PropsDecl go to {% set attrs %}."""
+        from pjx.ast_nodes import PropField, PropsDecl
+
+        child = _minimal_component(
+            path=Path("Button.jinja"),
+            props=PropsDecl(
+                name="ButtonProps",
+                fields=(PropField("variant", "str", default='"primary"'),),
+            ),
+        )
+        registry = self._make_registry_with_child("Button", child)
+
+        parent = _minimal_component(
+            imports=(ImportDecl(names=("Button",), source="./Button.jinja"),),
+            body=(
+                ComponentNode(
+                    name="Button",
+                    attrs={"variant": "danger", "class": "btn-lg", "id": "my-btn"},
+                ),
+            ),
+        )
+        result = Compiler(registry=registry).compile(parent).jinja_source
+        # variant is a declared prop → {% set variant = "danger" %}
+        assert '{% set variant = "danger" %}' in result
+        # class and id are extras → in {% set attrs %}...{% endset %}
+        assert "{% set attrs %}" in result
+        assert 'class="btn-lg"' in result
+        assert 'id="my-btn"' in result
+
+    def test_attrs_passthrough_transforms_reactive_attrs(self) -> None:
+        """Extra reactive attrs are compiled through _compile_attr."""
+        from pjx.ast_nodes import PropField, PropsDecl
+
+        child = _minimal_component(
+            path=Path("Card.jinja"),
+            props=PropsDecl(
+                name="CardProps",
+                fields=(PropField("title", "str"),),
+            ),
+        )
+        registry = self._make_registry_with_child("Card", child)
+
+        parent = _minimal_component(
+            imports=(ImportDecl(names=("Card",), source="./Card.jinja"),),
+            body=(
+                ComponentNode(
+                    name="Card",
+                    attrs={
+                        "title": "Hello",
+                        "on:click": "toggle()",
+                        "action:get": "/api/data",
+                    },
+                ),
+            ),
+        )
+        result = Compiler(registry=registry).compile(parent).jinja_source
+        # title is a prop
+        assert '{% set title = "Hello" %}' in result
+        # on:click → @click in attrs
+        assert '@click="toggle()"' in result
+        # action:get → hx-get in attrs
+        assert 'hx-get="/api/data"' in result
+
+    def test_attrs_passthrough_no_props_decl_fallback(self) -> None:
+        """Child without PropsDecl → all attrs treated as props (backwards compat)."""
+        child = _minimal_component(path=Path("Box.jinja"), props=None)
+        registry = self._make_registry_with_child("Box", child)
+
+        parent = _minimal_component(
+            imports=(ImportDecl(names=("Box",), source="./Box.jinja"),),
+            body=(ComponentNode(name="Box", attrs={"class": "container"}),),
+        )
+        result = Compiler(registry=registry).compile(parent).jinja_source
+        # No PropsDecl → all go to {% set %}
+        assert '{% set class = "container" %}' in result
+        assert '{% set attrs = "" %}' in result
+
+    def test_attrs_passthrough_no_registry_fallback(self) -> None:
+        """Without registry, all attrs go to {% set %} and attrs is empty."""
+        parent = _minimal_component(
+            imports=(ImportDecl(names=("Btn",), source="./Btn.jinja"),),
+            body=(ComponentNode(name="Btn", attrs={"variant": "x", "class": "y"}),),
+        )
+        result = Compiler(registry=None).compile(parent).jinja_source
+        assert '{% set variant = "x" %}' in result
+        assert '{% set class = "y" %}' in result
+        assert '{% set attrs = "" %}' in result
+
 
 # ---------------------------------------------------------------------------
 # Scoped CSS
 # ---------------------------------------------------------------------------
+
+
+class TestInlineIncludes:
+    def test_basic_inline(self) -> None:
+        source = '{% set x = 1 %}{% include "child.jinja" %}'
+        templates = {"child.jinja": "<p>hello</p>"}
+        result = Compiler.inline_includes(source, templates)
+        assert "{% include" not in result
+        assert "<p>hello</p>" in result
+        assert "{% set x = 1 %}" in result
+
+    def test_nested_inline(self) -> None:
+        source = '{% include "parent.jinja" %}'
+        templates = {
+            "parent.jinja": '<div>{% include "child.jinja" %}</div>',
+            "child.jinja": "<span>leaf</span>",
+        }
+        result = Compiler.inline_includes(source, templates)
+        assert "{% include" not in result
+        assert "<div><span>leaf</span></div>" in result
+
+    def test_missing_template_preserved(self) -> None:
+        source = '{% include "missing.jinja" %}'
+        result = Compiler.inline_includes(source, {})
+        assert '{% include "missing.jinja" %}' in result
+
+    def test_max_depth_stops_recursion(self) -> None:
+        # Self-referencing template — should stop at max_depth
+        source = '{% include "loop.jinja" %}'
+        templates = {"loop.jinja": '{% include "loop.jinja" %}'}
+        result = Compiler.inline_includes(source, templates, max_depth=3)
+        # After 3 levels, the innermost include is preserved
+        assert '{% include "loop.jinja" %}' in result
+
+    def test_multiple_includes(self) -> None:
+        source = '{% include "a.jinja" %} | {% include "b.jinja" %}'
+        templates = {"a.jinja": "AAA", "b.jinja": "BBB"}
+        result = Compiler.inline_includes(source, templates)
+        assert "AAA | BBB" == result
 
 
 class TestScopedCSS:
@@ -439,3 +598,165 @@ class TestTeleport:
         result = _compile(comp)
         assert "{% block teleport_head %}" in result
         assert "{% endblock %}" in result
+
+
+# ---------------------------------------------------------------------------
+# ErrorBoundary
+# ---------------------------------------------------------------------------
+
+
+class TestErrorBoundary:
+    def test_compile_error_boundary(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ErrorBoundaryNode(
+                    fallback="<p>Something went wrong</p>",
+                    body=(TextNode("safe content"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert "{% try %}" in result
+        assert "safe content" in result
+        assert "{% except %}" in result
+        assert "<p>Something went wrong</p>" in result
+        assert "{% endtry %}" in result
+
+    def test_compile_error_boundary_with_nested_element(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ErrorBoundaryNode(
+                    fallback="<span>error</span>",
+                    body=(
+                        ElementNode(
+                            tag="div",
+                            attrs={},
+                            children=(TextNode("nested"),),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert "{% try %}" in result
+        assert "<div>nested</div>" in result
+        assert "{% except %}<span>error</span>{% endtry %}" in result
+
+
+# ---------------------------------------------------------------------------
+# Await
+# ---------------------------------------------------------------------------
+
+
+class TestAwait:
+    def test_compile_await_basic(self) -> None:
+        comp = _minimal_component(
+            body=(AwaitNode(src="/api/data", trigger="load"),),
+        )
+        result = _compile(comp)
+        assert 'hx-get="/api/data"' in result
+        assert 'hx-trigger="load"' in result
+        assert 'hx-swap="innerHTML"' in result
+
+    def test_compile_await_with_loading_slot(self) -> None:
+        comp = _minimal_component(
+            body=(
+                AwaitNode(
+                    src="/api/items",
+                    trigger="revealed",
+                    loading=(TextNode("Loading..."),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert 'hx-get="/api/items"' in result
+        assert 'hx-trigger="revealed"' in result
+        assert "Loading..." in result
+
+    def test_compile_await_no_loading(self) -> None:
+        comp = _minimal_component(
+            body=(AwaitNode(src="/api/empty"),),
+        )
+        result = _compile(comp)
+        assert 'hx-get="/api/empty"' in result
+        # No loading content inside the div
+        assert "></div>" in result or '">Loading' not in result
+
+
+# ---------------------------------------------------------------------------
+# Transition
+# ---------------------------------------------------------------------------
+
+
+class TestTransition:
+    def test_compile_transition_enter_leave(self) -> None:
+        comp = _minimal_component(
+            body=(
+                TransitionNode(
+                    enter="fade-in",
+                    leave="fade-out",
+                    body=(TextNode("animated"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert 'x-transition:enter="fade-in"' in result
+        assert 'x-transition:leave="fade-out"' in result
+        assert "animated" in result
+
+    def test_compile_transition_enter_only(self) -> None:
+        comp = _minimal_component(
+            body=(
+                TransitionNode(
+                    enter="slide-in",
+                    body=(TextNode("slide"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert 'x-transition:enter="slide-in"' in result
+        assert "x-transition:leave" not in result
+        assert "slide" in result
+
+    def test_compile_transition_leave_only(self) -> None:
+        comp = _minimal_component(
+            body=(
+                TransitionNode(
+                    leave="slide-out",
+                    body=(TextNode("bye"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert "x-transition:enter" not in result
+        assert 'x-transition:leave="slide-out"' in result
+        assert "bye" in result
+
+
+# ---------------------------------------------------------------------------
+# Store
+# ---------------------------------------------------------------------------
+
+
+class TestStore:
+    def test_compile_store_declaration(self) -> None:
+        comp = _minimal_component(
+            stores=(StoreDecl(name="theme", value='{ dark: false, accent: "blue" }'),),
+        )
+        result = _compile(comp)
+        assert "Alpine.store('theme'" in result
+        assert '{ dark: false, accent: "blue" }' in result
+        assert "alpine:init" in result
+
+    def test_compile_multiple_stores(self) -> None:
+        comp = _minimal_component(
+            stores=(
+                StoreDecl(name="theme", value="{ dark: false }"),
+                StoreDecl(name="cart", value="{ items: [], total: 0 }"),
+            ),
+        )
+        result = _compile(comp)
+        assert "Alpine.store('theme'" in result
+        assert "Alpine.store('cart'" in result
+        assert "{ dark: false }" in result
+        assert "{ items: [], total: 0 }" in result

@@ -17,6 +17,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from pjx.ast_nodes import (
+    AssetDecl,
     AwaitNode,
     CaseNode,
     Component,
@@ -76,6 +77,7 @@ def parse(source: str, path: Path | None = None) -> Component:
     props: PropsDecl | None = None
     slots: list[SlotDecl] = []
     stores: list[StoreDecl] = []
+    assets: list[AssetDecl] = []
     variables: list[LetDecl | ConstDecl] = []
     states: list[StateDecl] = []
     computed: list[ComputedDecl] = []
@@ -100,6 +102,8 @@ def parse(source: str, path: Path | None = None) -> Component:
                 slots.append(decl)
             elif isinstance(decl, StoreDecl):
                 stores.append(decl)
+            elif isinstance(decl, AssetDecl):
+                assets.append(decl)
             elif isinstance(decl, (LetDecl, ConstDecl)):
                 variables.append(decl)
             elif isinstance(decl, StateDecl):
@@ -122,6 +126,7 @@ def parse(source: str, path: Path | None = None) -> Component:
         props=props,
         slots=tuple(slots),
         stores=tuple(stores),
+        assets=tuple(assets),
         variables=tuple(variables),
         states=tuple(states),
         computed=tuple(computed),
@@ -178,6 +183,7 @@ _Decl = (
     | PropsDecl
     | SlotDecl
     | StoreDecl
+    | AssetDecl
     | LetDecl
     | ConstDecl
     | StateDecl
@@ -246,6 +252,10 @@ class _ScriptParser:
                 return self._parse_state()
             case TokenKind.COMPUTED:
                 return self._parse_computed()
+            case TokenKind.CSS:
+                return self._parse_asset("css")
+            case TokenKind.JS:
+                return self._parse_asset("js")
             case _:
                 raise ParseError(
                     f"unexpected token {tok.value!r}",
@@ -311,8 +321,10 @@ class _ScriptParser:
 
     def _parse_props(self) -> PropsDecl:
         self._advance()  # consume 'props'
-        name = self._expect(TokenKind.IDENT).value
-        self._expect(TokenKind.EQUALS)
+        name = ""
+        if self._peek().kind == TokenKind.IDENT:
+            name = self._advance().value
+            self._expect(TokenKind.EQUALS)
         self._expect(TokenKind.LBRACE)
         self.skip_newlines()
         fields: list[PropField] = []
@@ -435,6 +447,11 @@ class _ScriptParser:
         self._expect(TokenKind.EQUALS)
         return ComputedDecl(name=name, expr=self._parse_expr())
 
+    def _parse_asset(self, kind: str) -> AssetDecl:
+        self._advance()  # consume 'css' or 'js'
+        path = self._expect(TokenKind.STRING).value
+        return AssetDecl(kind=kind, path=path)
+
 
 # ---------------------------------------------------------------------------
 # Body parser — HTML with PJX extensions
@@ -511,21 +528,27 @@ class _BodyParser(HTMLParser):
         return super().get_starttag_text()
 
     def _recover_tag_name(self, lowered_tag: str) -> str:
-        """Recover the original-case tag name from the source."""
-        # Use getpos() to find current position, then search backwards in source
-        # for the tag. As a fallback, search for the pattern in source.
-        tag_re = re.compile(rf"</?({re.escape(lowered_tag)})\b", re.IGNORECASE)
-        # Search from the last found position
-        for m in tag_re.finditer(self._original_source):
-            original = m.group(1)
-            if original.lower() == lowered_tag:
-                # Return the first occurrence that matches — we track via _last_search_pos
-                if not hasattr(self, "_last_positions"):
-                    self._last_positions: dict[str, int] = {}
-                start_from = self._last_positions.get(lowered_tag, 0)
-                if m.start() >= start_from:
-                    self._last_positions[lowered_tag] = m.start() + 1
-                    return original
+        """Recover the original-case tag name from the source.
+
+        Uses a position cursor per tag to avoid O(n*m) re-scanning.
+        Compiles each tag regex once and caches it.
+        """
+        if not hasattr(self, "_last_positions"):
+            self._last_positions: dict[str, int] = {}
+        if not hasattr(self, "_tag_re_cache"):
+            self._tag_re_cache: dict[str, re.Pattern[str]] = {}
+
+        if lowered_tag not in self._tag_re_cache:
+            self._tag_re_cache[lowered_tag] = re.compile(
+                rf"</?({re.escape(lowered_tag)})\b", re.IGNORECASE
+            )
+        tag_re = self._tag_re_cache[lowered_tag]
+        start_from = self._last_positions.get(lowered_tag, 0)
+
+        m = tag_re.search(self._original_source, pos=start_from)
+        if m and m.group(1).lower() == lowered_tag:
+            self._last_positions[lowered_tag] = m.start() + 1
+            return m.group(1)
         return lowered_tag
 
     def root_nodes(self) -> list[Node]:
@@ -647,7 +670,7 @@ class _BodyParser(HTMLParser):
                 fallback_nodes: tuple[Node, ...] | None = None
                 body_nodes: list[Node] = []
                 for child in children:
-                    if isinstance(child, ElementNode) and child.tag == "Fallback":
+                    if isinstance(child, ElementNode) and child.tag == "Else":
                         fallback_nodes = child.children
                     else:
                         body_nodes.append(child)
