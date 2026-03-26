@@ -1,5 +1,5 @@
 ---
-props UserCardProps = {
+props {
   name: str,
   email: str,
   avatar: str = "/static/default-avatar.png",
@@ -8,7 +8,7 @@ props UserCardProps = {
 slot actions
 ---
 
-<div class="user-card">
+<div class="user-card" {{ attrs }}>
   <img class="user-card__avatar" src="{{ props.avatar }}" alt="{{ props.name }}" />
   <div class="user-card__info">
     <h3>{{ props.name }}</h3>

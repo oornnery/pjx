@@ -12,6 +12,7 @@ dependencies = [
     "pydantic[email]>=2.12.5",
     "python-multipart>=0.0.22",
     "rich>=14.3.3",
+    "sse-starlette>=3.3.3",
     "typer>=0.24.1",
     "uvicorn[standard]>=0.42.0",
 ]

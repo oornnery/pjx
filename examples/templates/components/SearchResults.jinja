@@ -1,7 +1,7 @@
 ---
 import SearchResult from "./SearchResult.jinja"
 
-props SearchResultsProps = {
+props {
   results: list = [],
   query: str = "",
 }
@@ -9,14 +9,14 @@ props SearchResultsProps = {
 
 <Show when="not props.query">
   <p class="search__empty">Type to search users...</p>
-  <Fallback>
+  <Else>
     <Show when="props.results">
       <For each="props.results" as="user">
         <SearchResult name="{{ user.name }}" email="{{ user.email }}" avatar="{{ user.avatar }}" />
       </For>
-      <Fallback>
+      <Else>
         <p class="search__empty">No results for &ldquo;{{ props.query }}&rdquo;</p>
-      </Fallback>
+      </Else>
     </Show>
-  </Fallback>
+  </Else>
 </Show>

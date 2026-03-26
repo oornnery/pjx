@@ -1,12 +1,12 @@
 ---
-props SearchResultProps = {
+props {
   name: str = "",
   email: str = "",
   avatar: str = "",
 }
 ---
 
-<div class="search-result">
+<div class="search-result" {{ attrs }}>
   <img src="{{ props.avatar }}" class="search-result__avatar" alt="{{ props.name }}" />
   <div class="search-result__info">
     <strong>{{ props.name }}</strong>

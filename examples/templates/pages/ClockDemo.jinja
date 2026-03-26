@@ -1,0 +1,13 @@
+---
+import Layout from "../layouts/Base.jinja"
+---
+
+<Layout>
+  <div class="page">
+    <h1>Live Clock</h1>
+    <p class="clock-desc">Real-time server clock via SSE. The time streams from the backend every second.</p>
+    <div live="/sse/clock" channel="clock">
+      {{ clock }}
+    </div>
+  </div>
+</Layout>

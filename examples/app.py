@@ -1,14 +1,27 @@
 """Example PJX + FastAPI application.
 
+Demonstrates:
+- Page routing with ``@pjx.page()``
+- Component rendering with ``pjx.render()`` (HTMX partials)
+- Attrs passthrough (``data-user-id`` on UserCard → ``{{ attrs }}``)
+- Asset pipeline (``css``/``js`` in frontmatter → ``{{ pjx_assets.render() }}``)
+- Runtime prop validation (``validate_props = true`` in pjx.toml)
+
 Run with::
 
     uv run examples/app.py
     # or
     cd examples && pjx dev .
+
+Validate components::
+
+    cd examples && pjx check .
 """
 
 from __future__ import annotations
 
+import asyncio
+from datetime import datetime, timezone
 from html import escape as _esc
 from pathlib import Path
 
@@ -16,6 +29,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from markupsafe import Markup
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
 
 from pjx import PJX, SEO, PJXConfig
 
@@ -168,6 +182,42 @@ async def search() -> dict[str, object]:
     return {"search_results": Markup(_render_search_results(""))}
 
 
+@pjx.page("/clock", template="pages/ClockDemo.jinja", title="Clock — PJX")
+async def clock() -> dict[str, object]:
+    """Live clock — SSE streaming."""
+    return {"clock": Markup(_render_clock())}
+
+
+# -- SSE endpoints -----------------------------------------------------------
+
+
+def _render_clock() -> str:
+    """Render the Clock component with current server time."""
+    now = datetime.now(timezone.utc).astimezone()
+    return pjx.render(
+        "components/Clock.jinja",
+        {
+            "time": now.strftime("%H:%M:%S"),
+            "date": now.strftime("%d %b %Y"),
+            "weekday": now.strftime("%A"),
+            "timezone": now.strftime("%Z (UTC%z)"),
+        },
+    )
+
+
+async def _clock_generator():
+    """Yield clock HTML every second as SSE events."""
+    while True:
+        yield {"event": "clock", "data": _render_clock()}
+        await asyncio.sleep(1)
+
+
+@app.get("/sse/clock")
+async def sse_clock():
+    """SSE endpoint — streams the clock component every second."""
+    return EventSourceResponse(_clock_generator())
+
+
 # -- HTMX partials (HTML fragments) ------------------------------------------
 
 
@@ -204,17 +254,20 @@ async def htmx_add_todo(request: Request) -> HTMLResponse:
     """Add a new todo from form data."""
     form = await request.form()
     text = str(form.get("text", "")).strip()
+    status = str(form.get("status", "all"))
     if text:
         todos_db.append({"text": text, "done": False})
-    return HTMLResponse(_render_todo_list())
+    return HTMLResponse(_render_todo_list(status))
 
 
 @app.post("/htmx/todos/{idx}/toggle")
-async def htmx_toggle_todo(idx: int) -> HTMLResponse:
+async def htmx_toggle_todo(idx: int, request: Request) -> HTMLResponse:
     """Toggle a todo's done state."""
     if 0 <= idx < len(todos_db):
         todos_db[idx]["done"] = not todos_db[idx]["done"]
-    return HTMLResponse(_render_todo_list())
+    form = await request.form()
+    status = str(form.get("status", "all"))
+    return HTMLResponse(_render_todo_list(status))
 
 
 @app.get("/htmx/todos/filter")
@@ -224,11 +277,13 @@ async def htmx_filter_todos(status: str = "all") -> HTMLResponse:
 
 
 @app.delete("/htmx/todos/{idx}")
-async def htmx_delete_todo(idx: int) -> HTMLResponse:
+async def htmx_delete_todo(idx: int, request: Request) -> HTMLResponse:
     """Delete a todo."""
     if 0 <= idx < len(todos_db):
         todos_db.pop(idx)
-    return HTMLResponse(_render_todo_list())
+    form = await request.form()
+    status = str(form.get("status", "all"))
+    return HTMLResponse(_render_todo_list(status))
 
 
 @app.put("/htmx/todos/{idx}")
@@ -236,9 +291,10 @@ async def htmx_edit_todo(idx: int, request: Request) -> HTMLResponse:
     """Edit a todo's text from form data."""
     form = await request.form()
     text = str(form.get("text", "")).strip()
+    status = str(form.get("status", "all"))
     if 0 <= idx < len(todos_db) and text:
         todos_db[idx]["text"] = text
-    return HTMLResponse(_render_todo_list())
+    return HTMLResponse(_render_todo_list(status))
 
 
 @app.get("/htmx/search")
@@ -249,19 +305,21 @@ async def htmx_search(query: str = "") -> HTMLResponse:
 
 @app.post("/htmx/message/{user_id}")
 async def htmx_message(user_id: int) -> HTMLResponse:
-    """Send a message — returns toast notification."""
+    """Send a message — returns toast notification via Toast component."""
     user = next((u for u in USERS if u.id == user_id), None)
     if not user:
         return HTMLResponse(
-            '<div class="toast toast--error" x-data '
-            'x-init="setTimeout(() => $el.remove(), 3000)">'
-            "User not found</div>"
+            pjx.render(
+                "components/Toast.jinja",
+                {"message": "User not found", "variant": "error"},
+            )
         )
     messages_db.append({"to": user.name, "text": "Hello!"})
     return HTMLResponse(
-        f'<div class="toast toast--success" x-data '
-        f'x-init="setTimeout(() => $el.remove(), 3000)">'
-        f"Message sent to {_esc(user.name)}!</div>"
+        pjx.render(
+            "components/Toast.jinja",
+            {"message": f"Message sent to {_esc(user.name)}!", "variant": "success"},
+        )
     )
 
 

@@ -1,0 +1,17 @@
+---
+props {
+  time: str = "",
+  date: str = "",
+  weekday: str = "",
+  timezone: str = "",
+}
+---
+
+<div class="clock" id="live-clock" {{ attrs }}>
+  <div class="clock__time">{{ props.time }}</div>
+  <div class="clock__details">
+    <span class="clock__weekday">{{ props.weekday }}</span>
+    <span class="clock__date">{{ props.date }}</span>
+  </div>
+  <div class="clock__tz">{{ props.timezone }}</div>
+</div>

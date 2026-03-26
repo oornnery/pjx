@@ -2,7 +2,7 @@
 import Layout from "../layouts/Base.jinja"
 import UserCard from "../components/UserCard.jinja"
 
-props DashboardProps = {
+props {
   title: str = "Dashboard",
   users: list = [],
 }
@@ -14,7 +14,7 @@ props DashboardProps = {
     <div id="toast-container" class="toast-container"></div>
     <div class="dashboard__grid">
       <For each="users" as="user">
-        <UserCard name="{{ user.name }}" email="{{ user.email }}" avatar="{{ user.avatar }}">
+        <UserCard name="{{ user.name }}" email="{{ user.email }}" avatar="{{ user.avatar }}" data-user-id="{{ user.id }}">
           <Slot:actions>
             <button class="btn btn-primary"
               action:post="/htmx/message/{{ user.id }}"

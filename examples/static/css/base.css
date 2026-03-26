@@ -27,8 +27,10 @@ body {
 .navbar__links a:hover, .navbar__links a.active { color: #fff; font-weight: 600; }
 
 /* Page */
+.page { display: flex; flex-direction: column; align-items: center; width: 100%; }
 .page h1 { margin-bottom: 1rem; }
 .page p { color: #555; margin-bottom: 1rem; }
+.page > form, .page > div { width: 100%; }
 
 /* Buttons */
 button, .btn {

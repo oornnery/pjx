@@ -1,28 +1,29 @@
 ---
-props TodoItemProps = {
+props {
   idx: int = 0,
   text: str = "",
   done: bool = false,
 }
 ---
 
-<div class="{{ 'todo todo--done' if props.done else 'todo' }}" id="todo-{{ props.idx }}" x-data="{ editing: false }">
+<div class="{{ 'todo todo--done' if props.done else 'todo' }}" id="todo-{{ props.idx }}" x-data="{ editing: false }"
+  hx-vals="js:{status: document.getElementById('todo-filter')?.value || 'all'}">
   <div class="todo__view" x-show="!editing">
     <input type="checkbox" class="todo__check"
       {{ 'checked' if props.done else '' }}
       action:post="/htmx/todos/{{ props.idx }}/toggle"
-      target="#todo-list" swap="innerHTML" />
+      into="#todo-list" />
     <span class="todo__text">{{ props.text }}</span>
     <button on:click="editing = true" class="btn btn-sm">Edit</button>
     <button class="btn btn-sm btn-danger"
       action:delete="/htmx/todos/{{ props.idx }}"
-      target="#todo-list" swap="innerHTML">
+      into="#todo-list">
       &times;
     </button>
   </div>
   <form class="todo__edit" x-show="editing"
     action:put="/htmx/todos/{{ props.idx }}"
-    target="#todo-list" swap="innerHTML">
+    into="#todo-list">
     <input type="text" name="text" value="{{ props.text }}" required />
     <button type="submit" class="btn btn-sm btn-primary">Save</button>
     <button type="button" on:click="editing = false" class="btn btn-sm">Cancel</button>

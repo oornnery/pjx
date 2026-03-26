@@ -5,7 +5,9 @@ import Layout from "../layouts/Base.jinja"
 <Layout>
   <div class="page" x-data="{ filter: 'all' }">
     <h1>Todo List</h1>
-    <form class="todo-add" action:post="/htmx/todos/add" target="#todo-list" swap="innerHTML">
+    <input type="hidden" id="todo-filter" name="status" bind:value="filter" />
+    <form class="todo-add" action:post="/htmx/todos/add" into="#todo-list"
+      hx-include="#todo-filter">
       <input type="text" name="text" placeholder="What needs to be done?" required />
       <button type="submit" class="btn btn-primary">Add</button>
     </form>
@@ -14,21 +16,21 @@ import Layout from "../layouts/Base.jinja"
         bind:class="filter === 'all' && 'active'"
         on:click="filter = 'all'"
         action:get="/htmx/todos/filter?status=all"
-        target="#todo-list" swap="innerHTML">
+        into="#todo-list">
         All
       </button>
       <button class="btn btn-filter"
         bind:class="filter === 'pending' && 'active'"
         on:click="filter = 'pending'"
         action:get="/htmx/todos/filter?status=pending"
-        target="#todo-list" swap="innerHTML">
+        into="#todo-list">
         Pending
       </button>
       <button class="btn btn-filter"
         bind:class="filter === 'done' && 'active'"
         on:click="filter = 'done'"
         action:get="/htmx/todos/filter?status=done"
-        target="#todo-list" swap="innerHTML">
+        into="#todo-list">
         Done
       </button>
     </div>

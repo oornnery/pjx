@@ -58,6 +58,14 @@
 .search-result__info strong { font-size: 0.9375rem; }
 .search-result__info span { font-size: 0.8125rem; color: #666; }
 
+/* Clock */
+.clock { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2.5rem 3rem; background: #fff; border: 1px solid #ddd; border-radius: 12px; width: fit-content; margin: 0 auto; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
+.clock__time { font-size: 4.5rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: #1a1a1a; font-family: ui-monospace, "SF Mono", "Cascadia Code", "Segoe UI Mono", monospace; }
+.clock__details { display: flex; gap: 0.5rem; font-size: 1.125rem; color: #555; }
+.clock__weekday { font-weight: 600; }
+.clock__tz { font-size: 0.8125rem; color: #999; margin-top: 0.25rem; }
+.clock-desc { color: #666; font-size: 0.9375rem; margin-bottom: 1.5rem; }
+
 /* Dashboard */
 .dashboard__grid { display: flex; flex-direction: column; gap: 1rem; margin-top: 1rem; }
 

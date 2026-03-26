@@ -1,7 +1,11 @@
 ---
 import Navbar from "../components/Navbar.jinja"
 
-props BaseLayoutProps = {
+css "/static/css/base.css"
+css "/static/css/components.css"
+js "/static/js/app.js"
+
+props {
   title: str = "PJX App",
   favicon: str = "/static/images/favicon.svg",
 }
@@ -60,17 +64,11 @@ slot default
     <meta name="twitter:image" content="{{ seo.twitter_image|default(seo.og_image) }}" />
   </Show>
 
-  <link rel="stylesheet" href="/static/css/base.css" />
-  <link rel="stylesheet" href="/static/css/components.css" />
-  <For each="head_css|default([])" as="css">
-    <link rel="stylesheet" href="{{ css }}" />
-  </For>
+  {{ pjx_assets.render_css() }}
 
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
   <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
-  <For each="head_scripts|default([])" as="js">
-    <script src="{{ js }}"></script>
-  </For>
+  <script src="https://unpkg.com/htmx-ext-sse@2/sse.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -80,9 +78,6 @@ slot default
     </main>
   </div>
 
-  <For each="body_scripts|default([])" as="js">
-    <script src="{{ js }}"></script>
-  </For>
-  <script src="/static/js/app.js"></script>
+  {{ pjx_assets.render_js() }}
 </body>
 </html>
