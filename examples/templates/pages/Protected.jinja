@@ -1,0 +1,22 @@
+---
+import Layout from "../layouts/Base.jinja"
+
+middleware "auth"
+
+props {
+  user: str = "Guest",
+}
+---
+
+<Layout>
+  <VStack gap="1.5rem" class="page">
+    <h1>Protected Page</h1>
+    <div class="protected-card">
+      <p>Welcome, <strong>{{ props.user }}</strong>! You are logged in.</p>
+      <p class="protected-card__hint">This page requires the <code>auth</code> middleware. Without a session cookie, you'd be redirected to <code>/login</code>.</p>
+      <form method="post" action="/auth/logout">
+        <button type="submit" class="btn btn-danger">Logout</button>
+      </form>
+    </div>
+  </VStack>
+</Layout>

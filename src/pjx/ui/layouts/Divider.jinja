@@ -1,0 +1,7 @@
+---
+props {
+  class: str = "",
+}
+---
+
+<hr class="pjx-divider{{ ' ' + props.class if props.class else '' }}" {{ attrs }} />

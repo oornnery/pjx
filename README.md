@@ -172,20 +172,21 @@ state editing = false
 
 ### Frontmatter
 
-| Keyword    | Description                               |
-| ---------- | ----------------------------------------- |
-| `import`   | Import components (`.jinja` files)        |
-| `from`     | Import Python/Pydantic types              |
-| `extends`  | Inherit from a layout                     |
-| `props`    | Declare typed props (name optional)       |
-| `slot`     | Declare named slots                       |
-| `state`    | Reactive state (Alpine.js `x-data`)       |
-| `let`      | Local variable                            |
-| `const`    | Constant                                  |
-| `computed` | Computed value                            |
-| `store`    | Alpine global store                       |
-| `css`      | CSS asset declaration                     |
-| `js`       | JS asset declaration                      |
+| Keyword      | Description                         |
+| ------------ | ----------------------------------- |
+| `import`     | Import components (`.jinja` files)  |
+| `from`       | Import Python/Pydantic types        |
+| `extends`    | Inherit from a layout               |
+| `props`      | Declare typed props (name optional) |
+| `slot`       | Declare named slots                 |
+| `state`      | Reactive state (Alpine.js `x-data`) |
+| `let`        | Local variable                      |
+| `const`      | Constant                            |
+| `computed`   | Computed value                      |
+| `store`      | Alpine global store                 |
+| `css`        | CSS asset declaration               |
+| `js`         | JS asset declaration                |
+| `middleware` | Middleware chain for the component  |
 
 ### Reactive Attributes
 
@@ -272,6 +273,134 @@ async def htmx_add(request: Request) -> HTMLResponse:
         pjx.render("components/TodoList.jinja", {"todos": todos_db})
     )
 ```
+
+## File-Based Routing
+
+PJX supports automatic file-based routing, inspired by Next.js and SvelteKit.
+Call `pjx.auto_routes()` to scan the `pages/` directory and generate FastAPI
+routes from the filesystem:
+
+```python
+pjx = PJX(app, config=PJXConfig(toml_path="pjx.toml"))
+pjx.auto_routes()
+```
+
+### File conventions
+
+| File pattern                    | Route               | Description                    |
+| ------------------------------- | ------------------- | ------------------------------ |
+| `pages/index.jinja`             | `/`                 | Root page                      |
+| `pages/about.jinja`             | `/about`            | Static route                   |
+| `pages/blog/[slug].jinja`       | `/blog/{slug}`      | Dynamic parameter              |
+| `pages/docs/[...slug].jinja`    | `/docs/{slug:path}` | Catch-all (variable segments)  |
+| `pages/(auth)/login.jinja`      | `/login`            | Route group (no URL prefix)    |
+
+### Special files
+
+- **`layout.jinja`** — Wraps all pages and subdirectories at the same level.
+  Layouts nest: `pages/layout.jinja` wraps `pages/blog/layout.jinja` wraps
+  `pages/blog/[slug].jinja`.
+- **`loading.jinja`** — Loading skeleton shown via HTMX `hx-indicator`.
+- **`error.jinja`** — Rendered when a handler returns an error. Receives
+  `status_code` and `message` in the template context.
+
+### Colocated Handlers
+
+Python handlers can live alongside their templates using `RouteHandler` and
+`APIRoute`:
+
+```python
+from pjx.routing import RouteHandler, APIRoute
+
+handler = RouteHandler()
+
+@handler.get
+async def get():
+    return {"items": await fetch_items()}
+
+@handler.post
+async def post(form: Annotated[ItemForm, FormData()]):
+    await create_item(form)
+    return {"items": await fetch_items()}
+
+# JSON API endpoint (served under /api/ prefix)
+api = APIRoute()
+
+@api.get
+async def list_items():
+    return {"items": await fetch_items()}
+```
+
+## Layout Components
+
+PJX includes built-in layout components (no import needed), inspired by
+Chakra UI:
+
+| Component      | Description                          | Key props                         |
+| -------------- | ------------------------------------ | --------------------------------- |
+| `<Center>`     | Center content both axes             | `w`, `h`                          |
+| `<HStack>`     | Horizontal stack with gap            | `gap`, `align`, `justify`, `wrap` |
+| `<VStack>`     | Vertical stack with gap              | `gap`, `align`, `justify`         |
+| `<Grid>`       | Responsive CSS grid                  | `cols`, `gap`, `min`, `max`       |
+| `<Spacer>`     | Flexible space between items         | —                                 |
+| `<Container>`  | Max-width centered wrapper           | `max`, `px`                       |
+| `<Divider>`    | Horizontal/vertical rule             | `orientation`, `color`            |
+| `<Wrap>`       | Flex wrap with gap                   | `gap`, `align`, `justify`         |
+| `<AspectRatio>`| Maintain content aspect ratio        | `ratio`                           |
+| `<Hide>`       | Hide content by breakpoint           | `below`, `above`                  |
+
+```html
+<Container max="1200px">
+  <VStack gap="1rem">
+    <HStack gap="0.5rem" justify="space-between">
+      <h1>Dashboard</h1>
+      <Spacer />
+      <Button label="Settings" />
+    </HStack>
+    <Divider />
+    <Grid cols="3" gap="1rem" min="300px">
+      <Card title="Users" />
+      <Card title="Revenue" />
+      <Card title="Orders" />
+    </Grid>
+    <Hide below="md">
+      <AspectRatio ratio="16/9">
+        <img src="/chart.png" />
+      </AspectRatio>
+    </Hide>
+  </VStack>
+</Container>
+```
+
+## Middleware
+
+Components and pages can declare middleware in the frontmatter:
+
+```html
+---
+middleware "auth", "rate_limit"
+---
+```
+
+Register middleware handlers in the PJX runtime:
+
+```python
+@pjx.middleware("auth")
+async def auth_middleware(request: Request, call_next):
+    token = request.headers.get("Authorization")
+    if not token:
+        raise HTTPException(status_code=401)
+    response = await call_next(request)
+    return response
+
+@pjx.middleware("rate_limit")
+async def rate_limit_middleware(request: Request, call_next):
+    response = await call_next(request)
+    return response
+```
+
+Middleware declared in the frontmatter runs in declaration order. Layout
+middleware runs before page middleware.
 
 ## Project Structure
 
@@ -493,6 +622,13 @@ source string.
 - [x] Static analysis — `pjx check` validates imports, props, and slots
 - [x] `pjx build` — compile all templates + bundle scoped CSS
 - [x] `pjx format` — re-format `.jinja` files
+- [x] File-based routing — `pjx.auto_routes()`, dynamic `[slug]` and
+      catch-all `[...slug]` params, route groups `(name)/`, nested layouts
+- [x] Layout components — built-in `<Center>`, `<HStack>`, `<VStack>`,
+      `<Grid>`, `<Spacer>`, `<Container>`, `<Divider>`, `<Wrap>`,
+      `<AspectRatio>`, `<Hide>`
+- [x] Middleware — frontmatter `middleware "auth"` + `@pjx.middleware("auth")`
+- [x] Colocated handlers — `RouteHandler` and `APIRoute` helpers
 
 ### Planned
 

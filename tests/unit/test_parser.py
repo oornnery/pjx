@@ -442,6 +442,54 @@ class TestAssetDeclarations:
         assert comp.props is not None
 
 
+class TestMiddleware:
+    """Test middleware frontmatter parsing."""
+
+    def test_single_middleware(self) -> None:
+        comp = parse('---\nmiddleware "auth"\n---\n<div></div>')
+        assert len(comp.middleware) == 1
+        assert comp.middleware[0].names == ("auth",)
+
+    def test_multiple_middleware(self) -> None:
+        comp = parse('---\nmiddleware "auth", "rate_limit"\n---\n<div></div>')
+        assert len(comp.middleware) == 1
+        assert comp.middleware[0].names == ("auth", "rate_limit")
+
+    def test_middleware_with_other_decls(self) -> None:
+        comp = parse('---\nmiddleware "auth"\nprops { name: str }\n---\n<div></div>')
+        assert len(comp.middleware) == 1
+        assert comp.props is not None
+
+
+class TestLayoutComponents:
+    """Test that built-in layout components are parsed as ComponentNode."""
+
+    def test_center_parsed(self) -> None:
+        comp = parse("<Center><p>hi</p></Center>")
+        assert len(comp.body) == 1
+        from pjx.ast_nodes import ComponentNode
+
+        assert isinstance(comp.body[0], ComponentNode)
+        assert comp.body[0].name == "Center"
+
+    def test_hstack_with_attrs(self) -> None:
+        comp = parse('<HStack gap="2rem"><p>a</p></HStack>')
+        from pjx.ast_nodes import ComponentNode
+
+        node = comp.body[0]
+        assert isinstance(node, ComponentNode)
+        assert node.name == "HStack"
+        assert node.attrs["gap"] == "2rem"
+
+    def test_spacer_self_closing(self) -> None:
+        comp = parse("<Spacer />")
+        from pjx.ast_nodes import ComponentNode
+
+        node = comp.body[0]
+        assert isinstance(node, ComponentNode)
+        assert node.name == "Spacer"
+
+
 class TestParseErrors:
     def test_unknown_keyword(self) -> None:
         with pytest.raises(ParseError):

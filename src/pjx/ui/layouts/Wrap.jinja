@@ -1,0 +1,12 @@
+---
+props {
+  gap: str = "",
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-wrap{{ ' ' + props.class if props.class else '' }}" style="{% if props.gap %}--pjx-gap:{{ props.gap }};{% endif %}" {{ attrs }}>
+  <Slot />
+</div>

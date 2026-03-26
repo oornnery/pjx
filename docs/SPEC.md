@@ -74,7 +74,7 @@ script        = { statement } ;
 statement     = extends_stmt | import_stmt | from_import_stmt
               | props_stmt | slot_stmt | store_stmt
               | let_stmt | const_stmt | state_stmt | computed_stmt
-              | css_stmt | js_stmt ;
+              | css_stmt | js_stmt | middleware_stmt ;
 
 extends_stmt  = "extends" STRING ;
 
@@ -102,6 +102,8 @@ computed_stmt = "computed" IDENT "=" expr ;
 
 css_stmt      = "css" STRING ;
 js_stmt       = "js" STRING ;
+
+middleware_stmt = "middleware" STRING { "," STRING } ;
 
 (* Body: spread syntax em componentes *)
 component_use = "<" IDENT { attr | spread } [ "/" ] ">" ;
@@ -1452,7 +1454,179 @@ Walker recursivo que percorre `children`, `body`, `cases`, `fallback`.
 
 ---
 
-## 38. Non-Goals
+## 38. File-Based Routing
+
+PJX suporta roteamento automático baseado no sistema de arquivos, inspirado em
+Next.js e SvelteKit. `pjx.auto_routes()` escaneia o diretório `pages/` e gera
+rotas FastAPI automaticamente.
+
+### Ativação
+
+```python
+pjx = PJX(app, config=PJXConfig(toml_path="pjx.toml"))
+pjx.auto_routes()
+```
+
+### Convenções de arquivo
+
+| Padrão de arquivo              | Rota gerada                  | Descrição                             |
+| ------------------------------ | ---------------------------- | ------------------------------------- |
+| `pages/index.jinja`            | `/`                          | Página raiz                           |
+| `pages/about.jinja`            | `/about`                     | Rota estática                         |
+| `pages/blog/index.jinja`       | `/blog`                      | Index de diretório                    |
+| `pages/blog/[slug].jinja`      | `/blog/{slug}`               | Parâmetro dinâmico                    |
+| `pages/docs/[...slug].jinja`   | `/docs/{slug:path}`          | Catch-all (segmentos variáveis)       |
+| `pages/(auth)/login.jinja`     | `/login`                     | Route group (sem prefixo na URL)      |
+| `pages/layout.jinja`           | —                            | Layout compartilhado do diretório     |
+| `pages/loading.jinja`          | —                            | Skeleton de carregamento              |
+| `pages/error.jinja`            | —                            | Página de erro do diretório           |
+
+### Arquivos especiais
+
+- **`layout.jinja`** — Wrapa automaticamente todas as páginas e sub-diretórios
+  do mesmo nível. Layouts são aninhados: `pages/layout.jinja` wrapa
+  `pages/blog/layout.jinja` que wrapa `pages/blog/[slug].jinja`.
+- **`loading.jinja`** — Skeleton exibido via HTMX `hx-indicator` enquanto a
+  página carrega. Opcional.
+- **`error.jinja`** — Renderizado quando um handler retorna erro. Recebe
+  `status_code` e `message` no contexto. Opcional.
+- **Route groups `(name)/`** — Diretórios entre parênteses agrupam páginas sem
+  afetar a URL. Útil para aplicar layouts/middleware a um subset de rotas.
+
+### Colocated Handlers
+
+Handlers Python podem ser colocados ao lado dos templates usando
+`RouteHandler` e `APIRoute`:
+
+```python
+from pjx.routing import RouteHandler, APIRoute
+
+handler = RouteHandler()
+
+@handler.get
+async def get():
+    return {"items": await fetch_items()}
+
+@handler.post
+async def post(form: Annotated[ItemForm, FormData()]):
+    await create_item(form)
+    return {"items": await fetch_items()}
+```
+
+`APIRoute` permite definir endpoints de API JSON colocados ao lado do template,
+servidos sob o prefixo `/api/`:
+
+```python
+api = APIRoute()
+
+@api.get
+async def list_items():
+    return {"items": await fetch_items()}
+```
+
+---
+
+## 39. Middleware
+
+### Declaração no frontmatter
+
+Componentes e páginas podem declarar middleware no frontmatter:
+
+```html
+---
+middleware "auth", "rate_limit"
+---
+```
+
+A declaração aceita uma ou mais strings separadas por vírgula. Cada string
+referencia um middleware registrado no runtime PJX.
+
+### Registro no runtime
+
+```python
+@pjx.middleware("auth")
+async def auth_middleware(request: Request, call_next):
+    token = request.headers.get("Authorization")
+    if not token:
+        raise HTTPException(status_code=401)
+    response = await call_next(request)
+    return response
+
+@pjx.middleware("rate_limit")
+async def rate_limit_middleware(request: Request, call_next):
+    # Rate limiting logic
+    response = await call_next(request)
+    return response
+```
+
+Middleware declarado no frontmatter é aplicado na ordem de declaração.
+Middleware de layout é aplicado antes do middleware da página.
+
+---
+
+## 40. Layout Components (Built-ins)
+
+PJX inclui componentes de layout built-in inspirados em Chakra UI. São
+compilados diretamente pelo compilador (sem necessidade de import).
+
+### Componentes disponíveis
+
+| Componente      | Descrição                                      | Props principais                  |
+| --------------- | ---------------------------------------------- | --------------------------------- |
+| `<Center>`      | Centraliza conteúdo horizontal e verticalmente | `w`, `h`                          |
+| `<HStack>`      | Stack horizontal com gap                       | `gap`, `align`, `justify`, `wrap` |
+| `<VStack>`      | Stack vertical com gap                         | `gap`, `align`, `justify`         |
+| `<Grid>`        | Grid CSS responsivo                            | `cols`, `gap`, `min`, `max`       |
+| `<Spacer>`      | Espaço flexível entre itens                    | —                                 |
+| `<Container>`   | Largura máxima centralizada                    | `max`, `px`                       |
+| `<Divider>`     | Linha divisória                                | `orientation`, `color`            |
+| `<Wrap>`        | Flex wrap com gap                              | `gap`, `align`, `justify`         |
+| `<AspectRatio>` | Mantém proporção do conteúdo                   | `ratio`                           |
+| `<Hide>`        | Oculta conteúdo por breakpoint                 | `below`, `above`                  |
+
+### Exemplos
+
+```html
+<Container max="1200px">
+  <VStack gap="1rem">
+    <HStack gap="0.5rem" justify="space-between">
+      <h1>Dashboard</h1>
+      <Spacer />
+      <Button label="Settings" />
+    </HStack>
+    <Divider />
+    <Grid cols="3" gap="1rem" min="300px">
+      <Card title="Users" />
+      <Card title="Revenue" />
+      <Card title="Orders" />
+    </Grid>
+    <Hide below="md">
+      <AspectRatio ratio="16/9">
+        <img src="/chart.png" />
+      </AspectRatio>
+    </Hide>
+  </VStack>
+</Container>
+```
+
+### Compilação
+
+Layout components são compilados para HTML + CSS utilitário:
+
+| DSL                          | HTML compilado                                                            |
+| ---------------------------- | ------------------------------------------------------------------------- |
+| `<Center>`                   | `<div style="display:flex;align-items:center;justify-content:center">`    |
+| `<HStack gap="1rem">`        | `<div style="display:flex;flex-direction:row;gap:1rem">`                  |
+| `<VStack gap="1rem">`        | `<div style="display:flex;flex-direction:column;gap:1rem">`               |
+| `<Grid cols="3" gap="1rem">` | `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem">` |
+| `<Spacer />`                 | `<div style="flex:1">`                                                    |
+| `<Container max="1200px">`   | `<div style="max-width:1200px;margin:0 auto">`                            |
+| `<Hide below="md">`          | `<div class="pjx-hide-below-md">`                                         |
+| `<AspectRatio ratio="16/9">` | `<div style="aspect-ratio:16/9">`                                         |
+
+---
+
+## 41. Non-Goals
 
 - **Não é um framework frontend JS** — Alpine.js lida com reatividade client
 - **Não compila para React/Vue/Solid** — o alvo é Jinja2 + HTMX
@@ -1463,7 +1637,7 @@ Walker recursivo que percorre `children`, `body`, `cases`, `fallback`.
 
 ---
 
-## 39. Referências
+## 42. Referências
 
 - [HTMX](https://htmx.org/docs/)
 - [Alpine.js](https://alpinejs.dev/)

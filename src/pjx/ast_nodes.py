@@ -120,6 +120,13 @@ class ComputedDecl:
     expr: str
 
 
+@dataclass(frozen=True, slots=True)
+class MiddlewareDecl:
+    """``middleware "auth", "rate_limit"``."""
+
+    names: tuple[str, ...]
+
+
 # ---------------------------------------------------------------------------
 # Body nodes
 # ---------------------------------------------------------------------------
@@ -343,5 +350,6 @@ class Component:
     states: tuple[StateDecl, ...] = ()
     computed: tuple[ComputedDecl, ...] = ()
     assets: tuple[AssetDecl, ...] = ()
+    middleware: tuple[MiddlewareDecl, ...] = ()
     body: tuple[Node, ...] = ()
     style: str | None = None

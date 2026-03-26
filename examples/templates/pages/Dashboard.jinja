@@ -9,22 +9,21 @@ props {
 ---
 
 <Layout>
-  <div class="dashboard">
+  <VStack gap="1.5rem" class="dashboard">
     <h1>{{ props.title }}</h1>
     <div id="toast-container" class="toast-container"></div>
-    <div class="dashboard__grid">
+    <Grid min="320px" gap="1rem">
       <For each="users" as="user">
         <UserCard name="{{ user.name }}" email="{{ user.email }}" avatar="{{ user.avatar }}" data-user-id="{{ user.id }}">
           <Slot:actions>
             <button class="btn btn-primary"
               action:post="/htmx/message/{{ user.id }}"
-              target="#toast-container"
-              swap="beforeend">
+              into="#toast-container:beforeend">
               Message
             </button>
           </Slot:actions>
         </UserCard>
       </For>
-    </div>
-  </div>
+    </Grid>
+  </VStack>
 </Layout>

@@ -1,0 +1,34 @@
+---
+css "/static/css/base.css"
+css "/static/css/components.css"
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login — PJX</title>
+  <link rel="icon" href="/static/images/favicon.svg" type="image/svg+xml" />
+  {{ pjx_assets.render_css() }}
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <h1 class="login-card__title">Sign In</h1>
+    <p class="login-card__subtitle">Enter your username to continue</p>
+    <div id="login-toast"></div>
+    <form method="post" action="/auth/login"
+      hx-post="/auth/login"
+      hx-target="#login-toast"
+      hx-swap="innerHTML">
+      <div class="login-card__field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" placeholder="Your username" required autofocus />
+      </div>
+      <button type="submit" class="btn btn-primary login-card__submit">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>

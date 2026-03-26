@@ -21,6 +21,7 @@ from pjx.ast_nodes import (
     FromImportDecl,
     ImportDecl,
     LetDecl,
+    MiddlewareDecl,
     Node,
     PortalNode,
     PropField,
@@ -310,3 +311,28 @@ class TestComponent:
         assert len(c.variables) == 2
         assert len(c.states) == 1
         assert len(c.computed) == 1
+
+
+class TestMiddlewareDecl:
+    """Test MiddlewareDecl dataclass."""
+
+    def test_single_name(self) -> None:
+        m = MiddlewareDecl(names=("auth",))
+        assert m.names == ("auth",)
+
+    def test_multiple_names(self) -> None:
+        m = MiddlewareDecl(names=("auth", "rate_limit", "csrf"))
+        assert len(m.names) == 3
+
+    def test_frozen(self) -> None:
+        m = MiddlewareDecl(names=("auth",))
+        with pytest.raises(AttributeError):
+            m.names = ("other",)  # type: ignore[misc]
+
+    def test_component_with_middleware(self) -> None:
+        c = Component(
+            path=Path("test.jinja"),
+            middleware=(MiddlewareDecl(names=("auth",)),),
+        )
+        assert len(c.middleware) == 1
+        assert c.middleware[0].names == ("auth",)

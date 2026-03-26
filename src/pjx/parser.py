@@ -33,6 +33,7 @@ from pjx.ast_nodes import (
     FromImportDecl,
     ImportDecl,
     LetDecl,
+    MiddlewareDecl,
     Node,
     PortalNode,
     PropField,
@@ -81,6 +82,7 @@ def parse(source: str, path: Path | None = None) -> Component:
     variables: list[LetDecl | ConstDecl] = []
     states: list[StateDecl] = []
     computed: list[ComputedDecl] = []
+    middleware: list[MiddlewareDecl] = []
 
     if frontmatter is not None:
         tokens = tokenize(frontmatter)
@@ -110,6 +112,8 @@ def parse(source: str, path: Path | None = None) -> Component:
                 states.append(decl)
             elif isinstance(decl, ComputedDecl):
                 computed.append(decl)
+            elif isinstance(decl, MiddlewareDecl):
+                middleware.append(decl)
 
     # Collect known component names for body parser
     known: set[str] = set()
@@ -127,6 +131,7 @@ def parse(source: str, path: Path | None = None) -> Component:
         slots=tuple(slots),
         stores=tuple(stores),
         assets=tuple(assets),
+        middleware=tuple(middleware),
         variables=tuple(variables),
         states=tuple(states),
         computed=tuple(computed),
@@ -188,6 +193,7 @@ _Decl = (
     | ConstDecl
     | StateDecl
     | ComputedDecl
+    | MiddlewareDecl
 )
 
 
@@ -256,6 +262,8 @@ class _ScriptParser:
                 return self._parse_asset("css")
             case TokenKind.JS:
                 return self._parse_asset("js")
+            case TokenKind.MIDDLEWARE:
+                return self._parse_middleware()
             case _:
                 raise ParseError(
                     f"unexpected token {tok.value!r}",
@@ -452,6 +460,15 @@ class _ScriptParser:
         path = self._expect(TokenKind.STRING).value
         return AssetDecl(kind=kind, path=path)
 
+    def _parse_middleware(self) -> MiddlewareDecl:
+        """Parse ``middleware "auth", "rate_limit"``."""
+        self._advance()  # consume 'middleware'
+        names: list[str] = [self._expect(TokenKind.STRING).value]
+        while self._peek().kind == TokenKind.COMMA:
+            self._advance()
+            names.append(self._expect(TokenKind.STRING).value)
+        return MiddlewareDecl(names=tuple(names))
+
 
 # ---------------------------------------------------------------------------
 # Body parser — HTML with PJX extensions
@@ -514,8 +531,10 @@ class _BodyParser(HTMLParser):
     CDATA_CONTENT_ELEMENTS = ()  # type: ignore[assignment]
 
     def __init__(self, known_components: set[str]) -> None:
+        from pjx.layout import LAYOUT_COMPONENTS
+
         super().__init__(convert_charrefs=False)
-        self._known = known_components | _CONTROL_TAGS
+        self._known = known_components | _CONTROL_TAGS | LAYOUT_COMPONENTS
         self._stack: list[_OpenTag] = []
         self._root: list[Node] = []
         self._original_source: str = ""

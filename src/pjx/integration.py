@@ -9,15 +9,17 @@ from typing import Annotated, Any, Callable, get_args, get_origin
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
-
+from markupsafe import Markup
 from pydantic import BaseModel
 
 from pjx.compiler import Compiler
 from pjx.config import PJXConfig
 from pjx.engine import EngineProtocol, HybridEngine, create_engine
+from pjx.layout import UI_DIR
 from pjx.parser import parse_file
 from pjx.props import generate_props_model, validate_props
 from pjx.registry import ComponentRegistry
+from pjx.router import FileRouter
 
 _INCLUDE_RE = re.compile(r'\{%[-\s]*include\s+"([^"]+)"')
 
@@ -97,14 +99,22 @@ class PJX:
         self.config = config or PJXConfig()
         self.layout = layout
         self.default_seo = seo or SEO()
-        self.registry = ComponentRegistry([Path(d) for d in self.config.template_dirs])
+        # Include built-in ui/ directory so layout components are resolvable
+        tpl_dirs = [Path(d) for d in self.config.template_dirs] + [UI_DIR.parent]
+        self.registry = ComponentRegistry(tpl_dirs)
         self.engine: EngineProtocol = create_engine(self.config.engine)
         self.compiler = Compiler(registry=self.registry)
+
+        # Pre-register built-in layout components so the compiler can
+        # separate declared props from extra attrs (e.g. x-data).
+        self._register_builtin_layouts()
         self._props_models: dict[str, type[BaseModel]] = {}
         self._template_mtimes: dict[str, float] = {}  # path → mtime cache
         self._cached_css: dict[str, str | None] = {}
         self._cached_assets: dict[str, tuple] = {}
         self._compiled_sources: dict[str, str] = {}  # for inline rendering
+        self._middleware_registry: dict[str, Callable] = {}
+        self._registered_paths: set[str] = set()  # URLs already registered
 
         # Auto-mount static files directory
         static_dir = self.config.static_dir
@@ -116,6 +126,17 @@ class PJX:
         # Pre-compile layout if set
         if self.layout:
             self._compile_template(self.layout)
+
+    def _register_builtin_layouts(self) -> None:
+        """Parse and register built-in layout components in the registry."""
+        from pjx.layout import LAYOUT_COMPONENTS, LAYOUT_PREFIX
+
+        for name in LAYOUT_COMPONENTS:
+            if self.registry.get(name) is not None:
+                continue
+            path = self._find_template(f"{LAYOUT_PREFIX}/{name}.jinja")
+            component = parse_file(path)
+            self.registry.register(name, component)
 
     def page(
         self,
@@ -155,7 +176,23 @@ class PJX:
         def decorator(func: Callable) -> Callable:
             tpl = template or f"{func.__name__}.jinja"
 
+            # Discover middleware from template frontmatter
+            tpl_middleware: list[str] = []
+            try:
+                tpl_path = self._find_template(tpl)
+                component = parse_file(tpl_path)
+                for mw_decl in component.middleware:
+                    tpl_middleware.extend(mw_decl.names)
+            except FileNotFoundError:
+                pass
+
             async def wrapper(request: Request) -> HTMLResponse:
+                # Run middleware from template frontmatter
+                for mw_name in tpl_middleware:
+                    mw_func = self._middleware_registry.get(mw_name)
+                    if mw_func is not None:
+                        await mw_func(request)
+
                 context = await _call_handler(func, request)
                 if not isinstance(context, dict):
                     context = {}
@@ -191,13 +228,74 @@ class PJX:
 
         return decorator
 
+    def auto_routes(self, pages_dir: Path | str | None = None) -> None:
+        """Discover and register all file-based routes from a pages directory.
+
+        Scans the directory for ``.jinja`` templates and ``.py`` handlers,
+        converting filesystem paths to URL patterns (Next.js conventions).
+
+        Args:
+            pages_dir: Directory to scan. Defaults to ``config.pages_dir``.
+        """
+        dir_ = Path(pages_dir) if pages_dir else self.config.pages_dir
+        router = FileRouter(dir_, [Path(d) for d in self.config.template_dirs])
+        router.scan()
+        router.register(self)
+
+    def middleware(self, name: str) -> Callable:
+        """Decorator to register a named middleware function.
+
+        Registered middleware can be referenced in frontmatter::
+
+            ---
+            middleware "auth", "rate_limit"
+            ---
+
+        Args:
+            name: Middleware identifier used in frontmatter declarations.
+
+        Example::
+
+            @pjx.middleware("auth")
+            async def auth_middleware(request: Request):
+                if not request.session.get("user"):
+                    raise HTTPException(401)
+        """
+
+        def decorator(func: Callable) -> Callable:
+            self._middleware_registry[name] = func
+            return func
+
+        return decorator
+
+    def partial(self, template: str, **props: Any) -> Markup:
+        """Render a component as an HTML fragment, ready to embed in a page.
+
+        Returns ``Markup`` so Jinja2 won't double-escape the result.
+        Use this to render components in route handlers::
+
+            @pjx.page("/todos")
+            async def todos():
+                return {"todo_list": pjx.partial("components/TodoList.jinja", todos=items)}
+
+        Then in the template: ``{{ todo_list }}`` — no ``Markup()`` needed.
+
+        Args:
+            template: Component template path relative to template_dirs.
+            **props: Props passed to the component as keyword arguments.
+        """
+        return self.render(template, props)
+
     def render(
         self,
         template: str,
         context: dict[str, Any],
         layout: str | None = None,
-    ) -> str:
+    ) -> Markup:
         """Compile and render a template, optionally wrapping in a layout.
+
+        Returns ``Markup`` (safe HTML string) so rendered components can be
+        embedded in other templates without double-escaping.
 
         Args:
             template: Template path relative to template_dirs.
@@ -249,12 +347,10 @@ class PJX:
 
         # Wrap in layout if provided
         if layout:
-            from markupsafe import Markup
-
             render_ctx["body"] = Markup(body)
-            return self.engine.render(layout, render_ctx)
+            return Markup(self.engine.render(layout, render_ctx))
 
-        return body
+        return Markup(body)
 
     def _merge_seo(self, page_seo: SEO | None) -> SEO:
         """Merge per-page SEO over global defaults. Non-empty page fields win."""
@@ -448,7 +544,7 @@ class PJX:
 
     def _find_template(self, template: str) -> Path:
         """Find a template file in the configured template directories."""
-        for tpl_dir in self.config.template_dirs:
+        for tpl_dir in [*self.config.template_dirs, UI_DIR.parent]:
             candidate = Path(tpl_dir) / template
             if candidate.exists():
                 return candidate

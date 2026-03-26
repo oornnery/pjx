@@ -30,6 +30,7 @@ from pjx.ast_nodes import (
 )
 from pjx.css import generate_scope_hash, scope_css
 from pjx.errors import CompileError
+from pjx.layout import LAYOUT_COMPONENTS, LAYOUT_PREFIX, get_layout_props
 from pjx.props import separate_attrs
 
 if TYPE_CHECKING:
@@ -482,11 +483,23 @@ class Compiler:
         lines: list[str] = []
 
         # Find template path from imports (needed for child lookup)
-        template_path = f"{node.name}.jinja"
-        for imp in component.imports:
-            if node.name in imp.names:
-                template_path = imp.source
-                break
+        # Built-in layout components resolve to ui/layouts/<Name>.jinja
+        if node.name in LAYOUT_COMPONENTS:
+            template_path = f"{LAYOUT_PREFIX}/{node.name}.jinja"
+        else:
+            template_path = f"{node.name}.jinja"
+            for imp in component.imports:
+                if node.name in imp.names:
+                    template_path = imp.source
+                    break
+
+        # Reset props for built-in layout components to prevent scope leaking
+        # through Jinja {% include %}. Unmentioned props must be cleared.
+        if node.name in LAYOUT_COMPONENTS:
+            passed = set(node.attrs.keys())
+            for prop_name in get_layout_props(node.name):
+                if prop_name not in passed:
+                    lines.append(f'{{% set {prop_name} = "" %}}')
 
         # Separate declared props from extra passthrough attrs
         child_props_decl = None

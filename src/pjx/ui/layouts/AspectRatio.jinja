@@ -1,0 +1,12 @@
+---
+props {
+  ratio: str = "",
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-aspect{{ ' ' + props.class if props.class else '' }}" style="{% if props.ratio %}--pjx-ratio:{{ props.ratio }};{% endif %}" {{ attrs }}>
+  <Slot />
+</div>

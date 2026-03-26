@@ -3,11 +3,13 @@ import Layout from "../layouts/Base.jinja"
 ---
 
 <Layout>
-  <div class="page">
+  <VStack gap="1.5rem" class="page">
     <h1>Live Clock</h1>
     <p class="clock-desc">Real-time server clock via SSE. The time streams from the backend every second.</p>
-    <div live="/sse/clock" channel="clock">
-      {{ clock }}
-    </div>
-  </div>
+    <Center>
+      <div live="/sse/clock" channel="clock">
+        {{ clock }}
+      </div>
+    </Center>
+  </VStack>
 </Layout>

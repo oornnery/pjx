@@ -760,3 +760,158 @@ class TestStore:
         assert "Alpine.store('cart'" in result
         assert "{ dark: false }" in result
         assert "{ items: [], total: 0 }" in result
+
+
+# ---------------------------------------------------------------------------
+# Built-in layout components
+# ---------------------------------------------------------------------------
+
+
+class TestLayoutBuiltins:
+    """Test built-in layout components compile to {% include %} with props."""
+
+    def test_center_includes_template(self) -> None:
+        comp = _minimal_component(
+            body=(ComponentNode(name="Center", children=(TextNode("hi"),)),),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Center.jinja" %}' in result
+        assert "{% set slot_default %}hi{% endset %}" in result
+
+    def test_hstack_sets_gap_prop(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="HStack",
+                    attrs={"gap": "2rem"},
+                    children=(TextNode("a"), TextNode("b")),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/HStack.jinja" %}' in result
+        assert '{% set gap = "2rem" %}' in result
+
+    def test_vstack_sets_align_prop(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="VStack",
+                    attrs={"align": "center"},
+                    children=(TextNode("x"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/VStack.jinja" %}' in result
+        assert '{% set align = "center" %}' in result
+
+    def test_grid_sets_cols_and_min(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="Grid",
+                    attrs={"cols": "3", "min": "200px"},
+                    children=(TextNode("card"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Grid.jinja" %}' in result
+        assert '{% set cols = "3" %}' in result
+        assert '{% set min = "200px" %}' in result
+
+    def test_spacer_no_slot(self) -> None:
+        comp = _minimal_component(
+            body=(ComponentNode(name="Spacer"),),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Spacer.jinja" %}' in result
+        assert "slot_default" not in result
+
+    def test_container_sets_max(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="Container",
+                    attrs={"max": "1200px"},
+                    children=(TextNode("content"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Container.jinja" %}' in result
+        assert '{% set max = "1200px" %}' in result
+
+    def test_divider_includes_template(self) -> None:
+        comp = _minimal_component(
+            body=(ComponentNode(name="Divider"),),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Divider.jinja" %}' in result
+
+    def test_wrap_includes_template(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="Wrap",
+                    children=(TextNode("items"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Wrap.jinja" %}' in result
+
+    def test_aspect_ratio_sets_prop(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="AspectRatio",
+                    attrs={"ratio": "4/3"},
+                    children=(TextNode("video"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/AspectRatio.jinja" %}' in result
+        assert '{% set ratio = "4/3" %}' in result
+
+    def test_hide_sets_below(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="Hide",
+                    attrs={"below": "768px"},
+                    children=(TextNode("desktop only"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% include "ui/layouts/Hide.jinja" %}' in result
+        assert '{% set below = "768px" %}' in result
+
+    def test_extra_class_passed(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="Center",
+                    attrs={"class": "my-custom"},
+                    children=(TextNode("x"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% set class = "my-custom" %}' in result
+
+    def test_justify_passed_as_prop(self) -> None:
+        comp = _minimal_component(
+            body=(
+                ComponentNode(
+                    name="HStack",
+                    attrs={"justify": "between"},
+                    children=(TextNode("x"),),
+                ),
+            ),
+        )
+        result = _compile(comp)
+        assert '{% set justify = "between" %}' in result

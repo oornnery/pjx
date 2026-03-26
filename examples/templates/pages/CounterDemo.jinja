@@ -5,19 +5,19 @@ import ServerCounter from "../components/ServerCounter.jinja"
 ---
 
 <Layout>
-  <div class="page">
+  <VStack gap="1.5rem" class="page">
     <h1>Counter Demo</h1>
-    <div class="counter-grid">
-      <div class="counter-section">
+    <HStack gap="2rem" align="start">
+      <VStack gap="0.5rem" class="counter-section">
         <h2>Client-side (Alpine.js)</h2>
         <p>State lives in the browser. No server requests — instant updates.</p>
         <Counter />
-      </div>
-      <div class="counter-section">
+      </VStack>
+      <VStack gap="0.5rem" class="counter-section">
         <h2>Server-side (HTMX)</h2>
         <p>State lives on the server. Each click sends a request and swaps HTML.</p>
         <ServerCounter count="{{ server_count }}" />
-      </div>
-    </div>
-  </div>
+      </VStack>
+    </HStack>
+  </VStack>
 </Layout>
