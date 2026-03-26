@@ -614,6 +614,59 @@ vendor/ funcional.
 
 ---
 
+## Fase 6 — Melhorias (concluída)
+
+Objetivo: fechar gaps críticos para produção — attrs passthrough, asset
+pipeline, validação runtime, inline rendering, e static analysis.
+
+### 6.1 Attrs Passthrough ✅
+
+- `separate_attrs()` em `src/pjx/props.py` — separa props de extras
+- Compilador resolve `PropsDecl` do filho via registry
+- Extras renderizados como `{% set attrs %}...{% endset %}`
+- 6 testes em `tests/unit/test_props.py::TestSeparateAttrs`
+- 4 testes em `tests/unit/test_compiler.py::TestComponentAttrsPassthrough`
+
+### 6.2 Runtime Prop Validation ✅
+
+- `validate_props: bool = True` em `PJXConfig`
+- Cache de Pydantic models em `PJX._props_models`
+- Validação antes de render — `PropValidationError` com mensagem clara
+- 4 testes em `tests/integration/test_integration.py::TestRuntimePropValidation`
+
+### 6.3 Asset Pipeline ✅
+
+- `AssetDecl(kind, path)` em `ast_nodes.py`
+- Tokens `CSS`/`JS` no lexer, `_parse_asset()` no parser
+- `AssetCollector` em `src/pjx/assets.py` — dedup, render `<link>`/`<script>`
+- `pjx_assets` global disponível nos templates
+- 7 testes em `tests/unit/test_assets.py`
+- 4 testes em `tests/unit/test_parser.py::TestAssetDeclarations`
+
+### 6.4 Inline Render Mode ✅
+
+- `render_mode: Literal["include", "inline"]` em `PJXConfig`
+- `Compiler.inline_includes()` — substitui `{% include %}` recursivamente
+- MiniJinja inline: 10-74x mais rápido que Jinja2 ad-hoc
+- 5 testes em `tests/unit/test_compiler.py::TestInlineIncludes`
+- 1 teste em `tests/integration/test_integration.py::TestInlineRenderMode`
+
+### 6.5 Static Analysis (`pjx check`) ✅
+
+- `src/pjx/checker.py` — `check_imports`, `check_props`, `check_slots`
+- `_walk_nodes()` — walker recursivo do AST
+- CLI `pjx check` atualizado com 2 fases: parse+register, depois check
+- 10 testes em `tests/unit/test_checker.py`
+
+### 6.6 AST Node Compiler Coverage ✅
+
+- Testes para `ErrorBoundaryNode`, `AwaitNode`, `TransitionNode`, `StoreDecl`
+- 10 testes adicionados em `tests/unit/test_compiler.py`
+
+**Total: 300 testes passando** (364 com benchmarks).
+
+---
+
 ## Estratégia de Testes
 
 ### Estrutura
@@ -632,11 +685,15 @@ tests/
 │   ├── test_slots.py
 │   ├── test_registry.py
 │   ├── test_engine.py
-│   └── test_config.py
+│   ├── test_config.py
+│   ├── test_checker.py        # Static analysis
+│   └── test_assets.py         # Asset pipeline
 ├── integration/
 │   ├── test_integration.py    # FastAPI + PJX decorators
 │   ├── test_sse.py
 │   └── test_cli.py
+├── benchmark/
+│   └── test_engine_benchmark.py  # Jinja2 vs MiniJinja (64 tests)
 └── e2e/
     └── test_full_render.py    # Parse → compile → render → assert HTML
 ```
@@ -707,8 +764,9 @@ src/
     ├── slots.py
     ├── engine.py
     ├── integration.py
+    ├── checker.py       # Static analysis
+    ├── assets.py        # Asset pipeline + collector
     ├── sse.py
-    ├── assets.py
     ├── log.py
     └── cli/
         ├── __init__.py

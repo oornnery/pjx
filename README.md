@@ -9,16 +9,17 @@ a declarative syntax in `.jinja` files.
 
 ## Stack
 
-| Layer              | Technology                        |
-| ------------------ | --------------------------------- |
-| Language           | Python 3.14+                      |
-| Template engine    | Jinja2 (default), MiniJinja (opt) |
-| Server framework   | FastAPI + Uvicorn                 |
-| Reactivity         | Alpine.js (client-side)           |
-| Server interaction | HTMX                              |
-| Validation         | Pydantic                          |
-| CLI                | Typer + Rich                      |
-| CSS                | Scoped per component (optional)   |
+| Layer              | Technology                                 |
+| ------------------ | ------------------------------------------ |
+| Language           | Python 3.14+                               |
+| Template engine    | HybridEngine (default), Jinja2, MiniJinja  |
+| Server framework   | FastAPI + Uvicorn                          |
+| Reactivity         | Alpine.js (client-side)                    |
+| Server interaction | HTMX                                       |
+| SSE streaming      | sse-starlette                              |
+| Validation         | Pydantic                                   |
+| CLI                | Typer + Rich                               |
+| CSS                | Scoped per component (optional)            |
 
 ## Installation
 
@@ -38,7 +39,7 @@ cd my-app
 ### 2. Configure (`pjx.toml`)
 
 ```toml
-engine = "jinja2"
+engine = "hybrid"
 debug = true
 
 template_dirs = ["templates"]
@@ -75,7 +76,7 @@ Layouts are PJX components that use `<Slot />` to inject page content:
 ---
 import Navbar from "../components/Navbar.jinja"
 
-props BaseLayoutProps = {
+props {
   title: str = "My App",
 }
 
@@ -144,7 +145,7 @@ and an HTML body:
 import Layout from "../layouts/Base.jinja"
 import UserCard from "../components/UserCard.jinja"
 
-props DashboardProps = {
+props {
   title: str = "Dashboard",
   users: list = [],
 }
@@ -176,31 +177,42 @@ state editing = false
 | `import`   | Import components (`.jinja` files)        |
 | `from`     | Import Python/Pydantic types              |
 | `extends`  | Inherit from a layout                     |
-| `props`    | Declare typed props with defaults         |
+| `props`    | Declare typed props (name optional)       |
 | `slot`     | Declare named slots                       |
 | `state`    | Reactive state (Alpine.js `x-data`)       |
 | `let`      | Local variable                            |
 | `const`    | Constant                                  |
 | `computed` | Computed value                            |
 | `store`    | Alpine global store                       |
+| `css`      | CSS asset declaration                     |
+| `js`       | JS asset declaration                      |
 
 ### Reactive Attributes
 
-| PJX                 | Compiles to        | Framework |
-| ------------------- | ------------------ | --------- |
-| `reactive`          | `x-data="{ ... }"` | Alpine.js |
-| `on:click="..."`    | `@click="..."`     | Alpine.js |
-| `bind:model="..."`  | `x-model="..."`    | Alpine.js |
-| `action:get="..."`  | `hx-get="..."`     | HTMX      |
-| `action:post="..."` | `hx-post="..."`    | HTMX      |
-| `target="..."`      | `hx-target="..."`  | HTMX      |
-| `swap="..."`        | `hx-swap="..."`    | HTMX      |
-| `trigger="..."`     | `hx-trigger="..."` | HTMX      |
+| PJX                 | Compiles to             | Framework |
+| ------------------- | ----------------------- | --------- |
+| `reactive`          | `x-data="{ ... }"`      | Alpine.js |
+| `on:click="..."`    | `@click="..."`          | Alpine.js |
+| `bind:model="..."`  | `x-model="..."`         | Alpine.js |
+| `action:get="..."`  | `hx-get="..."`          | HTMX      |
+| `action:post="..."` | `hx-post="..."`         | HTMX      |
+| `target="..."`      | `hx-target="..."`       | HTMX      |
+| `swap="..."`        | `hx-swap="..."`         | HTMX      |
+| `into="#sel"`       | `hx-target` + `hx-swap` | HTMX      |
+| `trigger="..."`     | `hx-trigger="..."`      | HTMX      |
+
+The `into=` shorthand combines `hx-target` and `hx-swap` in a single attribute:
+
+```html
+<button into="#result">              <!-- hx-target="#result" hx-swap="innerHTML" -->
+<button into="#result:outerHTML">    <!-- hx-target="#result" hx-swap="outerHTML" -->
+```
 
 ### Control Flow
 
 ```html
 <Show when="user.active">...</Show>
+<Show when="user.active"><Else>Not active</Else></Show>
 <For each="items" as="item">...</For>
 <Switch on="status">
   <Case value="active">...</Case>
@@ -277,13 +289,105 @@ my-app/
 └── pjx.toml             # Configuration
 ```
 
+## Attrs Passthrough
+
+Attributes not declared as props are passed through to the component's root
+element via `{{ attrs }}`. This enables HTML, HTMX, and Alpine attributes
+without declaring each one as a prop:
+
+```html
+---
+props {
+  label: str,
+  variant: str = "primary",
+}
+---
+
+<button class="btn btn-{{ props.variant }}" {{ attrs }}>
+  {{ props.label }}
+</button>
+```
+
+Usage — `class` and `hx-get` are extras, not declared props:
+
+```html
+<Button label="Save" class="mt-4" hx-get="/save" />
+```
+
+## Asset Pipeline
+
+Components declare CSS/JS dependencies in frontmatter. PJX collects,
+deduplicates, and renders `<link>`/`<script>` tags automatically:
+
+```html
+---
+css "components/card.css"
+js "components/card.js"
+---
+
+<div class="card">...</div>
+```
+
+In the layout, render collected assets with `{{ pjx_assets.render() }}`:
+
+```html
+<head>
+  {{ pjx_assets.render() }}
+</head>
+```
+
+## Runtime Prop Validation
+
+When `validate_props = true` (default), PJX validates props against their
+declared types at render time using Pydantic models. Missing required props
+or type mismatches raise `PropValidationError` with clear messages:
+
+```python
+config = PJXConfig(validate_props=True)  # default
+```
+
+Disable in production for performance:
+
+```python
+config = PJXConfig(validate_props=False)
+```
+
+## Static Analysis
+
+`pjx check` validates components statically without running the server:
+
+- **Import resolution** — verifies all imports resolve to existing files
+- **Props checking** — verifies required props are passed to child components
+- **Slot checking** — verifies slot passes match declared slots in children
+
+```bash
+pjx check .
+```
+
+## Render Modes
+
+PJX supports two render modes, configurable via `render_mode`:
+
+| Mode      | How it works                                              | Best for  |
+| --------- | --------------------------------------------------------- | --------- |
+| `include` | Standard `{% include %}` (default)                        | Jinja2    |
+| `inline`  | Inlines all includes into a flat template at compile time | MiniJinja |
+
+Inline mode eliminates `{% include %}` overhead, enabling MiniJinja's
+`render_string` path which is 10-67x faster than Jinja2's ad-hoc compilation:
+
+```python
+config = PJXConfig(engine="minijinja", render_mode="inline")
+```
+
 ## CLI
 
 ```bash
 pjx init <dir>          # Scaffold project
 pjx dev <dir>           # Dev server with hot reload
 pjx build               # Compile all .jinja + bundle CSS
-pjx check               # Check syntax
+pjx check               # Validate imports, props, and slots
+pjx format              # Re-format .jinja files
 pjx add <pkg>           # Install JS package + copy to vendor/
 ```
 
@@ -295,52 +399,107 @@ Measured with `pytest-benchmark` on Python 3.14 (64 tests, WSL2 Linux).
 
 Templates are compiled once at startup and reused. This is the hot path.
 
-| Scenario             | Jinja2      | MiniJinja  | Winner         |
-| -------------------- | ----------- | ---------- | -------------- |
-| Simple variable      | 9.1 us      | **3.2 us** | MiniJinja 2.8x |
-| Loop (10 items)      | 16.1 us     | **7.8 us** | MiniJinja 2.1x |
-| Loop (1000 items)    | 622 us      | **446 us** | MiniJinja 1.4x |
-| HTMX page (30 todos) | 246 us      | **172 us** | MiniJinja 1.4x |
-| Layout               | **17.6 us** | 20.7 us    | Jinja2 1.2x    |
-| Filters              | **19 us**   | 24.5 us    | Jinja2 1.3x    |
-| Conditionals         | **33 us**   | 53 us      | Jinja2 1.6x    |
-| HTML escaping (50)   | **128 us**  | 218 us     | Jinja2 1.7x    |
-| Variables (50)       | **44.5 us** | 90 us      | Jinja2 2x      |
-| Complex component    | **48 us**   | 101 us     | Jinja2 2.1x    |
-| Throughput (100x)    | **4.6 ms**  | 9.8 ms     | Jinja2 2.1x    |
-| Nested loops (50x20) | **522 us**  | 1,628 us   | Jinja2 3.1x    |
+| Scenario              | Jinja2      | MiniJinja    | Winner          |
+| --------------------- | ----------- | ------------ | --------------- |
+| Minimal template      | 8.9 us      | **3.1 us**   | MiniJinja 2.9x  |
+| Simple variable       | 8.4 us      | **3.1 us**   | MiniJinja 2.7x  |
+| Loop (10 items)       | 14.6 us     | **7.5 us**   | MiniJinja 1.9x  |
+| Loop (1000 items)     | 592 us      | **439 us**   | MiniJinja 1.3x  |
+| HTMX page (30 todos)  | 228 us      | **169 us**   | MiniJinja 1.3x  |
+| Layout                | **17.1 us** | 20.2 us      | Jinja2 1.2x     |
+| Filters               | **18.2 us** | 23.6 us      | Jinja2 1.3x     |
+| Conditionals          | **30.1 us** | 48.3 us      | Jinja2 1.6x     |
+| Deep nesting          | **170 us**  | 426 us       | Jinja2 2.5x     |
+| HTML escaping (50)    | **110 us**  | 221 us       | Jinja2 2x       |
+| Variables (50)        | **40.6 us** | 79.8 us      | Jinja2 2x       |
+| Complex component     | **46.7 us** | 96 us        | Jinja2 2.1x     |
+| Throughput (100x)     | **4.7 ms**  | 9.4 ms       | Jinja2 2x       |
+| Nested loops (50x20)  | **489 us**  | 1,536 us     | Jinja2 3.1x     |
 
-### Ad-hoc compilation (`render_string`) — compile + render each call
+### Ad-hoc compilation (`render_string`) — inline render path
 
-| Scenario             | Jinja2       | MiniJinja  | Winner             |
-| -------------------- | ------------ | ---------- | ------------------ |
-| Simple variable      | 305 us       | **4.5 us** | MiniJinja **67x**  |
-| Loop (10 items)      | 581 us       | **9.7 us** | MiniJinja **60x**  |
-| Filters              | 1,474 us     | **29 us**  | MiniJinja **51x**  |
-| Layout               | 992 us       | **24 us**  | MiniJinja **41x**  |
-| Variables (50)       | 3,701 us     | **99 us**  | MiniJinja **37x**  |
-| HTMX page (30 todos) | 1,830 us     | **178 us** | MiniJinja **10x**  |
-| HTML escaping (50)   | 757 us       | **215 us** | MiniJinja **3.5x** |
-| Loop (1000 items)    | 1,144 us     | **444 us** | MiniJinja **2.6x** |
-| Nested loops (50x20) | **1,357 us** | 1,545 us   | Jinja2 1.1x        |
+This is the path used by inline render mode (`render_mode = "inline"`),
+where MiniJinja's Rust parser dominates.
 
-**Current default: Jinja2** — templates are pre-compiled at startup, where Jinja2's
-bytecode cache wins on throughput. MiniJinja's Rust parser dominates ad-hoc
-compilation (10-67x faster) and is the better choice for on-the-fly rendering.
+| Scenario              | Jinja2       | MiniJinja    | Winner              |
+| --------------------- | ------------ | ------------ | ------------------- |
+| Minimal template      | 326 us       | **4.4 us**   | MiniJinja **74x**   |
+| Simple variable       | 303 us       | **4.4 us**   | MiniJinja **69x**   |
+| Loop (10 items)       | 561 us       | **9.8 us**   | MiniJinja **57x**   |
+| Filters               | 1,503 us     | **29 us**    | MiniJinja **52x**   |
+| Layout                | 960 us       | **24.4 us**  | MiniJinja **39x**   |
+| Variables (50)        | 3,716 us     | **101 us**   | MiniJinja **37x**   |
+| Conditionals          | 1,455 us     | **55.8 us**  | MiniJinja **26x**   |
+| Complex component     | 2,390 us     | **105 us**   | MiniJinja **23x**   |
+| HTMX page (30 todos)  | 1,932 us     | **179 us**   | MiniJinja **11x**   |
+| Deep nesting          | 1,593 us     | **432 us**   | MiniJinja **3.7x**  |
+| HTML escaping (50)    | 797 us       | **212 us**   | MiniJinja **3.8x**  |
+| Loop (1000 items)     | 1,150 us     | **453 us**   | MiniJinja **2.5x**  |
+| Nested loops (50x20)  | **1,363 us** | 1,538 us     | Jinja2 1.1x         |
+
+### Recommendation
+
+**Default:** HybridEngine (`engine = "hybrid"`) — automatically selects the
+optimal engine per template. Uses Jinja2 bytecode cache for pre-registered
+templates and MiniJinja's Rust parser for ad-hoc/inline compilation.
+
+**Jinja2 only:** `engine = "jinja2"` with `render_mode = "include"` — bytecode
+cache wins on throughput for pre-registered templates (2-3x faster).
+
+**Inline mode:** MiniJinja with `render_mode = "inline"` — Rust parser
+dominates ad-hoc compilation (10-74x faster). Best for on-the-fly rendering
+and dynamic content where templates change frequently.
 
 Run benchmarks: `uv run pytest tests/benchmark/ -v --benchmark-sort=mean`
 
+## Performance Optimizations
+
+### Mtime-based template caching
+
+`_compile_template()` checks each file's mtime before recompilation. If the
+source has not changed since the last compile, the cached result is returned
+immediately. Cold compile takes ~33 ms; cached lookups take ~2.7 ms (12x
+speedup).
+
+### Diamond import deduplication
+
+A `_seen` set in the compilation pipeline prevents shared dependencies from
+being compiled more than once. In a diamond dependency graph
+(A->B->D, A->C->D), template D is compiled exactly once.
+
+### Lexer constant hoisting
+
+The `_SINGLE` and `_ESCAPES` lookup dicts used by the lexer are now
+module-level constants instead of being rebuilt on every loop iteration.
+
+### O(1) tag recovery
+
+Tag-recovery regexes are compiled once per tag name and cached. The search
+resumes from the last matched position instead of re-scanning the entire
+source string.
+
 ## Roadmap
 
-- [ ] On-the-fly rendering mode — inline all `{% include %}` at compile time
-      to produce flat templates, enabling `render_string` path where MiniJinja
-      is 10-67x faster
+### Done
+
+- [x] Attrs passthrough — extra HTML/HTMX/Alpine attributes pass through
+      to child components via `{{ attrs }}`
+- [x] Asset pipeline — `css`/`js` frontmatter declarations, `AssetCollector`
+      with dedup, `{{ pjx_assets.render() }}` in layouts
+- [x] Runtime prop validation — Pydantic models cached per template,
+      validated at render time with `PropValidationError`
+- [x] Inline render mode — `inline_includes()` flattens `{% include %}` at
+      compile time for MiniJinja's 10-74x faster `render_string` path
+- [x] Static analysis — `pjx check` validates imports, props, and slots
+- [x] `pjx build` — compile all templates + bundle scoped CSS
+- [x] `pjx format` — re-format `.jinja` files
+
+### Planned
+
 - [ ] Hot reload — watch `.jinja` files and recompile on change (dev mode)
-- [ ] `pjx build` — pre-compile all templates + bundle scoped CSS
-- [ ] `pjx init` — scaffold project with layout, components, and config
-- [ ] `pjx check` — validate component syntax without running server
 - [ ] Tailwind CSS integration via `pjx add tailwind`
-- [ ] SSE streaming with `PJX.sse()` decorator
+- [x] SSE streaming with `PJX.sse()` decorator — `sse-starlette` backend,
+      `live=`/`channel=` attributes, SSE clock demo at `/clock`
 - [ ] MiniJinja benchmark parity — investigate nested loop / escaping gap
 
 ## Development

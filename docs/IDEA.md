@@ -16,7 +16,7 @@ import Button from "./Button.jinja"
 import Badge from "../shared/Badge.jinja"
 import { CardHeader, CardBody } from "./Card.jinja"
 
-props TodoItemProps = {
+props {
   id:       int,
   text:     str,
   done:     bool      = false,
@@ -105,7 +105,7 @@ Indica que a página herda de um layout. O corpo da página é injetado no
 Declaração tipada usando tipos Pydantic nativos.
 
 ```python
-props UserCardProps = {
+props {
   name:     str,                                        # required
   age:      int                        = 0,             # optional
   role:     Literal["admin", "mod", "user"] = "user",   # choices via Literal
@@ -697,26 +697,32 @@ slot actions                                   # slot vazio se não fornecido
 <!-- Select (qual parte da resposta usar) -->
 <div select=".content">            <!-- pega só .content da resposta -->
 <div select-oob="#sidebar">        <!-- OOB swap adicional -->
+
+<!-- Into (shorthand para target + swap) -->
+<button into="#result">             <!-- hx-target="#result" hx-swap="innerHTML" -->
+<button into="#result:outerHTML">   <!-- hx-target="#result" hx-swap="outerHTML" -->
 ```
 
-| Escrito                          | Compilado                           |
-| -------------------------------- | ----------------------------------- |
-| `swap="x"`                       | `hx-swap="x"`                       |
-| `target="x"`                     | `hx-target="x"`                     |
-| `trigger="x"`                    | `hx-trigger="x"`                    |
-| `select="x"`                     | `hx-select="x"`                     |
-| `select-oob="x"`                 | `hx-select-oob="x"`                 |
-| `confirm="x"`                    | `hx-confirm="x"`                    |
-| `indicator="x"`                  | `hx-indicator="x"`                  |
-| `push-url`                       | `hx-push-url="true"`                |
-| `push-url="/path"`               | `hx-push-url="/path"`               |
-| `replace-url`                    | `hx-replace-url="true"`             |
-| `vals='{"k":"v"}'`               | `hx-vals='{"k":"v"}'`               |
-| `headers='{"X-Custom":"v"}'`     | `hx-headers='{"X-Custom":"v"}'`     |
-| `encoding="multipart/form-data"` | `hx-encoding="multipart/form-data"` |
-| `preserve`                       | `hx-preserve="true"`                |
-| `sync="closest form:abort"`      | `hx-sync="closest form:abort"`      |
-| `disabled-elt="this"`            | `hx-disabled-elt="this"`            |
+| Escrito                          | Compilado                              |
+| -------------------------------- | -------------------------------------- |
+| `swap="x"`                       | `hx-swap="x"`                          |
+| `target="x"`                     | `hx-target="x"`                        |
+| `trigger="x"`                    | `hx-trigger="x"`                       |
+| `select="x"`                     | `hx-select="x"`                        |
+| `select-oob="x"`                 | `hx-select-oob="x"`                    |
+| `confirm="x"`                    | `hx-confirm="x"`                       |
+| `indicator="x"`                  | `hx-indicator="x"`                     |
+| `push-url`                       | `hx-push-url="true"`                   |
+| `push-url="/path"`               | `hx-push-url="/path"`                  |
+| `replace-url`                    | `hx-replace-url="true"`                |
+| `vals='{"k":"v"}'`               | `hx-vals='{"k":"v"}'`                  |
+| `headers='{"X-Custom":"v"}'`     | `hx-headers='{"X-Custom":"v"}'`        |
+| `encoding="multipart/form-data"` | `hx-encoding="multipart/form-data"`    |
+| `preserve`                       | `hx-preserve="true"`                   |
+| `sync="closest form:abort"`      | `hx-sync="closest form:abort"`         |
+| `disabled-elt="this"`            | `hx-disabled-elt="this"`               |
+| `into="#sel"`                    | `hx-target="#sel" hx-swap="innerHTML"` |
+| `into="#sel:outerHTML"`          | `hx-target="#sel" hx-swap="outerHTML"` |
 
 ---
 
@@ -774,6 +780,9 @@ slot actions                                   # slot vazio se não fornecido
 ---
 
 ## 10. SSE — Server-Sent Events
+
+Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
+(`htmx-ext-sse@2`) via a `<script>` tag.
 
 ```html
 <!-- Conectar a um endpoint SSE -->
@@ -909,7 +918,7 @@ slot actions                                   # slot vazio se não fornecido
 ```html
 ---
 import Button from "./Button.jinja"
-props AlertProps = { type: str = "info" }
+props { type: str = "info" }
 ---
 
 <!-- Estilos com escopo automático (atributo data-pjx-HASH no componente) -->
@@ -1015,7 +1024,7 @@ no body é passado direto para o HTML (não é processado pelo frontmatter):
 
 ```html
 ---
-props ChartProps = {
+props {
   data: list = [],
   type: str = "bar",
 }
@@ -1041,7 +1050,7 @@ scoped. Esse arquivo pode ser incluído no layout base.
 ### Configuração de diretórios (`pjx.toml`)
 
 ```toml
-engine = "jinja2"
+engine = "hybrid"
 debug = true
 
 template_dirs = ["templates"]
@@ -1144,7 +1153,7 @@ import DataTable from "./DataTable.jinja"
 import Chart from "./Chart.jinja"
 import Modal from "./Modal.jinja"
 
-props DashboardProps = {
+props {
   user:    dict,
   stats:   list[dict],
   orders:  list[dict],
@@ -1371,7 +1380,7 @@ Páginas herdam de layouts via `extends`.
 
 ```html
 ---
-props LayoutProps = {
+props {
   title: str = "PJX App",
   description: str = "",
 }
@@ -1411,7 +1420,7 @@ slot footer
 extends "layouts/Base.jinja"
 from pydantic import EmailStr
 
-props HomeProps = {
+props {
   user: dict,
   items: list[dict],
 }
@@ -1532,7 +1541,7 @@ Funções disponíveis em expressões dentro do template body:
 ---
 extends "layouts/Base.jinja"
 
-props Error404Props = {
+props {
   path: str,
 }
 ---
@@ -1566,7 +1575,7 @@ Componentes podem importar a si mesmos para renderizar estruturas em árvore.
 ---
 import TreeNode from "./TreeNode.jinja"
 
-props TreeNodeProps = {
+props {
   node: dict,
   depth: int = 0,
   max_depth: int = 10,
@@ -1609,11 +1618,28 @@ próximo `---` em uma linha isolada. Regras:
 import ...
 from pydantic import ...
 extends "..."
-props Name = { ... }
+props [Name =] { ... }
 slot ...
 let/const/state/computed
 store ...
+css "path/to/style.css"
+js "path/to/script.js"
 ---                       ← fechamento (próximo --- isolado)
 <style scoped>...</style> ← opcional
 <div>...</div>            ← body HTML
 ```
+
+### Assets no Frontmatter
+
+Componentes podem declarar dependências de CSS e JS:
+
+```html
+---
+css "components/card.css"
+js "components/card.js"
+---
+```
+
+Assets são coletados recursivamente (incluindo imports), deduplicados por
+`(kind, path)`, e disponibilizados no template via `{{ pjx_assets.render() }}`.
+CSS é renderizado como `<link>`, JS como `<script type="module">`.

@@ -14,7 +14,7 @@ HTMX (interação server-side) e Alpine.js (reatividade client-side).
 | Camada             | Tecnologia                                      |
 | ------------------ | ----------------------------------------------- |
 | Linguagem          | Python 3.14+                                    |
-| Template engine    | Jinja2 (padrão), MiniJinja (opt-in)             |
+| Template engine    | HybridEngine (padrão), Jinja2, MiniJinja        |
 | Server framework   | FastAPI + Uvicorn                               |
 | Reatividade client | Alpine.js                                       |
 | Interação server   | HTMX                                            |
@@ -64,7 +64,7 @@ Todo componente é um arquivo `.jinja` com até três blocos:
 
 ## 3. Gramática do Frontmatter
 
-O frontmatter (`---`) aceita 10 tipos de declaração. Cada linha começa com
+O frontmatter (`---`) aceita 12 tipos de declaração. Cada linha começa com
 uma keyword, tornando a gramática LL(1).
 
 ### 3.1 EBNF
@@ -73,7 +73,8 @@ uma keyword, tornando a gramática LL(1).
 script        = { statement } ;
 statement     = extends_stmt | import_stmt | from_import_stmt
               | props_stmt | slot_stmt | store_stmt
-              | let_stmt | const_stmt | state_stmt | computed_stmt ;
+              | let_stmt | const_stmt | state_stmt | computed_stmt
+              | css_stmt | js_stmt ;
 
 extends_stmt  = "extends" STRING ;
 
@@ -84,7 +85,7 @@ wildcard_import = "*" "from" STRING ;
 
 from_import_stmt = "from" MODULE "import" IDENT { "," IDENT } ;
 
-props_stmt    = "props" IDENT "=" "{" prop_field { "," prop_field } "}" ;
+props_stmt    = "props" [ IDENT "=" ] "{" prop_field { "," prop_field } "}" ;
 prop_field    = IDENT ":" type_expr [ "=" expr ] ;
 type_expr     = pydantic_type [ "|" type_expr ] ;
 pydantic_type = IDENT [ "[" type_expr { "," type_expr } "]" ]
@@ -98,6 +99,9 @@ let_stmt      = "let" IDENT "=" expr ;
 const_stmt    = "const" IDENT "=" expr ;
 state_stmt    = "state" IDENT "=" expr ;
 computed_stmt = "computed" IDENT "=" expr ;
+
+css_stmt      = "css" STRING ;
+js_stmt       = "js" STRING ;
 
 (* Body: spread syntax em componentes *)
 component_use = "<" IDENT { attr | spread } [ "/" ] ">" ;
@@ -201,7 +205,7 @@ Props explícitos sempre sobrescrevem valores do spread.
 Declaração tipada usando tipos Pydantic nativos.
 
 ```python
-props UserCardProps = {
+props {
   name:     str,                                        # required
   age:      int                        = 0,             # optional
   role:     Literal["admin", "mod", "user"] = "user",   # choices via Literal
@@ -213,6 +217,9 @@ props UserCardProps = {
   url:      HttpUrl | None             = None,           # URL validada
   on_click: Callable                   = None,           # callback
 }
+
+# Named form is still supported:
+# props UserCardProps = { name: str, age: int = 0 }
 ```
 
 ### Tipos suportados
@@ -347,15 +354,16 @@ slot footer = <span>© 2025 PJX</span>       # com fallback
     <button>Delete</button>
 </Show>
 
-<Show when="items" fallback="<p>Nenhum item.</p>">
+<Show when="items">
     <ul>...</ul>
+    <Else><p>Nenhum item.</p></Else>
 </Show>
 ```
 
-| DSL                                        | Jinja2                                  |
-| ------------------------------------------ | --------------------------------------- |
-| `<Show when="x">body</Show>`               | `{% if x %}body{% endif %}`             |
-| `<Show when="x" fallback="fb">body</Show>` | `{% if x %}body{% else %}fb{% endif %}` |
+| DSL                                         | Jinja2                                  |
+| ------------------------------------------- | --------------------------------------- |
+| `<Show when="x">body</Show>`                | `{% if x %}body{% endif %}`             |
+| `<Show when="x">body<Else>fb</Else></Show>` | `{% if x %}body{% else %}fb{% endif %}` |
 
 ### 8.2 `<For>` — Iteração
 
@@ -542,24 +550,26 @@ Resolve o componente por nome em runtime via registry.
 
 ### 10.2 Swap, Target, Trigger
 
-| DSL                | HTML                    |
-| ------------------ | ----------------------- |
-| `swap="x"`         | `hx-swap="x"`           |
-| `target="x"`       | `hx-target="x"`         |
-| `trigger="x"`      | `hx-trigger="x"`        |
-| `select="x"`       | `hx-select="x"`         |
-| `select-oob="x"`   | `hx-select-oob="x"`     |
-| `confirm="x"`      | `hx-confirm="x"`        |
-| `indicator="x"`    | `hx-indicator="x"`      |
-| `push-url`         | `hx-push-url="true"`    |
-| `replace-url`      | `hx-replace-url="true"` |
-| `vals='json'`      | `hx-vals='json'`        |
-| `headers='json'`   | `hx-headers='json'`     |
-| `encoding="x"`     | `hx-encoding="x"`       |
-| `preserve`         | `hx-preserve="true"`    |
-| `sync="x"`         | `hx-sync="x"`           |
-| `disabled-elt="x"` | `hx-disabled-elt="x"`   |
-| `boost`            | `hx-boost="true"`       |
+| DSL                | HTML                                   |
+| ------------------ | -------------------------------------- |
+| `swap="x"`         | `hx-swap="x"`                          |
+| `target="x"`       | `hx-target="x"`                        |
+| `trigger="x"`      | `hx-trigger="x"`                       |
+| `select="x"`       | `hx-select="x"`                        |
+| `select-oob="x"`   | `hx-select-oob="x"`                    |
+| `confirm="x"`      | `hx-confirm="x"`                       |
+| `indicator="x"`    | `hx-indicator="x"`                     |
+| `push-url`         | `hx-push-url="true"`                   |
+| `replace-url`      | `hx-replace-url="true"`                |
+| `vals='json'`      | `hx-vals='json'`                       |
+| `headers='json'`   | `hx-headers='json'`                    |
+| `encoding="x"`     | `hx-encoding="x"`                      |
+| `preserve`         | `hx-preserve="true"`                   |
+| `sync="x"`         | `hx-sync="x"`                          |
+| `into="#sel"`      | `hx-target="#sel" hx-swap="innerHTML"` |
+| `into="#sel:swap"` | `hx-target="#sel" hx-swap="swap"`      |
+| `disabled-elt="x"` | `hx-disabled-elt="x"`                  |
+| `boost`            | `hx-boost="true"`                      |
 
 ### 10.3 Swap values
 
@@ -577,6 +587,9 @@ Modifiers: `transition:true`, `settle:300ms`, `scroll:top`, `show:top`,
 ---
 
 ## 11. SSE — Server-Sent Events
+
+Requires `sse-starlette` (`uv add sse-starlette`). Layouts must load the
+HTMX SSE extension (`htmx-ext-sse@2`).
 
 ```html
 <div live="/events/dashboard">
@@ -672,19 +685,21 @@ class EngineProtocol(Protocol):
 
 ### Engines
 
-| Engine                 | Quando usar                                                  |
-| ---------------------- | ------------------------------------------------------------ |
-| **Jinja2** (padrão)    | Máxima compatibilidade, ecossistema maduro, 1.5x mais rápido |
-| **MiniJinja** (opt-in) | Rust-based, melhor para free-threaded Python 3.14            |
+| Engine                    | Quando usar                                                  |
+| ------------------------- | ------------------------------------------------------------ |
+| **HybridEngine** (padrão) | Seleciona automaticamente o engine ideal por template        |
+| **Jinja2**                | Máxima compatibilidade, ecossistema maduro, 1.5x mais rápido |
+| **MiniJinja**             | Rust-based, melhor para free-threaded Python 3.14            |
 
 Configurável via `pjx.toml`:
 
 ```toml
 [pjx]
-engine = "jinja2"  # "jinja2" | "minijinja" | "auto"
+engine = "hybrid"  # "hybrid" | "jinja2" | "minijinja"
 ```
 
-`auto` → Jinja2 (default, pode mudar no futuro).
+`hybrid` → HybridEngine (default). Automatically selects the optimal engine
+per template.
 
 ### Limitações do MiniJinja
 
@@ -878,7 +893,7 @@ O PJX usa um arquivo TOML **flat** (sem tabelas `[pjx]`) carregado via
 `PJXConfig`:
 
 ```toml
-engine = "jinja2"           # "jinja2" | "minijinja" | "auto"
+engine = "hybrid"           # "hybrid" | "jinja2" | "minijinja"
 debug = false
 
 template_dirs = ["templates"]
@@ -1024,7 +1039,7 @@ Layouts definem a estrutura base da página. Páginas herdam via `extends`.
 
 ```html
 ---
-props LayoutProps = {
+props {
   title: str = "PJX App",
   description: str = "",
 }
@@ -1064,7 +1079,7 @@ slot footer
 extends "layouts/Base.jinja"
 from pydantic import EmailStr
 
-props HomeProps = {
+props {
   user: dict,
 }
 ---
@@ -1168,7 +1183,7 @@ Registradas como globals no template engine via `engine.add_global()`.
 ---
 extends "layouts/Base.jinja"
 
-props Error404Props = {
+props {
   path: str,
 }
 ---
@@ -1198,7 +1213,7 @@ Componentes podem importar a si mesmos para árvores:
 ---
 import TreeNode from "./TreeNode.jinja"
 
-props TreeNodeProps = {
+props {
   node: dict,
   depth: int = 0,
   max_depth: int = 10,
@@ -1279,7 +1294,165 @@ Found 3 errors in 2 files (checked 4 files)
 
 ---
 
-## 32. Non-Goals
+## 32. Asset Pipeline
+
+Componentes declaram dependências CSS/JS no frontmatter:
+
+```html
+---
+css "components/card.css"
+js "components/card.js"
+---
+```
+
+### AST
+
+```python
+@dataclass(frozen=True, slots=True)
+class AssetDecl:
+    kind: str  # "css" ou "js"
+    path: str
+```
+
+`Component` e `CompiledComponent` possuem `assets: tuple[AssetDecl, ...]`.
+
+### `AssetCollector`
+
+`src/pjx/assets.py` — coleta, deduplica e renderiza tags:
+
+- `add(asset)` — adiciona ao set ordenado (dedup por `(kind, path)`)
+- `render_css()` — gera tags `<link rel="stylesheet">`
+- `render_js(module=True)` — gera tags `<script type="module">`
+- `render()` — CSS + JS
+
+Disponível no template como `{{ pjx_assets.render() }}`.
+
+---
+
+## 33. Attrs Passthrough
+
+Atributos não declarados como props são separados e disponibilizados como
+`{{ attrs }}` no template do componente filho.
+
+### Fluxo
+
+1. Compilador resolve o `PropsDecl` do componente filho via registry
+2. `separate_attrs(props_decl, all_attrs)` separa props de extras
+3. Props declarados → `{% set name = value %}`
+4. Extras → `{% set attrs %}class="x" id="y"{% endset %}`
+
+### `separate_attrs()`
+
+```python
+def separate_attrs(
+    props_decl: PropsDecl | None,
+    all_attrs: dict[str, str | bool],
+) -> tuple[dict[str, str | bool], dict[str, str | bool]]:
+```
+
+Se `props_decl` é `None` → tudo vai para props (backwards compatible).
+
+---
+
+## 34. Runtime Prop Validation
+
+Quando `validate_props = true` em `PJXConfig`, o PJX valida props em
+runtime usando Pydantic models cacheados:
+
+1. Em `_compile_template()`: gera e cacheia model via `generate_props_model()`
+2. Em `render()`: antes de renderizar, chama `validate_props(model, context)`
+3. `PropValidationError` com mensagem clara (qual prop, tipo esperado)
+
+---
+
+## 35. Inline Render Mode
+
+`render_mode: Literal["include", "inline"] = "include"` em `PJXConfig`.
+
+### `inline_includes()`
+
+```python
+@staticmethod
+def inline_includes(
+    source: str,
+    compiled_templates: dict[str, str],
+    *,
+    max_depth: int = 50,
+) -> str:
+```
+
+Substitui recursivamente `{% include "X" %}` pelo source compilado de `X`.
+Produz um template flat sem dependências externas, ideal para
+`engine.render_string()` onde MiniJinja é 10-74x mais rápido.
+
+### Fluxo
+
+1. Compilar componente + imports → `_compiled_sources`
+2. `inline_includes(source, _compiled_sources)` → template flat
+3. `engine.render_string(flat, context)` — sem I/O de template
+
+---
+
+## 36. Compilation Caching & Performance
+
+### Mtime-based template cache
+
+`_compile_template()` stores each compiled template alongside its source
+file's `mtime`. On subsequent calls, if the file's mtime has not changed the
+cached `CompiledComponent` is returned without re-parsing or re-compiling.
+
+- Cold compile: ~33 ms
+- Cached hit: ~2.7 ms (12x speedup)
+
+### Diamond import deduplication
+
+The compilation pipeline maintains a `_seen: set[str]` of already-compiled
+template paths. In a diamond dependency graph (A->B->D, A->C->D), template D
+is compiled exactly once regardless of how many parents import it.
+
+### Lexer constant hoisting
+
+The `_SINGLE` and `_ESCAPES` lookup dicts in `lexer.py` are module-level
+constants. Previously they were rebuilt on every loop iteration inside the
+tokenizer.
+
+### O(1) tag recovery
+
+Tag-recovery regexes are compiled once per tag name and cached in a
+module-level dict. The regex search starts from the last matched position
+rather than re-scanning the entire source string from the beginning.
+
+---
+
+## 37. Static Analysis (`checker.py`)
+
+Verificações estáticas sem executar o servidor:
+
+### `check_imports(component, registry)`
+
+Verifica se todos os imports resolvem para arquivos existentes.
+
+### `check_props(component, registry)`
+
+Para cada `ComponentNode` no body, verifica se props obrigatórios
+(sem default) estão presentes nos attrs.
+
+### `check_slots(component, registry)`
+
+Verifica se slots passados a componentes filhos existem na declaração
+do filho. `default` é sempre válido.
+
+### `check_all(component, registry)`
+
+Executa todos os checks e retorna lista consolidada de `PJXError`.
+
+### `_walk_nodes(nodes)`
+
+Walker recursivo que percorre `children`, `body`, `cases`, `fallback`.
+
+---
+
+## 38. Non-Goals
 
 - **Não é um framework frontend JS** — Alpine.js lida com reatividade client
 - **Não compila para React/Vue/Solid** — o alvo é Jinja2 + HTMX
@@ -1290,7 +1463,7 @@ Found 3 errors in 2 files (checked 4 files)
 
 ---
 
-## 33. Referências
+## 39. Referências
 
 - [HTMX](https://htmx.org/docs/)
 - [Alpine.js](https://alpinejs.dev/)
