@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import builtins
+import ast
 from typing import Any
 
 from pydantic import BaseModel, Field, create_model
@@ -25,6 +25,96 @@ _BUILTIN_TYPES: dict[str, type] = {
 }
 
 
+def _resolve_type(expr: str, namespace: dict[str, Any]) -> Any:
+    """Safely resolve a type expression without eval().
+
+    Supports simple names (``str``), generic subscripts (``list[str]``),
+    union syntax (``str | None``), and nested combinations.
+
+    Args:
+        expr: Type expression string from the DSL.
+        namespace: Allowed type names to resolve against.
+
+    Returns:
+        The resolved Python type.
+
+    Raises:
+        PropValidationError: If the expression uses unsupported syntax.
+    """
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError as exc:
+        raise PropValidationError(f"invalid type expression: {expr!r}") from exc
+
+    return _eval_type_node(tree.body, namespace, expr)
+
+
+def _eval_type_node(node: ast.expr, namespace: dict[str, Any], expr: str) -> Any:
+    """Recursively resolve an AST node to a Python type."""
+    if isinstance(node, ast.Name):
+        if node.id not in namespace:
+            raise PropValidationError(
+                f"unknown type {node.id!r} in expression: {expr!r}"
+            )
+        return namespace[node.id]
+
+    if isinstance(node, ast.Subscript):
+        # e.g. list[str], dict[str, int]
+        origin = _eval_type_node(node.slice, namespace, expr)
+        base = _eval_type_node(node.value, namespace, expr)
+        return base[origin]
+
+    if isinstance(node, ast.Tuple):
+        # e.g. dict[str, int] — the slice is a Tuple
+        return tuple(_eval_type_node(elt, namespace, expr) for elt in node.elts)
+
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.BitOr):
+        # e.g. str | None (PEP 604 union)
+        left = _eval_type_node(node.left, namespace, expr)
+        right = _eval_type_node(node.right, namespace, expr)
+        return left | right
+
+    if isinstance(node, ast.Constant) and node.value is None:
+        return type(None)
+
+    raise PropValidationError(f"unsupported syntax in type expression: {expr!r}")
+
+
+# DSL uses JavaScript-style booleans; map to Python before literal_eval
+_DSL_CONSTANTS: dict[str, str] = {
+    "true": "True",
+    "false": "False",
+    "null": "None",
+}
+
+
+def _safe_eval_default(expr: str) -> Any:
+    """Safely evaluate a default value expression using ast.literal_eval.
+
+    Only allows Python literals: strings, numbers, bools, None, lists, dicts,
+    tuples, sets. Also accepts DSL-style ``true``/``false``/``null``.
+    No function calls, attribute access, or arbitrary code.
+
+    Args:
+        expr: Default value expression from the DSL.
+
+    Returns:
+        The evaluated Python literal value.
+
+    Raises:
+        PropValidationError: If the expression is not a safe literal.
+    """
+    # Normalize DSL constants (true → True, false → False, null → None)
+    normalized = _DSL_CONSTANTS.get(expr, expr)
+    try:
+        return ast.literal_eval(normalized)
+    except (ValueError, SyntaxError) as exc:
+        raise PropValidationError(
+            f"unsafe default value expression: {expr!r} — "
+            f"only literals (strings, numbers, bools, None, lists, dicts) are allowed"
+        ) from exc
+
+
 def generate_props_model(
     decl: PropsDecl,
     extra_types: dict[str, Any] | None = None,
@@ -42,24 +132,13 @@ def generate_props_model(
     if extra_types:
         namespace.update(extra_types)
 
-    # Also make builtins available for eval
-    namespace["__builtins__"] = builtins.__dict__
-
     field_definitions: dict[str, Any] = {}
 
     for field in decl.fields:
-        try:
-            field_type = eval(field.type_expr, namespace)  # noqa: S307
-        except Exception as exc:
-            raise PropValidationError(
-                f"invalid type expression: {field.type_expr!r}"
-            ) from exc
+        field_type = _resolve_type(field.type_expr, namespace)
 
         if field.default is not None:
-            try:
-                default_value = eval(field.default, namespace)  # noqa: S307
-            except Exception:
-                default_value = field.default
+            default_value = _safe_eval_default(field.default)
 
             # Use Field(default_factory=...) for mutable defaults
             if isinstance(default_value, (list, dict, set)):

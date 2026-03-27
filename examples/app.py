@@ -27,6 +27,8 @@ import asyncio
 from datetime import datetime, timezone
 from pathlib import Path
 
+import logging
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from pydantic import BaseModel
@@ -34,13 +36,43 @@ from sse_starlette.sse import EventSourceResponse
 
 from pjx import PJX, SEO, PJXConfig
 
+logger = logging.getLogger("pjx.examples")
+
 app = FastAPI()
 
 
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception) -> HTMLResponse:
+    """Return a safe error page without leaking internal details."""
+    logger.exception("unhandled error on %s", request.url.path)
+    return HTMLResponse(
+        "<h1>500 — Internal Server Error</h1><p>Something went wrong.</p>",
+        status_code=500,
+    )
+
+
 @app.middleware("http")
-async def no_cache_static(request: Request, call_next):  # noqa: ANN001
-    """Disable browser cache for static files in dev mode."""
+async def security_headers(request: Request, call_next):  # noqa: ANN001
+    """Add security headers and disable static file caching in dev mode."""
     response = await call_next(request)
+    # Prevent MIME-type sniffing
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    # Prevent clickjacking
+    response.headers["X-Frame-Options"] = "DENY"
+    # XSS protection (legacy browsers)
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    # Referrer policy
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # Content Security Policy
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "font-src 'self'"
+    )
+    # Dev mode: no-cache for static files
     if request.url.path.startswith("/static/"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -231,7 +263,7 @@ async def protected(request: Request) -> dict[str, object]:
 async def auth_login(request: Request) -> Response:
     """Handle login form — set session cookie and redirect."""
     form = await request.form()
-    username = str(form.get("username", "")).strip()
+    username = str(form.get("username", "")).strip()[:100]
     is_htmx = request.headers.get("HX-Request") == "true"
     if not username:
         return HTMLResponse(
@@ -246,7 +278,13 @@ async def auth_login(request: Request) -> Response:
         response = HTMLResponse("", headers={"HX-Redirect": "/protected"})
     else:
         response = RedirectResponse("/protected", status_code=303)
-    response.set_cookie("session", username, max_age=3600)
+    response.set_cookie(
+        "session",
+        username,
+        max_age=3600,
+        httponly=True,
+        samesite="lax",
+    )
     return response
 
 
@@ -258,7 +296,7 @@ async def auth_logout(request: Request) -> Response:
         response = HTMLResponse("", headers={"HX-Redirect": "/login"})
     else:
         response = RedirectResponse("/login", status_code=303)
-    response.delete_cookie("session")
+    response.delete_cookie("session", httponly=True, samesite="lax")
     return response
 
 
@@ -306,8 +344,8 @@ async def htmx_counter_reset() -> HTMLResponse:
 async def htmx_add_todo(request: Request) -> HTMLResponse:
     """Add a new todo from form data."""
     form = await request.form()
-    text = str(form.get("text", "")).strip()
-    status = str(form.get("status", "all"))
+    text = str(form.get("text", "")).strip()[:500]
+    status = str(form.get("status", "all"))[:20]
     if text:
         todos_db.append({"text": text, "done": False})
     return HTMLResponse(_todo_list_html(status))
@@ -319,7 +357,7 @@ async def htmx_toggle_todo(idx: int, request: Request) -> HTMLResponse:
     if 0 <= idx < len(todos_db):
         todos_db[idx]["done"] = not todos_db[idx]["done"]
     form = await request.form()
-    status = str(form.get("status", "all"))
+    status = str(form.get("status", "all"))[:20]
     return HTMLResponse(_todo_list_html(status))
 
 
@@ -335,7 +373,7 @@ async def htmx_delete_todo(idx: int, request: Request) -> HTMLResponse:
     if 0 <= idx < len(todos_db):
         todos_db.pop(idx)
     form = await request.form()
-    status = str(form.get("status", "all"))
+    status = str(form.get("status", "all"))[:20]
     return HTMLResponse(_todo_list_html(status))
 
 
@@ -343,8 +381,8 @@ async def htmx_delete_todo(idx: int, request: Request) -> HTMLResponse:
 async def htmx_edit_todo(idx: int, request: Request) -> HTMLResponse:
     """Edit a todo's text from form data."""
     form = await request.form()
-    text = str(form.get("text", "")).strip()
-    status = str(form.get("status", "all"))
+    text = str(form.get("text", "")).strip()[:500]
+    status = str(form.get("status", "all"))[:20]
     if 0 <= idx < len(todos_db) and text:
         todos_db[idx]["text"] = text
     return HTMLResponse(_todo_list_html(status))
@@ -353,7 +391,7 @@ async def htmx_edit_todo(idx: int, request: Request) -> HTMLResponse:
 @app.get("/htmx/search")
 async def htmx_search(query: str = "") -> HTMLResponse:
     """Search users — returns HTML fragment."""
-    return HTMLResponse(_search_html(query))
+    return HTMLResponse(_search_html(query[:200]))
 
 
 @app.post("/htmx/message/{user_id}")

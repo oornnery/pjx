@@ -53,11 +53,18 @@ class Jinja2Engine:
         return name in self._templates
 
 
+def _minijinja_auto_escape(name: str) -> str:
+    """Auto-escape callback for MiniJinja — escape HTML by default."""
+    if name.endswith((".txt", ".text", ".md")):
+        return "none"
+    return "html"
+
+
 class MiniJinjaEngine:
     """Wrapper over ``minijinja.Environment``."""
 
     def __init__(self) -> None:
-        self._env = minijinja.Environment()
+        self._env = minijinja.Environment(auto_escape_callback=_minijinja_auto_escape)
         self._templates: dict[str, str] = {}
 
     def render(self, template_name: str, context: dict[str, Any]) -> str:

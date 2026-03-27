@@ -528,7 +528,7 @@ class _BodyParser(HTMLParser):
     since ``HTMLParser`` lowercases everything by default.
     """
 
-    CDATA_CONTENT_ELEMENTS = ()  # type: ignore[assignment]
+    CDATA_CONTENT_ELEMENTS = ()  # ty: ignore[override-of-final-variable]
 
     def __init__(self, known_components: set[str]) -> None:
         from pjx.layout import LAYOUT_COMPONENTS

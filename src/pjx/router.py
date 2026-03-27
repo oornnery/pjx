@@ -205,7 +205,26 @@ class FileRouter:
         template = entry.template
         methods = list(entry.methods)
 
+        # Discover middleware from template frontmatter
+        tpl_middleware: list[str] = list(entry.middleware)
+        if not tpl_middleware:
+            try:
+                from pjx.parser import parse_file as _parse
+
+                tpl_path = pjx._find_template(template)
+                component = _parse(tpl_path)
+                for mw_decl in component.middleware:
+                    tpl_middleware.extend(mw_decl.names)
+            except FileNotFoundError:
+                pass
+
         async def page_wrapper(request: Request, **path_params: Any) -> HTMLResponse:
+            # Enforce middleware from template frontmatter
+            for mw_name in tpl_middleware:
+                mw_func = pjx._middleware_registry.get(mw_name)
+                if mw_func is not None:
+                    await mw_func(request)
+
             context: dict[str, Any] = dict(path_params)
             context["request"] = request
             if handler_fn is not None:

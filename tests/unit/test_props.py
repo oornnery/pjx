@@ -4,7 +4,13 @@ import pytest
 
 from pjx.ast_nodes import PropField, PropsDecl
 from pjx.errors import PropValidationError
-from pjx.props import generate_props_model, separate_attrs, validate_props
+from pjx.props import (
+    _resolve_type,
+    _safe_eval_default,
+    generate_props_model,
+    separate_attrs,
+    validate_props,
+)
 
 
 class TestGeneratePropsModel:
@@ -78,8 +84,86 @@ class TestValidateProps:
 class TestInvalidTypeExpr:
     def test_bad_type_expr(self) -> None:
         decl = PropsDecl(name="P", fields=(PropField("x", "InvalidType123"),))
-        with pytest.raises(PropValidationError, match="invalid type"):
+        with pytest.raises(PropValidationError, match="unknown type"):
             generate_props_model(decl)
+
+
+class TestSafeTypeResolution:
+    """Verify _resolve_type blocks unsafe patterns and resolves safe ones."""
+
+    def test_simple_type(self) -> None:
+        from typing import Any
+
+        ns = {"str": str, "int": int, "Any": Any}
+        assert _resolve_type("str", ns) is str
+
+    def test_generic_subscript(self) -> None:
+        ns = {"list": list, "str": str}
+        assert _resolve_type("list[str]", ns) == list[str]
+
+    def test_union_type(self) -> None:
+        ns = {"str": str, "None": type(None)}
+        result = _resolve_type("str | None", ns)
+        assert result == str | None
+
+    def test_rejects_unknown_type(self) -> None:
+        with pytest.raises(PropValidationError, match="unknown type"):
+            _resolve_type("Foo", {"str": str})
+
+    def test_rejects_dotted_access(self) -> None:
+        with pytest.raises(PropValidationError, match="unsupported syntax"):
+            _resolve_type("os.system", {"str": str})
+
+    def test_rejects_function_call(self) -> None:
+        with pytest.raises(PropValidationError, match="unsupported syntax"):
+            _resolve_type("__import__('os')", {"str": str})
+
+    def test_rejects_attribute_access(self) -> None:
+        with pytest.raises(PropValidationError, match="unsupported syntax"):
+            _resolve_type("os.path", {"os": __import__("os")})
+
+
+class TestSafeEvalDefault:
+    """Verify _safe_eval_default blocks code execution."""
+
+    def test_string_literal(self) -> None:
+        assert _safe_eval_default('"hello"') == "hello"
+
+    def test_int_literal(self) -> None:
+        assert _safe_eval_default("42") == 42
+
+    def test_bool_literal(self) -> None:
+        assert _safe_eval_default("True") is True
+
+    def test_dsl_true(self) -> None:
+        assert _safe_eval_default("true") is True
+
+    def test_dsl_false(self) -> None:
+        assert _safe_eval_default("false") is False
+
+    def test_dsl_null(self) -> None:
+        assert _safe_eval_default("null") is None
+
+    def test_none_literal(self) -> None:
+        assert _safe_eval_default("None") is None
+
+    def test_list_literal(self) -> None:
+        assert _safe_eval_default("[]") == []
+
+    def test_dict_literal(self) -> None:
+        assert _safe_eval_default("{}") == {}
+
+    def test_rejects_function_call(self) -> None:
+        with pytest.raises(PropValidationError, match="unsafe default"):
+            _safe_eval_default("__import__('os').system('rm -rf /')")
+
+    def test_rejects_lambda(self) -> None:
+        with pytest.raises(PropValidationError, match="unsafe default"):
+            _safe_eval_default("lambda: None")
+
+    def test_rejects_exec(self) -> None:
+        with pytest.raises(PropValidationError, match="unsafe default"):
+            _safe_eval_default("exec('import os')")
 
 
 class TestSeparateAttrs:

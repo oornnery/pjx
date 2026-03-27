@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Annotated, Any, Callable, get_args, get_origin
+from typing import Annotated, Any, get_args, get_origin
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
@@ -22,6 +23,7 @@ from pjx.registry import ComponentRegistry
 from pjx.router import FileRouter
 
 _INCLUDE_RE = re.compile(r'\{%[-\s]*include\s+"([^"]+)"')
+_UNSET: object = object()  # sentinel for "use PJX default layout"
 
 
 class FormData:
@@ -145,7 +147,7 @@ class PJX:
         *,
         title: str | None = None,
         seo: SEO | None = None,
-        layout: str | None = ...,  # type: ignore[assignment]
+        layout: str | None | object = _UNSET,
         methods: list[str] | None = None,
         **route_kwargs: Any,
     ) -> Callable:
@@ -163,18 +165,21 @@ class PJX:
                 Add ``"POST"`` to handle form submissions.
             **route_kwargs: Additional kwargs for FastAPI route.
         """
-        page_layout = self.layout if layout is ... else layout
+        page_layout: str | None = self.layout if layout is _UNSET else layout  # ty: ignore[invalid-assignment]
         page_methods = methods or ["GET"]
 
         # Build per-page SEO from decorator args
         if seo and title:
-            seo = SEO(**{**seo.__dict__, "title": title})
+            from dataclasses import replace
+
+            seo = replace(seo, title=title)
         elif title:
             seo = SEO(title=title)
         page_seo = seo
 
-        def decorator(func: Callable) -> Callable:
-            tpl = template or f"{func.__name__}.jinja"
+        def decorator[F: Callable[..., Any]](func: F) -> F:
+            func_name = getattr(func, "__name__", "unknown")
+            tpl = template or f"{func_name}.jinja"
 
             # Discover middleware from template frontmatter
             tpl_middleware: list[str] = []
@@ -203,17 +208,17 @@ class PJX:
                 html = self.render(tpl, context, layout=page_layout)
                 return HTMLResponse(html)
 
-            wrapper.__name__ = func.__name__
-            wrapper.__doc__ = func.__doc__
+            wrapper.__name__ = func_name
+            wrapper.__doc__ = getattr(func, "__doc__", None)
             self.app.add_api_route(path, wrapper, methods=page_methods, **route_kwargs)
-            return wrapper
+            return wrapper  # ty: ignore[invalid-return-type]
 
         return decorator
 
-    def component(self, template: str) -> Callable:
+    def component(self, template: str) -> Callable[..., Any]:
         """Decorator to register a component partial route."""
 
-        def decorator(func: Callable) -> Callable:
+        def decorator[F: Callable[..., Any]](func: F) -> F:
             async def wrapper(request: Request) -> HTMLResponse:
                 context = await _call_handler(func, request)
                 if not isinstance(context, dict):
@@ -222,9 +227,9 @@ class PJX:
                 html = self.render(template, context)
                 return HTMLResponse(html)
 
-            wrapper.__name__ = func.__name__
-            wrapper.__doc__ = func.__doc__
-            return wrapper
+            wrapper.__name__ = getattr(func, "__name__", "unknown")
+            wrapper.__doc__ = getattr(func, "__doc__", None)
+            return wrapper  # ty: ignore[invalid-return-type]
 
         return decorator
 
@@ -435,12 +440,9 @@ class PJX:
         asset_collector: Any | None,
     ) -> None:
         """Re-collect CSS/assets from a previously compiled template."""
-        if (
-            css_parts is not None
-            and template in self._cached_css
-            and self._cached_css[template]
-        ):
-            css_parts.append(self._cached_css[template])
+        cached_css = self._cached_css.get(template)
+        if css_parts is not None and cached_css:
+            css_parts.append(cached_css)
         if asset_collector is not None and template in self._cached_assets:
             for asset in self._cached_assets[template]:
                 asset_collector.add(asset)
@@ -543,9 +545,17 @@ class PJX:
                 pass
 
     def _find_template(self, template: str) -> Path:
-        """Find a template file in the configured template directories."""
+        """Find a template file in the configured template directories.
+
+        Validates that the resolved path stays within the template directory
+        to prevent path traversal attacks (e.g. ``../../etc/passwd``).
+        """
         for tpl_dir in [*self.config.template_dirs, UI_DIR.parent]:
-            candidate = Path(tpl_dir) / template
+            tpl_root = Path(tpl_dir).resolve()
+            candidate = (Path(tpl_dir) / template).resolve()
+            # Ensure resolved path is within the template directory
+            if not str(candidate).startswith(str(tpl_root)):
+                continue
             if candidate.exists():
                 return candidate
         msg = f"template not found: {template!r}"

@@ -16,9 +16,11 @@ LAYOUT_PREFIX: str = "ui/layouts"
 _LAYOUTS_DIR: Path = UI_DIR / "layouts"
 
 #: Component names auto-discovered from ``ui/layouts/*.jinja``.
-LAYOUT_COMPONENTS: frozenset[str] = frozenset(
-    p.stem for p in _LAYOUTS_DIR.glob("*.jinja")
-) if _LAYOUTS_DIR.is_dir() else frozenset()
+LAYOUT_COMPONENTS: frozenset[str] = (
+    frozenset(p.stem for p in _LAYOUTS_DIR.glob("*.jinja"))
+    if _LAYOUTS_DIR.is_dir()
+    else frozenset()
+)
 
 #: Cache for parsed props — populated lazily by ``get_layout_props()``.
 _props_cache: dict[str, tuple[str, ...]] = {}
