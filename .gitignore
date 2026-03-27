@@ -12,3 +12,7 @@ wheels/
 .env
 .ruff_cache/
 .rumdl_cache/
+.benchmarks
+
+node_modules/
+**/static/vendor/

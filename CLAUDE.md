@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 PJX is a Python DSL for reactive `.jinja` components, inspired by JSX, Svelte
 and SolidJS. It compiles a declarative component syntax (props, state, slots,
 imports, control flow) down to Jinja2 + HTMX + Alpine.js. The full DSL
-specification lives in `docs/IDEA.md`, technical spec in `docs/SPEC.md`.
+specification lives in `docs/dev/IDEA.md`, technical spec in `docs/dev/SPEC.md`.
 
 ## Stack
 
@@ -23,22 +23,28 @@ specification lives in `docs/IDEA.md`, technical spec in `docs/SPEC.md`.
 
 ```bash
 rtk uv sync                          # Install deps from lockfile
-rtk uv run ruff format .             # Format
-rtk uv run ruff check . --fix        # Lint
-rtk uv run ty check                  # Type check
-rtk uv run pytest -v                 # Test all
+rtk uv run task format               # Format (ruff)
+rtk uv run task lint                 # Lint + autofix (ruff)
+rtk uv run task check                # Format + lint + markdown lint
+rtk uv run task typecheck            # Type check (ty)
+rtk uv run task test                 # Run all tests
+rtk uv run task cov                  # Tests with coverage report
+rtk uv run task ci                   # Full CI: check + typecheck + test
 rtk uv run pytest tests/test_foo.py::test_bar -v  # Single test
-rtk uv run rumdl check .             # Markdown lint
 ```
 
 ## Validation (run in order, fail fast)
 
 ```bash
-rtk uv run ruff format --check .
-rtk uv run ruff check .
-rtk uv run rumdl check .
-rtk uv run ty check
-rtk uv run pytest -v
+rtk uv run task ci
+```
+
+Or manually:
+
+```bash
+rtk uv run task check
+rtk uv run task typecheck
+rtk uv run task test
 ```
 
 ## Skills
@@ -97,4 +103,4 @@ Each skill has a `references/` folder with detailed submodules. Load on demand.
 - Keep `README.md` up to date when installation, usage, or architecture changes
 - Add usage examples in `examples/` for each public feature — short
   self-contained scripts that demonstrate real API usage
-- Update `docs/IDEA.md` if the implementation diverges from the spec
+- Update `docs/dev/IDEA.md` if the implementation diverges from the spec
