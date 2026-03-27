@@ -1,71 +1,71 @@
-# PJX — Especificação Técnica
+# PJX — Technical Specification
 
-> DSL Python que compila componentes `.jinja` reativos para
+> Python DSL that compiles reactive `.jinja` components to
 > Jinja2 + HTMX + Alpine.js + SSE.
 
-## 1. Visão Geral
+## 1. Overview
 
-PJX é um compilador e runtime que transforma uma sintaxe de componentes
-inspirada em JSX/SolidJS/Svelte em templates Jinja2 padrão, enriquecidos com
-HTMX (interação server-side) e Alpine.js (reatividade client-side).
+PJX is a compiler and runtime that transforms a component syntax inspired by
+JSX/SolidJS/Svelte into standard Jinja2 templates, enriched with HTMX
+(server-side interaction) and Alpine.js (client-side reactivity).
 
 ### Stack
 
-| Camada             | Tecnologia                                      |
-| ------------------ | ----------------------------------------------- |
-| Linguagem          | Python 3.14+                                    |
-| Template engine    | HybridEngine (padrão), Jinja2, MiniJinja        |
-| Server framework   | FastAPI + Uvicorn                               |
-| Reatividade client | Alpine.js                                       |
-| Interação server   | HTMX                                            |
-| Realtime           | SSE / WebSocket (via HTMX extensions)           |
-| CSS                | Scoped por componente + Tailwind CSS (opcional) |
-| Validação          | Pydantic                                        |
-| CLI                | Typer + Rich                                    |
-| Frontend tooling   | npm (Alpine, HTMX, Tailwind → vendor/)          |
+| Layer              | Technology                                     |
+| ------------------ | ---------------------------------------------- |
+| Language           | Python 3.14+                                   |
+| Template engine    | HybridEngine (default), Jinja2, MiniJinja      |
+| Server framework   | FastAPI + Uvicorn                              |
+| Client reactivity  | Alpine.js                                      |
+| Server interaction | HTMX                                           |
+| Realtime           | SSE / WebSocket (via HTMX extensions)          |
+| CSS                | Scoped per component + Tailwind CSS (optional) |
+| Validation         | Pydantic                                       |
+| CLI                | Typer + Rich                                   |
+| Frontend tooling   | npm (Alpine, HTMX, Tailwind → vendor/)         |
 
-### Público-alvo
+### Target Audience
 
-Desenvolvedores Python que querem construir UIs reativas server-rendered sem
-escrever JavaScript, mantendo a produtividade de um framework de componentes
-moderno.
+Python developers who want to build reactive server-rendered UIs without
+writing JavaScript, while maintaining the productivity of a modern component
+framework.
 
 ---
 
-## 2. Anatomia de um Componente
+## 2. Anatomy of a Component
 
-Todo componente é um arquivo `.jinja` com até três blocos:
+Every component is a `.jinja` file with up to three blocks:
 
 ```text
 ┌──────────────────────────────────┐
-│ ---                              │  ← Frontmatter (DSL declarativa)
+│ ---                              │  ← Frontmatter (declarative DSL)
 │   extends, from, import,         │
 │   props, slot, store,            │
 │   let, const, state, computed    │
 │ ---                              │
 ├──────────────────────────────────┤
-│ <style scoped>                   │  ← CSS com escopo automático (opcional)
+│ <style scoped>                   │  ← CSS with automatic scoping (optional)
 │   .card { ... }                  │
 │ </style>                         │
 ├──────────────────────────────────┤
-│ <div reactive>                   │  ← HTML body com DSL de atributos
+│ <div reactive>                   │  ← HTML body with attribute DSL
 │   <Show when="x">...</Show>     │
 │   <Button ...spread_props />    │
 │ </div>                           │
 └──────────────────────────────────┘
 ```
 
-- O frontmatter (`---`) é **obrigatório** se o componente tem props, state
-  ou imports. Pode ser omitido em componentes puramente estáticos.
-- O bloco `<style scoped>` é **opcional**.
-- O **body HTML** é obrigatório.
+- The frontmatter (`---`) is **required** if the component has props, state
+  or imports. It can be omitted in purely static components.
+- The `<style scoped>` block is **optional**.
+- The **HTML body** is required.
 
 ---
 
-## 3. Gramática do Frontmatter
+## 3. Frontmatter Grammar
 
-O frontmatter (`---`) aceita 12 tipos de declaração. Cada linha começa com
-uma keyword, tornando a gramática LL(1).
+The frontmatter (`---`) accepts 12 types of declaration. Each line starts with
+a keyword, making the grammar LL(1).
 
 ### 3.1 EBNF
 
@@ -105,22 +105,22 @@ js_stmt       = "js" STRING ;
 
 middleware_stmt = "middleware" STRING { "," STRING } ;
 
-(* Body: spread syntax em componentes *)
+(* Body: spread syntax in components *)
 component_use = "<" IDENT { attr | spread } [ "/" ] ">" ;
 spread        = "..." IDENT ;
 ```
 
-### 3.2 Tipos suportados em props
+### 3.2 Supported types in props
 
-A DSL aceita tipos Pydantic nativos diretamente:
+The DSL accepts native Pydantic types directly:
 
-| Tipo DSL                      | Pydantic model           |
+| DSL Type                      | Pydantic model           |
 | ----------------------------- | ------------------------ |
-| `str`, `int`, `bool`, `float` | Tipos nativos            |
+| `str`, `int`, `bool`, `float` | Native types             |
 | `str \| None`                 | `str \| None` (Optional) |
-| `list[str]`, `dict[str, Any]` | Genéricos                |
-| `Literal["a", "b"]`           | Enum inline              |
-| `EmailStr`, `HttpUrl`         | Tipos Pydantic           |
+| `list[str]`, `dict[str, Any]` | Generics                 |
+| `Literal["a", "b"]`           | Inline enum              |
+| `EmailStr`, `HttpUrl`         | Pydantic types           |
 | `Annotated[int, Gt(0)]`       | Constraints              |
 | `Callable`                    | `Callable \| None`       |
 
@@ -128,28 +128,27 @@ A DSL aceita tipos Pydantic nativos diretamente:
 
 ## 4. Imports
 
-### Importar componentes
+### Importing components
 
 ```python
-# Default — nome = nome do arquivo
+# Default — name = file name
 import Button from "./Button.jinja"
 
 # Alias
 import Button from "./Button.jinja" as PrimaryButton
 
-# Named — múltiplos de um arquivo ou diretório
+# Named — multiple from a file or directory
 import { CardHeader, CardBody } from "./Card.jinja"
 import { Card, Badge, Avatar } from "./components/"
 
-# Wildcard — todos do diretório
+# Wildcard — all from directory
 import * from "./ui/"
 ```
 
-### Importar tipos Python/Pydantic
+### Importing Python/Pydantic types
 
-Tipos primitivos (`str`, `int`, `bool`, `float`, `list`, `dict`, `Callable`,
-`Any`, `None`) são auto-importados. Tipos Pydantic precisam de import
-explícito:
+Primitive types (`str`, `int`, `bool`, `float`, `list`, `dict`, `Callable`,
+`Any`, `None`) are auto-imported. Pydantic types require explicit import:
 
 ```python
 from typing import Literal, Annotated
@@ -157,32 +156,32 @@ from pydantic import EmailStr, HttpUrl
 from annotated_types import Gt, Lt, Ge, Le, MinLen, MaxLen
 ```
 
-### Extends (herança de layout)
+### Extends (layout inheritance)
 
 ```python
 extends "layouts/Base.jinja"
 ```
 
-Indica que a página herda de um layout. O corpo é injetado no
-`<Slot:content />` do layout. Veja seção 25 (Layouts).
+Indicates that the page inherits from a layout. The body is injected into
+the layout's `<Slot:content />`. See section 25 (Layouts).
 
-### Resolução de caminhos
+### Path resolution
 
-| Padrão                    | Resolução                                      |
-| ------------------------- | ---------------------------------------------- |
-| `"./Button.jinja"`        | Relativo ao arquivo que importa                |
-| `"../shared/Modal.jinja"` | Subida de diretório relativa                   |
-| `"./components/"`         | Diretório: busca `{Name}.jinja` para cada nome |
-| `"./ui/"` com wildcard    | Glob `*.jinja` no diretório                    |
+| Pattern                   | Resolution                                        |
+| ------------------------- | ------------------------------------------------- |
+| `"./Button.jinja"`        | Relative to the importing file                    |
+| `"../shared/Modal.jinja"` | Relative upward directory traversal               |
+| `"./components/"`         | Directory: looks for `{Name}.jinja` for each name |
+| `"./ui/"` with wildcard   | Glob `*.jinja` in the directory                   |
 
-### Compilação e composição
+### Compilation and composition
 
-O compilador registra cada import no `ComponentRegistry`. Ao encontrar
-`<Button />` no body, resolve para `{% include %}` com contexto via
+The compiler registers each import in the `ComponentRegistry`. When it finds
+`<Button />` in the body, it resolves to `{% include %}` with context via
 `{% with %}`:
 
 ```jinja2
-{# <Button label="Salvar" variant="primary" /> compila para: #}
+{# <Button label="Salvar" variant="primary" /> compiles to: #}
 {% with _props_label="Salvar", _props_variant="primary" %}
 {% include "components/Button.jinja" %}
 {% endwith %}
@@ -192,31 +191,31 @@ O compilador registra cada import no `ComponentRegistry`. Ao encontrar
 {% include "components/Card.jinja" %}
 {% endwith %}
 
-{# <Button ...btn_props label="Override" /> compila para: #}
+{# <Button ...btn_props label="Override" /> compiles to: #}
 {% with _spread=btn_props, _props_label="Override" %}
 {% include "components/Button.jinja" %}
 {% endwith %}
 ```
 
-Props explícitos sempre sobrescrevem valores do spread.
+Explicit props always override spread values.
 
 ---
 
 ## 5. Props
 
-Declaração tipada usando tipos Pydantic nativos.
+Typed declaration using native Pydantic types.
 
 ```python
 props {
   name:     str,                                        # required
   age:      int                        = 0,             # optional
   role:     Literal["admin", "mod", "user"] = "user",   # choices via Literal
-  email:    EmailStr,                                    # tipo Pydantic
+  email:    EmailStr,                                    # Pydantic type
   bio:      str | None                 = None,           # nullable
   tags:     list[str]                  = [],             # list factory
   meta:     dict[str, Any]            = {},              # dict factory
   score:    Annotated[int, Gt(0), Lt(100)] = 50,         # constraints
-  url:      HttpUrl | None             = None,           # URL validada
+  url:      HttpUrl | None             = None,           # validated URL
   on_click: Callable                   = None,           # callback
 }
 
@@ -224,27 +223,27 @@ props {
 # props UserCardProps = { name: str, age: int = 0 }
 ```
 
-### Tipos suportados
+### Supported types
 
-| Tipo DSL                      | Pydantic         |
+| DSL Type                      | Pydantic         |
 | ----------------------------- | ---------------- |
-| `str`, `int`, `bool`, `float` | Tipos nativos    |
+| `str`, `int`, `bool`, `float` | Native types     |
 | `str \| None`                 | Union / Optional |
-| `list[str]`, `dict[str, Any]` | Genéricos        |
-| `Literal["a", "b"]`           | Enum inline      |
-| `EmailStr`, `HttpUrl`         | Tipos Pydantic   |
+| `list[str]`, `dict[str, Any]` | Generics         |
+| `Literal["a", "b"]`           | Inline enum      |
+| `EmailStr`, `HttpUrl`         | Pydantic types   |
 | `Annotated[int, Gt(0)]`       | Constraints      |
 | `Callable`                    | Callbacks        |
 
-### Acesso no template
+### Access in the template
 
 ```html
 <span>{{ props.name }}</span>
 ```
 
-### Compilação interna
+### Internal compilation
 
-Cada `PropsDecl` gera um `pydantic.BaseModel` dinâmico via
+Each `PropsDecl` generates a dynamic `pydantic.BaseModel` via
 `pydantic.create_model()`:
 
 ```python
@@ -261,21 +260,21 @@ class UserCardProps(BaseModel):
     on_click: Callable | None = None
 ```
 
-A validação ocorre no momento do render: o contexto passado pela rota FastAPI
-é validado contra o model antes de chegar ao template engine.
+Validation occurs at render time: the context passed by the FastAPI route
+is validated against the model before reaching the template engine.
 
 ---
 
-## 6. Variáveis
+## 6. Variables
 
-| Keyword    | Escopo             | Mutável  | Compilação           |
+| Keyword    | Scope              | Mutable  | Compilation          |
 | ---------- | ------------------ | -------- | -------------------- |
-| `let`      | Server (Jinja2)    | Sim      | `{% set x = expr %}` |
-| `const`    | Server (Jinja2)    | Não      | `{% set X = expr %}` |
-| `state`    | Client (Alpine.js) | Sim      | Incluído no `x-data` |
-| `computed` | Server (Jinja2)    | Derivada | `{% set x = expr %}` |
+| `let`      | Server (Jinja2)    | Yes      | `{% set x = expr %}` |
+| `const`    | Server (Jinja2)    | No       | `{% set X = expr %}` |
+| `state`    | Client (Alpine.js) | Yes      | Included in `x-data` |
+| `computed` | Server (Jinja2)    | Derived  | `{% set x = expr %}` |
 
-### Exemplos
+### Examples
 
 ```python
 let greeting = "Hello, " + props.name
@@ -286,16 +285,16 @@ computed total = len(props.items)
 computed progress = (done_count / total * 100) if total > 0 else 0
 ```
 
-### State e x-data
+### State and x-data
 
-Todas as declarações `state` são coletadas e emitidas como o objeto
-`x-data` do elemento marcado com `reactive`:
+All `state` declarations are collected and emitted as the `x-data` object
+of the element marked with `reactive`:
 
 ```html
 <!-- DSL -->
 <div reactive>
 
-<!-- Compilado -->
+<!-- Compiled -->
 <div x-data="{ count: 0, form: { name: '', email: '' } }">
 ```
 
@@ -303,53 +302,53 @@ Todas as declarações `state` são coletadas e emitidas como o objeto
 
 ## 7. Slots
 
-### Declaração
+### Declaration
 
 ```python
-slot header                                  # sem fallback
-slot footer = <span>© 2025 PJX</span>       # com fallback
+slot header                                  # no fallback
+slot footer = <span>© 2025 PJX</span>       # with fallback
 ```
 
-### Renderização no template
+### Rendering in the template
 
 ```html
 <!-- Self-closing -->
 <Slot:header />
 
-<!-- Com fallback inline -->
+<!-- With inline fallback -->
 <Slot:header>
-    <h2>Título padrão</h2>
+    <h2>Default title</h2>
 </Slot:header>
 
-<!-- Condicional -->
+<!-- Conditional -->
 <Show when="has_slot('header')">
     <header><Slot:header /></header>
 </Show>
 ```
 
-### Passagem ao usar componente
+### Passing when using a component
 
 ```html
 <Card title="Hello">
-    <p>Corpo (slot default)</p>
+    <p>Body (default slot)</p>
     <slot:header><h1>Custom</h1></slot:header>
-    <slot:footer><button>Fechar</button></slot:footer>
+    <slot:footer><button>Close</button></slot:footer>
 </Card>
 ```
 
-### Compilação
+### Compilation
 
 | DSL                               | Jinja2                                                             |
 | --------------------------------- | ------------------------------------------------------------------ |
 | `<Slot:name />`                   | `{{ _slot_name \| default('') }}`                                  |
 | `<Slot:name>fallback</Slot:name>` | `{% if _slot_name %}{{ _slot_name }}{% else %}fallback{% endif %}` |
-| `<slot:name>content</slot:name>`  | Passa `content` como variável `_slot_name` via `{% with %}`        |
+| `<slot:name>content</slot:name>`  | Passes `content` as variable `_slot_name` via `{% with %}`         |
 
 ---
 
 ## 8. Control Flow Tags
 
-### 8.1 `<Show>` — Condicional
+### 8.1 `<Show>` — Conditional
 
 ```html
 <Show when="user.is_admin">
@@ -358,7 +357,7 @@ slot footer = <span>© 2025 PJX</span>       # com fallback
 
 <Show when="items">
     <ul>...</ul>
-    <Else><p>Nenhum item.</p></Else>
+    <Else><p>No items.</p></Else>
 </Show>
 ```
 
@@ -367,13 +366,13 @@ slot footer = <span>© 2025 PJX</span>       # com fallback
 | `<Show when="x">body</Show>`                | `{% if x %}body{% endif %}`             |
 | `<Show when="x">body<Else>fb</Else></Show>` | `{% if x %}body{% else %}fb{% endif %}` |
 
-### 8.2 `<For>` — Iteração
+### 8.2 `<For>` — Iteration
 
 ```html
 <For each="users" as="user">
     <li>{{ user.name }}</li>
 <Empty>
-    <p>Nenhum resultado.</p>
+    <p>No results.</p>
 </Empty>
 </For>
 ```
@@ -383,7 +382,7 @@ slot footer = <span>© 2025 PJX</span>       # com fallback
 | `<For each="x" as="i">body</For>` | `{% for i in x %}body{% endfor %}` |
 | `<Empty>fallback</Empty>`         | `{% else %}fallback`               |
 
-Variáveis de loop herdadas do Jinja2: `loop.index`, `loop.index0`,
+Loop variables inherited from Jinja2: `loop.index`, `loop.index0`,
 `loop.first`, `loop.last`, `loop.length`, `loop.cycle()`.
 
 ### 8.3 `<Switch>` / `<Case>` / `<Default>`
@@ -399,8 +398,8 @@ Variáveis de loop herdadas do Jinja2: `loop.index`, `loop.index0`,
 | DSL                      | Jinja2                  |
 | ------------------------ | ----------------------- |
 | `<Switch on="x">`        | `{% set _sw = x %}`     |
-| `<Case value="v">` (1º)  | `{% if _sw == "v" %}`   |
-| `<Case value="v">` (2º+) | `{% elif _sw == "v" %}` |
+| `<Case value="v">` (1st) | `{% if _sw == "v" %}`   |
+| `<Case value="v">` (2nd+)| `{% elif _sw == "v" %}` |
 | `<Default>`              | `{% else %}`            |
 | `</Switch>`              | `{% endif %}`           |
 
@@ -408,7 +407,7 @@ Variáveis de loop herdadas do Jinja2: `loop.index`, `loop.index0`,
 
 ```html
 <Portal target="notifications">
-    <div class="toast">Item salvo!</div>
+    <div class="toast">Item saved!</div>
 </Portal>
 ```
 
@@ -420,19 +419,19 @@ Variáveis de loop herdadas do Jinja2: `loop.index`, `loop.index0`,
 ### 8.5 `<ErrorBoundary>`
 
 ```html
-<ErrorBoundary fallback="<p>Algo deu errado.</p>">
+<ErrorBoundary fallback="<p>Something went wrong.</p>">
     <UserProfile user="{{ user }}" />
 </ErrorBoundary>
 ```
 
-Compilação: wrapper `try/except` que renderiza fallback em caso de erro.
+Compilation: `try/except` wrapper that renders the fallback in case of error.
 
-### 8.6 `<Await>` — Carregamento Assíncrono
+### 8.6 `<Await>` — Asynchronous Loading
 
 ```html
 <Await src="/api/users" trigger="load">
-    <slot:loading><div class="skeleton">Carregando...</div></slot:loading>
-    <slot:error><p>Erro ao carregar.</p></slot:error>
+    <slot:loading><div class="skeleton">Loading...</div></slot:loading>
+    <slot:error><p>Error loading.</p></slot:error>
 </Await>
 ```
 
@@ -444,10 +443,10 @@ Compilação: wrapper `try/except` que renderiza fallback em caso de erro.
 
 ```html
 <Transition enter="fade-in 300ms" leave="fade-out 200ms">
-    <Show when="visible"><div>Conteúdo</div></Show>
+    <Show when="visible"><div>Content</div></Show>
 </Transition>
 
-<!-- Lista com transições -->
+<!-- List with transitions -->
 <TransitionGroup tag="ul" enter="slide-in" leave="slide-out" move="shuffle">
     <For each="items" as="item">
         <li key="{{ item.id }}">{{ item.name }}</li>
@@ -458,10 +457,10 @@ Compilação: wrapper `try/except` que renderiza fallback em caso de erro.
 | DSL                                             | HTML                                            |
 | ----------------------------------------------- | ----------------------------------------------- |
 | `<Transition enter="x" leave="y">`              | `x-transition:enter="x" x-transition:leave="y"` |
-| `<TransitionGroup tag="ul" enter="x" move="y">` | `<ul>` com transition classes por item          |
-| `key="{{ id }}"`                                | Identificador para diff de lista                |
+| `<TransitionGroup tag="ul" enter="x" move="y">` | `<ul>` with transition classes per item         |
+| `key="{{ id }}"`                                | Identifier for list diffing                     |
 
-### 8.8 `<Fragment>` — Sem wrapper DOM
+### 8.8 `<Fragment>` — No DOM wrapper
 
 ```html
 <Fragment>
@@ -470,32 +469,32 @@ Compilação: wrapper `try/except` que renderiza fallback em caso de erro.
 </Fragment>
 ```
 
-Compilação: renderiza apenas os filhos, sem elemento wrapper.
+Compilation: renders only the children, without a wrapper element.
 
 ### 8.9 `<Teleport>` — Client-side (Alpine)
 
 ```html
 <Teleport to="#modal-root">
-    <div class="modal">Conteúdo</div>
+    <div class="modal">Content</div>
 </Teleport>
 ```
 
-Diferente do Portal (server OOB): Teleport usa Alpine.js para mover
-elementos no DOM client-side.
+Unlike Portal (server OOB): Teleport uses Alpine.js to move
+elements in the client-side DOM.
 
-### 8.10 `<Component>` — Renderização Dinâmica
+### 8.10 `<Component>` — Dynamic Rendering
 
 ```html
 <Component is="{{ widget_type }}" data="{{ widget_data }}" />
 ```
 
-Resolve o componente por nome em runtime via registry.
+Resolves the component by name at runtime via registry.
 
 ---
 
-## 9. Atributos Reativos (Alpine.js)
+## 9. Reactive Attributes (Alpine.js)
 
-### 9.1 `reactive` — Inicializa x-data
+### 9.1 `reactive` — Initializes x-data
 
 | DSL                     | HTML                            |
 | ----------------------- | ------------------------------- |
@@ -538,9 +537,9 @@ Resolve o componente por nome em runtime via registry.
 
 ---
 
-## 10. HTMX — Interação Server
+## 10. HTMX — Server Interaction
 
-### 10.1 `action:` — Verbos HTTP
+### 10.1 `action:` — HTTP Verbs
 
 | DSL                    | HTML               |
 | ---------------------- | ------------------ |
@@ -626,14 +625,14 @@ HTMX SSE extension (`htmx-ext-sse@2`).
 
 ## 13. Loading States
 
-| DSL                        | Efeito                           |
+| DSL                        | Effect                           |
 | -------------------------- | -------------------------------- |
-| `loading`                  | Classe `htmx-indicator`          |
-| `loading:show`             | Visível durante request          |
-| `loading:hide`             | Escondido durante request        |
-| `loading:class="x"`        | Adiciona classes durante request |
-| `loading:disabled`         | `disabled` durante request       |
-| `loading:aria-busy="true"` | `aria-busy` durante request      |
+| `loading`                  | `htmx-indicator` class           |
+| `loading:show`             | Visible during request           |
+| `loading:hide`             | Hidden during request            |
+| `loading:class="x"`        | Adds classes during request      |
+| `loading:disabled`         | `disabled` during request        |
+| `loading:aria-busy="true"` | `aria-busy` during request       |
 
 ---
 
@@ -645,13 +644,13 @@ HTMX SSE extension (`htmx-ext-sse@2`).
            on:input="valid = $el.form.checkValidity()" />
     <button type="submit" bind:disabled="!valid"
             loading:class="opacity-50" disabled-elt="this">
-        <span loading:hide>Criar</span>
-        <span loading:show>Criando...</span>
+        <span loading:hide>Create</span>
+        <span loading:show>Creating...</span>
     </button>
 </form>
 ```
 
-Upload com `encoding="multipart/form-data"`.
+Upload with `encoding="multipart/form-data"`.
 
 ---
 
@@ -664,12 +663,12 @@ Upload com `encoding="multipart/form-data"`.
 </style>
 ```
 
-### Compilação
+### Compilation
 
-1. Gerar hash determinístico do path do componente: `sha256(path)[:7]`
-2. Prefixar cada seletor: `.alert` → `[data-pjx-a1b2c3] .alert`
-3. Adicionar `data-pjx-a1b2c3` ao root element do componente
-4. Coletar CSS de todos os componentes no build final
+1. Generate deterministic hash from the component path: `sha256(path)[:7]`
+2. Prefix each selector: `.alert` → `[data-pjx-a1b2c3] .alert`
+3. Add `data-pjx-a1b2c3` to the component's root element
+4. Collect CSS from all components in the final build
 
 ---
 
@@ -687,13 +686,13 @@ class EngineProtocol(Protocol):
 
 ### Engines
 
-| Engine                    | Quando usar                                                  |
+| Engine                    | When to use                                                  |
 | ------------------------- | ------------------------------------------------------------ |
-| **HybridEngine** (padrão) | Seleciona automaticamente o engine ideal por template        |
-| **Jinja2**                | Máxima compatibilidade, ecossistema maduro, 1.5x mais rápido |
-| **MiniJinja**             | Rust-based, melhor para free-threaded Python 3.14            |
+| **HybridEngine** (default)| Automatically selects the optimal engine per template        |
+| **Jinja2**                | Maximum compatibility, mature ecosystem, 1.5x faster         |
+| **MiniJinja**             | Rust-based, better for free-threaded Python 3.14             |
 
-Configurável via `pjx.toml`:
+Configurable via `pjx.toml`:
 
 ```toml
 [pjx]
@@ -703,20 +702,20 @@ engine = "hybrid"  # "hybrid" | "jinja2" | "minijinja"
 `hybrid` → HybridEngine (default). Automatically selects the optimal engine
 per template.
 
-### Limitações do MiniJinja
+### MiniJinja Limitations
 
-- Sem acesso a métodos Python (`x.items()`)
-- Sem `varargs`/`kwargs` em macros
-- Sem `%` string formatting
-- Tuples viram lists
+- No access to Python methods (`x.items()`)
+- No `varargs`/`kwargs` in macros
+- No `%` string formatting
+- Tuples become lists
 
-O compilador PJX gera Jinja2 syntax padrão compatível com ambos os engines.
+The PJX compiler generates standard Jinja2 syntax compatible with both engines.
 
 ---
 
-## 17. Integração FastAPI
+## 17. FastAPI Integration
 
-### Classe principal
+### Main class
 
 ```python
 from pjx import PJX, PJXConfig, SEO
@@ -731,43 +730,59 @@ pjx = PJX(
         description="Default SEO for all pages.",
         og_type="website",
     ),
+    csrf=True,
+    csrf_secret="your-secret-key",
+    csrf_exempt_paths={"/api/webhooks"},
+    health=True,
 )
 ```
 
-Parâmetros de `PJX`:
+`PJX` parameters:
 
-| Param    | Tipo       | Descrição                                                  |
-| -------- | ---------- | ---------------------------------------------------------- |
-| `app`    | `FastAPI`  | Instância do FastAPI                                       |
-| `config` | `PJXConfig`| Configuração carregada de `pjx.toml` (opcional)            |
-| `layout` | `str`      | Template de layout padrão, wrapa todas as páginas          |
-| `seo`    | `SEO`      | SEO global — páginas herdam, podem sobrescrever por campo  |
+| Param               | Type        | Description                                         |
+| ------------------- | ----------- | --------------------------------------------------- |
+| `app`               | `FastAPI`   | FastAPI instance                                    |
+| `config`            | `PJXConfig` | Configuration loaded from `pjx.toml` (optional)     |
+| `layout`            | `str`       | Default layout template, wraps all pages            |
+| `seo`               | `SEO`       | Global SEO — pages inherit, can override per field  |
+| `csrf`              | `bool`      | Enables CSRF middleware (double-submit cookie)      |
+| `csrf_secret`       | `str`       | Secret key for signing CSRF tokens                  |
+| `csrf_exempt_paths` | `set[str]`  | Routes exempt from CSRF validation (webhooks, APIs) |
+| `health`            | `bool`      | Registers `/health` and `/ready` endpoints          |
 
-O `PJX` auto-monta `/static` a partir de `config.static_dir`.
+`PJX` auto-mounts `/static` from `config.static_dir`.
+
+When `csrf=True`, the middleware injects `csrf_token()` as a Jinja2 global.
+Use in the layout: `<body hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'>`.
+
+When `health=True`, two endpoints are registered:
+
+- `/health` — liveness probe (`{"status": "ok"}`)
+- `/ready` — readiness probe (verifies that `template_dirs` exist)
 
 ### SEO
 
-`SEO` é um dataclass com campos para `<title>`, `<meta>` tags, Open Graph e
-Twitter Card. O SEO global definido em `PJX(seo=...)` é aplicado a todas as
-páginas. Para sobrescrever por página, use `title=` no decorador ou retorne
-`seo` no handler:
+`SEO` is a dataclass with fields for `<title>`, `<meta>` tags, Open Graph and
+Twitter Card. The global SEO defined in `PJX(seo=...)` is applied to all
+pages. To override per page, use `title=` in the decorator or return
+`seo` in the handler:
 
 ```python
-# Via decorador (mais comum)
+# Via decorator (most common)
 @pjx.page("/about", title="About — My App")
 
-# Via handler (controle total)
+# Via handler (full control)
 @pjx.page("/about")
 async def about():
     return {"seo": SEO(title="About", description="Custom description.")}
 ```
 
-Campos não-vazios da página sobrescrevem o global; vazios usam o fallback.
+Non-empty page fields override the global; empty ones use the fallback.
 
 ### Decorators
 
 ```python
-# Página com template, título e métodos
+# Page with template, title and methods
 @pjx.page(
     "/search",
     template="pages/Search.jinja",
@@ -778,17 +793,17 @@ async def search(form: Annotated[SearchForm, FormData()]):
     results = do_search(form.query)
     return {"query": form.query, "results": results}
 
-# Componente parcial (sem layout, retorna HTML fragment)
+# Partial component (no layout, returns HTML fragment)
 @pjx.component("components/ItemList.jinja")
 async def item_list(request: Request):
     return {"items": await get_items()}
 ```
 
-### FormData e Annotated
+### FormData and Annotated
 
-Handlers de página podem receber Pydantic models como parâmetros. Use
-`Annotated[Model, FormData()]` para parsear form data (POST) ou query params
-(GET) automaticamente:
+Page handlers can receive Pydantic models as parameters. Use
+`Annotated[Model, FormData()]` to parse form data (POST) or query params
+(GET) automatically:
 
 ```python
 from typing import Annotated
@@ -803,13 +818,13 @@ async def search(form: Annotated[SearchForm, FormData()]):
     return {"results": do_search(form.query)}
 ```
 
-Parâmetros sem `FormData` são injetados normalmente pelo FastAPI (`request`,
+Parameters without `FormData` are injected normally by FastAPI (`request`,
 `Depends`, etc.).
 
 ### HTMX Partials
 
-Endpoints que retornam HTML fragments para HTMX não precisam de layout.
-Use rotas FastAPI normais com `HTMLResponse`:
+Endpoints that return HTML fragments for HTMX don't need a layout.
+Use regular FastAPI routes with `HTMLResponse`:
 
 ```python
 @app.post("/htmx/todos/add")
@@ -819,14 +834,14 @@ async def htmx_add_todo(request: Request) -> HTMLResponse:
     return HTMLResponse(render_todo_list())
 ```
 
-### Fluxo por request
+### Flow per request
 
-1. FastAPI chama o handler → recebe `dict` de contexto
-2. PJX merge SEO: decorator `title=` → handler `seo` → global default
-3. Compila template e imports (com cache)
-4. Engine renderiza Jinja2 compilado com contexto + `props` namespace
-5. Wrapa no layout (se configurado) com `{{ body }}` como Markup
-6. Retorna `HTMLResponse`
+1. FastAPI calls the handler → receives `dict` of context
+2. PJX merges SEO: decorator `title=` → handler `seo` → global default
+3. Compiles template and imports (with cache)
+4. Engine renders compiled Jinja2 with context + `props` namespace
+5. Wraps in layout (if configured) with `{{ body }}` as Markup
+6. Returns `HTMLResponse`
 
 ### SSE Decorator
 
@@ -843,55 +858,55 @@ async def stats_stream(stream: EventStream):
 
 ## 18. CLI
 
-Comandos disponíveis via `pjx` (Typer + Rich):
+Available commands via `pjx` (Typer + Rich):
 
-| Comando            | Descrição                                                    |
+| Command            | Description                                                  |
 | ------------------ | ------------------------------------------------------------ |
-| `pjx init`         | Scaffolda projeto: dirs, config, package.json                |
-| `pjx dev`          | Dev server com hot reload (uvicorn --reload)                 |
+| `pjx init`         | Scaffolds project: dirs, config, package.json                |
+| `pjx dev`          | Dev server with hot reload (uvicorn --reload)                |
 | `pjx run`          | Production server                                            |
-| `pjx build`        | Compila todos os `.jinja` + bundle CSS + npm build           |
-| `pjx check`        | Verifica sintaxe de todos os `.jinja` (como ruff check)      |
-| `pjx format`       | Auto-formata `.jinja` (normaliza whitespace, ordena imports) |
-| `pjx add <pkg>`    | Instala pacote JS via npm + copia para vendor/               |
-| `pjx remove <pkg>` | Remove pacote JS via npm                                     |
+| `pjx build`        | Compiles all `.jinja` + bundles CSS + npm build              |
+| `pjx check`        | Checks syntax of all `.jinja` (like ruff check)              |
+| `pjx format`       | Auto-formats `.jinja` (normalizes whitespace, sorts imports) |
+| `pjx add <pkg>`    | Installs JS package via npm + copies to vendor/              |
+| `pjx remove <pkg>` | Removes JS package via npm                                   |
 
 ### Logging
 
-Todos os comandos usam `logging` com `rich.logging.RichHandler`:
+All commands use `logging` with `rich.logging.RichHandler`:
 
-- `DEBUG` — detalhes de parse/compile (flag `--verbose`)
-- `INFO` — progresso normal (arquivos processados, server iniciado)
+- `DEBUG` — parse/compile details (flag `--verbose`)
+- `INFO` — normal progress (files processed, server started)
 - `WARNING` — deprecations, fallbacks
-- `ERROR` — erros de parse/compile com localização (arquivo:linha:coluna)
+- `ERROR` — parse/compile errors with location (file:line:column)
 
 ---
 
-## 19. Estrutura de Projeto (gerada por `pjx init`)
+## 19. Project Structure (generated by `pjx init`)
 
 ```text
 project/
-├── pjx.toml                  # Configuração PJX
-├── package.json               # npm para deps JS
+├── pjx.toml                  # PJX configuration
+├── package.json               # npm for JS deps
 ├── templates/
-│   ├── pages/                 # Componentes de página completa
-│   ├── components/            # Componentes reutilizáveis
-│   ├── ui/                    # Primitivos UI (Button, Badge, etc.)
-│   ├── layouts/               # Layouts base (header, footer, nav)
-│   └── vendor/                # Templates de terceiros
+│   ├── pages/                 # Full page components
+│   ├── components/            # Reusable components
+│   ├── ui/                    # UI primitives (Button, Badge, etc.)
+│   ├── layouts/               # Base layouts (header, footer, nav)
+│   └── vendor/                # Third-party templates
 ├── static/
-│   ├── vendor/                # JS/CSS compilado do npm (alpine, htmx)
-│   ├── js/                    # JavaScript customizado
-│   └── css/                   # CSS customizado + scoped compilado
+│   ├── vendor/                # Compiled JS/CSS from npm (alpine, htmx)
+│   ├── js/                    # Custom JavaScript
+│   └── css/                   # Custom CSS + compiled scoped CSS
 └── src/
-    └── app.py                 # FastAPI app com PJX
+    └── app.py                 # FastAPI app with PJX
 ```
 
 ---
 
-## 20. Configuração (`pjx.toml`)
+## 20. Configuration (`pjx.toml`)
 
-O PJX usa um arquivo TOML **flat** (sem tabelas `[pjx]`) carregado via
+PJX uses a **flat** TOML file (no `[pjx]` tables) loaded via
 `PJXConfig`:
 
 ```toml
@@ -910,84 +925,94 @@ vendor_static_dir = "static/vendor"
 host = "127.0.0.1"
 port = 8000
 
-alpine = true               # Incluir Alpine.js por padrão
-htmx = true                 # Incluir HTMX por padrão
+alpine = true               # Include Alpine.js by default
+htmx = true                 # Include HTMX by default
 tailwind = false             # Tailwind CSS opt-in
+
+# Logging
+log_json = false             # JSON output for production (ELK, Datadog)
+log_level = "INFO"           # DEBUG | INFO | WARNING | ERROR | CRITICAL
+
+# CORS (empty = disabled)
+cors_origins = []            # ["https://example.com"]
+cors_methods = ["GET"]       # Allowed methods
+cors_headers = []            # Extra allowed headers
+cors_credentials = false     # Allow cross-origin cookies
 ```
 
-### Carregamento
+### Loading
 
 ```python
 from pjx import PJXConfig
 
-# Caminho explícito — paths resolvidos relativo ao diretório do .toml
-config = PJXConfig(toml_path="examples/pjx.toml")
+# Explicit path — paths resolved relative to the .toml directory
+config = PJXConfig(toml_path="examples/demo/pjx.toml")
 
 # CWD
-config = PJXConfig()  # procura pjx.toml no diretório atual
+config = PJXConfig()  # looks for pjx.toml in the current directory
 ```
 
-Variáveis de ambiente com prefixo `PJX_` sobrescrevem valores do TOML
-(via `pydantic-settings`). Prioridade: init kwargs > env vars > TOML.
+Environment variables with the `PJX_` prefix override TOML values
+(via `pydantic-settings`). Priority: init kwargs > env vars > TOML.
 
-Todos os caminhos relativos no TOML são resolvidos contra o diretório do
-arquivo `pjx.toml`, não contra o CWD.
+All relative paths in the TOML are resolved against the directory of the
+`pjx.toml` file, not against the CWD.
 
 ---
 
-## 21. Pipeline de Compilação
+## 21. Compilation Pipeline
 
 ```text
 .jinja file
   │
   ├─ [1] parser._extract_blocks()
-  │      Separa: frontmatter, <style scoped> body, HTML body
+  │      Separates: frontmatter, <style scoped> body, HTML body
   │
   ├─ [2] lexer.tokenize(script)
-  │      Gera stream de tokens (keyword-driven)
+  │      Generates token stream (keyword-driven)
   │
   ├─ [3] parser._parse_script(tokens)
-  │      Produz: extends, from_imports, imports, props, slots, store,
+  │      Produces: extends, from_imports, imports, props, slots, store,
   │              let/const, state, computed
   │
   ├─ [4] parser._parse_body(html, known_components)
-  │      html.parser.HTMLParser → árvore de Nodes
-  │      Reconhece: <Show>, <For>, <Switch>, <Portal>, etc.
-  │      Reconhece componentes registrados (PascalCase)
+  │      html.parser.HTMLParser → Node tree
+  │      Recognizes: <Show>, <For>, <Switch>, <Portal>, etc.
+  │      Recognizes registered components (PascalCase)
   │
   ├─ [5] Component AST (ast_nodes.Component)
   │
   ├─ [6] compiler.compile(component)
-  │      ├─ Emite {% set %} para let/const/computed
-  │      ├─ Coleta state → alpine_data dict
-  │      ├─ Transforma nodes recursivamente:
+  │      ├─ Emits {% set %} for let/const/computed
+  │      ├─ Collects state → alpine_data dict
+  │      ├─ Transforms nodes recursively:
   │      │   ShowNode → {% if %}
   │      │   ForNode → {% for %}
   │      │   SwitchNode → {% if/elif/else %}
-  │      │   ElementNode → transforma attrs (bind:→x-, on:→@, action:→hx-)
+  │      │   ElementNode → transforms attrs (bind:→x-, on:→@, action:→hx-)
   │      │   ComponentNode → {% with %}{% include %}{% endwith %}
   │      │   PortalNode → <div hx-swap-oob>
   │      │   AwaitNode → <div hx-get hx-trigger="load">
-  │      └─ css.scope_css() se <style scoped> presente
+  │      └─ css.scope_css() if <style scoped> present
   │
   ├─ [7] CompiledComponent
-  │      .jinja_source  → template Jinja2 válido
-  │      .css           → CSS com escopo
-  │      .alpine_data   → dict para x-data
-  │      .scope_hash    → identificador de escopo
+  │      .jinja_source  → valid Jinja2 template
+  │      .css           → scoped CSS
+  │      .alpine_data   → dict for x-data
+  │      .scope_hash    → scope identifier
   │
-  └─ [8] engine.render(jinja_source, context) → HTML final
+  └─ [8] engine.render(jinja_source, context) → final HTML
 ```
 
 ---
 
-## 22. Arquitetura de Módulos
+## 22. Module Architecture
 
 ```text
 src/pjx/
-├── errors.py          # Hierarquia de exceções
-├── ast_nodes.py       # Dataclasses do AST (IR)
-├── lexer.py           # Tokenizer do frontmatter
+├── errors.py          # Exception hierarchy
+├── ast_nodes.py       # AST dataclasses (IR)
+├── lexer.py           # Frontmatter tokenizer
 ├── parser.py          # .jinja → Component AST
 ├── compiler.py        # AST → Jinja2 + Alpine + HTMX
 ├── css.py             # Scoped CSS
@@ -1010,7 +1035,7 @@ src/pjx/
     └── packages.py    # pjx add, remove
 ```
 
-### Grafo de dependências
+### Dependency graph
 
 ```text
 errors (leaf)
@@ -1033,11 +1058,11 @@ cli/* → config, registry, compiler, engine, log
 
 ---
 
-## 23. Layouts e Herança
+## 23. Layouts and Inheritance
 
-Layouts definem a estrutura base da página. Páginas herdam via `extends`.
+Layouts define the base page structure. Pages inherit via `extends`.
 
-### Layout base (`layouts/Base.jinja`)
+### Base layout (`layouts/Base.jinja`)
 
 ```html
 ---
@@ -1074,7 +1099,7 @@ slot footer
 </html>
 ```
 
-### Página que herda
+### Page that inherits
 
 ```html
 ---
@@ -1090,19 +1115,19 @@ props {
     <meta property="og:title" content="Home — {{ props.user.name }}" />
 </slot:head>
 
-<h1>Bem-vindo, {{ props.user.name }}</h1>
+<h1>Welcome, {{ props.user.name }}</h1>
 ```
 
-O corpo da página (fora de `<slot:*>`) é injetado no `<Slot:content />`
-do layout automaticamente.
+The page body (outside of `<slot:*>`) is automatically injected into the
+layout's `<Slot:content />`.
 
-### Compilação
+### Compilation
 
 ```jinja2
-{# extends "layouts/Base.jinja" compila para: #}
+{# extends "layouts/Base.jinja" compiles to: #}
 {% extends "layouts/Base.jinja" %}
 {% block content %}
-  <h1>Bem-vindo, {{ props.user.name }}</h1>
+  <h1>Welcome, {{ props.user.name }}</h1>
 {% endblock %}
 {% block head %}
   <meta property="og:title" content="Home — {{ props.user.name }}" />
@@ -1113,14 +1138,14 @@ do layout automaticamente.
 
 ## 24. Prop Spreading
 
-Espalhar um dict como props de um componente:
+Spread a dict as a component's props:
 
 ```html
 <Button ...btn_props />
 <Button ...btn_props label="Override" />
 ```
 
-Props explícitos sobrescrevem valores do spread. Compilação:
+Explicit props override spread values. Compilation:
 
 ```jinja2
 {% with _spread=btn_props, _props_label="Override" %}
@@ -1132,7 +1157,7 @@ Props explícitos sobrescrevem valores do spread. Compilação:
 
 ## 25. Global State (Alpine Stores)
 
-### Declaração no frontmatter
+### Declaration in frontmatter
 
 ```python
 store todos = {
@@ -1142,7 +1167,7 @@ store todos = {
 }
 ```
 
-### Uso em componentes
+### Usage in components
 
 ```html
 <div reactive:store="todos">
@@ -1150,36 +1175,36 @@ store todos = {
 </div>
 ```
 
-### Compilação
+### Compilation
 
-| Escrito                 | Compilado                                      |
+| Written                 | Compiled                                       |
 | ----------------------- | ---------------------------------------------- |
-| `store name = { ... }`  | `Alpine.store('name', { ... })` no script init |
+| `store name = { ... }`  | `Alpine.store('name', { ... })` in init script |
 | `reactive:store="name"` | `x-data="Alpine.store('name')"`                |
 
 ---
 
-## 26. Funções Built-in nos Templates
+## 26. Built-in Template Functions
 
-| Função                  | Descrição                               |
-| ----------------------- | --------------------------------------- |
-| `has_slot('name')`      | `true` se o slot foi fornecido pelo pai |
-| `len(x)`                | Comprimento de lista/string             |
-| `range(n)`              | Sequência 0..n-1                        |
-| `enumerate(x)`          | Pares (index, item)                     |
-| `url_for('route_name')` | URL reversa para rota FastAPI           |
-| `static('path')`        | URL para arquivo estático               |
+| Function                | Description                               |
+| ----------------------- | ----------------------------------------- |
+| `has_slot('name')`      | `true` if the slot was provided by parent |
+| `len(x)`                | Length of list/string                     |
+| `range(n)`              | Sequence 0..n-1                           |
+| `enumerate(x)`          | Pairs (index, item)                       |
+| `url_for('route_name')` | Reverse URL for FastAPI route             |
+| `static('path')`        | URL for static file                       |
 
-### Implementação
+### Implementation
 
-Registradas como globals no template engine via `engine.add_global()`.
-`has_slot('name')` verifica se `_slot_{name}` está definido no contexto.
+Registered as globals in the template engine via `engine.add_global()`.
+`has_slot('name')` checks whether `_slot_{name}` is defined in the context.
 
 ---
 
-## 27. Páginas de Erro
+## 27. Error Pages
 
-### Template de erro
+### Error template
 
 ```html
 ---
@@ -1191,10 +1216,10 @@ props {
 ---
 
 <h1>404</h1>
-<p>Página <code>{{ props.path }}</code> não encontrada.</p>
+<p>Page <code>{{ props.path }}</code> not found.</p>
 ```
 
-### Registro via FastAPI
+### Registration via FastAPI
 
 ```python
 @pjx.error(404, "errors/404.jinja")
@@ -1202,14 +1227,14 @@ async def not_found(request: Request):
     return {"path": request.url.path}
 ```
 
-Internamente, registra um `exception_handler` no FastAPI que renderiza
-o template com o contexto retornado.
+Internally, registers an `exception_handler` on FastAPI that renders
+the template with the returned context.
 
 ---
 
-## 28. Componentes Recursivos
+## 28. Recursive Components
 
-Componentes podem importar a si mesmos para árvores:
+Components can import themselves for tree structures:
 
 ```html
 ---
@@ -1232,22 +1257,22 @@ props {
 </div>
 ```
 
-O registry detecta self-imports e permite até `max_depth` níveis.
-Ultrapassar gera `CompileError`.
+The registry detects self-imports and allows up to `max_depth` levels.
+Exceeding it generates a `CompileError`.
 
 ---
 
-## 29. Frontmatter — Regras de Parsing
+## 29. Frontmatter — Parsing Rules
 
-- `---` deve estar **sozinho na linha** (sem espaços)
-- Primeiro `---` abre, próximo `---` isolado fecha
-- Strings no frontmatter podem conter `---`:
-  `let x = "foo --- bar"` é válido
-- Comentários: `#` até fim da linha
-- Linhas em branco ignoradas
-- Props blocks `{ ... }` podem ocupar várias linhas
+- `---` must be **alone on the line** (no spaces)
+- First `---` opens, next isolated `---` closes
+- Strings in the frontmatter can contain `---`:
+  `let x = "foo --- bar"` is valid
+- Comments: `#` until end of line
+- Blank lines are ignored
+- Props blocks `{ ... }` can span multiple lines
 
-Ordem recomendada das declarações:
+Recommended order of declarations:
 
 ```text
 extends → from → import → props → slot → store → let/const → state → computed
@@ -1255,25 +1280,25 @@ extends → from → import → props → slot → store → let/const → state
 
 ---
 
-## 30. Formato de Erros
+## 30. Error Format
 
-Erros seguem o formato `arquivo:linha:coluna: Tipo: mensagem`:
+Errors follow the format `file:line:column: Type: message`:
 
 ```text
-templates/Card.jinja:15:3: ParseError: Tag <Show> não fechada
-templates/Home.jinja:3:1: ImportError: Componente "Missing.jinja" não encontrado
-templates/Form.jinja:8:12: PropValidationError: Campo "email" esperava EmailStr
+templates/Card.jinja:15:3: ParseError: Unclosed <Show> tag
+templates/Home.jinja:3:1: ImportError: Component "Missing.jinja" not found
+templates/Form.jinja:8:12: PropValidationError: Field "email" expected EmailStr
 ```
 
 ### `pjx check` output
 
 ```text
 ✗ templates/Card.jinja
-  15:3  error  Tag <Show> não fechada
-  42:5  error  Prop "status" requerido mas sem default
+  15:3  error  Unclosed <Show> tag
+  42:5  error  Prop "status" required but has no default
 
 ✗ templates/Home.jinja
-  3:1   error  Componente "Missing.jinja" não encontrado
+  3:1   error  Component "Missing.jinja" not found
 
 ✓ templates/Layout.jinja
 ✓ templates/Button.jinja
@@ -1283,22 +1308,22 @@ Found 3 errors in 2 files (checked 4 files)
 
 ---
 
-## 31. `pjx format` — Regras de Formatação
+## 31. `pjx format` — Formatting Rules
 
-- **Frontmatter**: normaliza indentação (0 espaços), espaço ao redor de `=`
-  e `:`, agrupa declarações por tipo (extends → imports → props → etc.)
-- **Imports**: ordena alfabeticamente, agrupa `from` imports separados de
-  `import` componentes
-- **Props**: alinha `:` e `=` por coluna, um campo por linha
-- **Body HTML**: normaliza indentação (2 espaços), self-closing com `/>`
-- **Atributos**: um por linha se mais de 3 atributos
-- **Style**: preserva CSS original (não reformata)
+- **Frontmatter**: normalizes indentation (0 spaces), spacing around `=`
+  and `:`, groups declarations by type (extends → imports → props → etc.)
+- **Imports**: sorts alphabetically, groups `from` imports separate from
+  `import` components
+- **Props**: aligns `:` and `=` by column, one field per line
+- **Body HTML**: normalizes indentation (2 spaces), self-closing with `/>`
+- **Attributes**: one per line if more than 3 attributes
+- **Style**: preserves original CSS (does not reformat)
 
 ---
 
 ## 32. Asset Pipeline
 
-Componentes declaram dependências CSS/JS no frontmatter:
+Components declare CSS/JS dependencies in the frontmatter:
 
 ```html
 ---
@@ -1312,35 +1337,35 @@ js "components/card.js"
 ```python
 @dataclass(frozen=True, slots=True)
 class AssetDecl:
-    kind: str  # "css" ou "js"
+    kind: str  # "css" or "js"
     path: str
 ```
 
-`Component` e `CompiledComponent` possuem `assets: tuple[AssetDecl, ...]`.
+`Component` and `CompiledComponent` have `assets: tuple[AssetDecl, ...]`.
 
 ### `AssetCollector`
 
-`src/pjx/assets.py` — coleta, deduplica e renderiza tags:
+`src/pjx/assets.py` — collects, deduplicates and renders tags:
 
-- `add(asset)` — adiciona ao set ordenado (dedup por `(kind, path)`)
-- `render_css()` — gera tags `<link rel="stylesheet">`
-- `render_js(module=True)` — gera tags `<script type="module">`
+- `add(asset)` — adds to the ordered set (dedup by `(kind, path)`)
+- `render_css()` — generates `<link rel="stylesheet">` tags
+- `render_js(module=True)` — generates `<script type="module">` tags
 - `render()` — CSS + JS
 
-Disponível no template como `{{ pjx_assets.render() }}`.
+Available in the template as `{{ pjx_assets.render() }}`.
 
 ---
 
 ## 33. Attrs Passthrough
 
-Atributos não declarados como props são separados e disponibilizados como
-`{{ attrs }}` no template do componente filho.
+Attributes not declared as props are separated and made available as
+`{{ attrs }}` in the child component's template.
 
-### Fluxo
+### Flow
 
-1. Compilador resolve o `PropsDecl` do componente filho via registry
-2. `separate_attrs(props_decl, all_attrs)` separa props de extras
-3. Props declarados → `{% set name = value %}`
+1. Compiler resolves the child component's `PropsDecl` via registry
+2. `separate_attrs(props_decl, all_attrs)` separates props from extras
+3. Declared props → `{% set name = value %}`
 4. Extras → `{% set attrs %}class="x" id="y"{% endset %}`
 
 ### `separate_attrs()`
@@ -1352,24 +1377,24 @@ def separate_attrs(
 ) -> tuple[dict[str, str | bool], dict[str, str | bool]]:
 ```
 
-Se `props_decl` é `None` → tudo vai para props (backwards compatible).
+If `props_decl` is `None` → everything goes to props (backwards compatible).
 
 ---
 
 ## 34. Runtime Prop Validation
 
-Quando `validate_props = true` em `PJXConfig`, o PJX valida props em
-runtime usando Pydantic models cacheados:
+When `validate_props = true` in `PJXConfig`, PJX validates props at
+runtime using cached Pydantic models:
 
-1. Em `_compile_template()`: gera e cacheia model via `generate_props_model()`
-2. Em `render()`: antes de renderizar, chama `validate_props(model, context)`
-3. `PropValidationError` com mensagem clara (qual prop, tipo esperado)
+1. In `_compile_template()`: generates and caches model via `generate_props_model()`
+2. In `render()`: before rendering, calls `validate_props(model, context)`
+3. `PropValidationError` with clear message (which prop, expected type)
 
 ---
 
 ## 35. Inline Render Mode
 
-`render_mode: Literal["include", "inline"] = "include"` em `PJXConfig`.
+`render_mode: Literal["include", "inline"] = "include"` in `PJXConfig`.
 
 ### `inline_includes()`
 
@@ -1383,15 +1408,15 @@ def inline_includes(
 ) -> str:
 ```
 
-Substitui recursivamente `{% include "X" %}` pelo source compilado de `X`.
-Produz um template flat sem dependências externas, ideal para
-`engine.render_string()` onde MiniJinja é 10-74x mais rápido.
+Recursively replaces `{% include "X" %}` with the compiled source of `X`.
+Produces a flat template without external dependencies, ideal for
+`engine.render_string()` where MiniJinja is 10-74x faster.
 
-### Fluxo
+### Flow
 
-1. Compilar componente + imports → `_compiled_sources`
-2. `inline_includes(source, _compiled_sources)` → template flat
-3. `engine.render_string(flat, context)` — sem I/O de template
+1. Compile component + imports → `_compiled_sources`
+2. `inline_includes(source, _compiled_sources)` → flat template
+3. `engine.render_string(flat, context)` — no template I/O
 
 ---
 
@@ -1428,75 +1453,75 @@ rather than re-scanning the entire source string from the beginning.
 
 ## 37. Static Analysis (`checker.py`)
 
-Verificações estáticas sem executar o servidor:
+Static checks without running the server:
 
 ### `check_imports(component, registry)`
 
-Verifica se todos os imports resolvem para arquivos existentes.
+Verifies that all imports resolve to existing files.
 
 ### `check_props(component, registry)`
 
-Para cada `ComponentNode` no body, verifica se props obrigatórios
-(sem default) estão presentes nos attrs.
+For each `ComponentNode` in the body, verifies that required props
+(without default) are present in the attrs.
 
 ### `check_slots(component, registry)`
 
-Verifica se slots passados a componentes filhos existem na declaração
-do filho. `default` é sempre válido.
+Verifies that slots passed to child components exist in the child's
+declaration. `default` is always valid.
 
 ### `check_all(component, registry)`
 
-Executa todos os checks e retorna lista consolidada de `PJXError`.
+Runs all checks and returns a consolidated list of `PJXError`.
 
 ### `_walk_nodes(nodes)`
 
-Walker recursivo que percorre `children`, `body`, `cases`, `fallback`.
+Recursive walker that traverses `children`, `body`, `cases`, `fallback`.
 
 ---
 
 ## 38. File-Based Routing
 
-PJX suporta roteamento automático baseado no sistema de arquivos, inspirado em
-Next.js e SvelteKit. `pjx.auto_routes()` escaneia o diretório `pages/` e gera
-rotas FastAPI automaticamente.
+PJX supports automatic routing based on the file system, inspired by
+Next.js and SvelteKit. `pjx.auto_routes()` scans the `pages/` directory and
+generates FastAPI routes automatically.
 
-### Ativação
+### Activation
 
 ```python
 pjx = PJX(app, config=PJXConfig(toml_path="pjx.toml"))
 pjx.auto_routes()
 ```
 
-### Convenções de arquivo
+### File conventions
 
-| Padrão de arquivo              | Rota gerada                  | Descrição                             |
-| ------------------------------ | ---------------------------- | ------------------------------------- |
-| `pages/index.jinja`            | `/`                          | Página raiz                           |
-| `pages/about.jinja`            | `/about`                     | Rota estática                         |
-| `pages/blog/index.jinja`       | `/blog`                      | Index de diretório                    |
-| `pages/blog/[slug].jinja`      | `/blog/{slug}`               | Parâmetro dinâmico                    |
-| `pages/docs/[...slug].jinja`   | `/docs/{slug:path}`          | Catch-all (segmentos variáveis)       |
-| `pages/(auth)/login.jinja`     | `/login`                     | Route group (sem prefixo na URL)      |
-| `pages/layout.jinja`           | —                            | Layout compartilhado do diretório     |
-| `pages/loading.jinja`          | —                            | Skeleton de carregamento              |
-| `pages/error.jinja`            | —                            | Página de erro do diretório           |
+| File pattern                   | Generated route                | Description                           |
+| ------------------------------ | ------------------------------ | ------------------------------------- |
+| `pages/index.jinja`            | `/`                            | Root page                             |
+| `pages/about.jinja`            | `/about`                       | Static route                          |
+| `pages/blog/index.jinja`       | `/blog`                        | Directory index                       |
+| `pages/blog/[slug].jinja`      | `/blog/{slug}`                 | Dynamic parameter                     |
+| `pages/docs/[...slug].jinja`   | `/docs/{slug:path}`            | Catch-all (variable segments)         |
+| `pages/(auth)/login.jinja`     | `/login`                       | Route group (no prefix in URL)        |
+| `pages/layout.jinja`           | —                              | Shared directory layout               |
+| `pages/loading.jinja`          | —                              | Loading skeleton                      |
+| `pages/error.jinja`            | —                              | Directory error page                  |
 
-### Arquivos especiais
+### Special files
 
-- **`layout.jinja`** — Wrapa automaticamente todas as páginas e sub-diretórios
-  do mesmo nível. Layouts são aninhados: `pages/layout.jinja` wrapa
-  `pages/blog/layout.jinja` que wrapa `pages/blog/[slug].jinja`.
-- **`loading.jinja`** — Skeleton exibido via HTMX `hx-indicator` enquanto a
-  página carrega. Opcional.
-- **`error.jinja`** — Renderizado quando um handler retorna erro. Recebe
-  `status_code` e `message` no contexto. Opcional.
-- **Route groups `(name)/`** — Diretórios entre parênteses agrupam páginas sem
-  afetar a URL. Útil para aplicar layouts/middleware a um subset de rotas.
+- **`layout.jinja`** — Automatically wraps all pages and sub-directories
+  at the same level. Layouts are nested: `pages/layout.jinja` wraps
+  `pages/blog/layout.jinja` which wraps `pages/blog/[slug].jinja`.
+- **`loading.jinja`** — Skeleton shown via HTMX `hx-indicator` while the
+  page loads. Optional.
+- **`error.jinja`** — Rendered when a handler returns an error. Receives
+  `status_code` and `message` in the context. Optional.
+- **Route groups `(name)/`** — Directories in parentheses group pages without
+  affecting the URL. Useful for applying layouts/middleware to a subset of routes.
 
 ### Colocated Handlers
 
-Handlers Python podem ser colocados ao lado dos templates usando
-`RouteHandler` e `APIRoute`:
+Python handlers can be colocated alongside templates using
+`RouteHandler` and `APIRoute`:
 
 ```python
 from pjx.routing import RouteHandler, APIRoute
@@ -1513,8 +1538,8 @@ async def post(form: Annotated[ItemForm, FormData()]):
     return {"items": await fetch_items()}
 ```
 
-`APIRoute` permite definir endpoints de API JSON colocados ao lado do template,
-servidos sob o prefixo `/api/`:
+`APIRoute` allows defining JSON API endpoints colocated alongside the template,
+served under the `/api/` prefix:
 
 ```python
 api = APIRoute()
@@ -1528,9 +1553,9 @@ async def list_items():
 
 ## 39. Middleware
 
-### Declaração no frontmatter
+### Declaration in frontmatter
 
-Componentes e páginas podem declarar middleware no frontmatter:
+Components and pages can declare middleware in the frontmatter:
 
 ```html
 ---
@@ -1538,10 +1563,10 @@ middleware "auth", "rate_limit"
 ---
 ```
 
-A declaração aceita uma ou mais strings separadas por vírgula. Cada string
-referencia um middleware registrado no runtime PJX.
+The declaration accepts one or more comma-separated strings. Each string
+references a middleware registered in the PJX runtime.
 
-### Registro no runtime
+### Registration in the runtime
 
 ```python
 @pjx.middleware("auth")
@@ -1559,32 +1584,32 @@ async def rate_limit_middleware(request: Request, call_next):
     return response
 ```
 
-Middleware declarado no frontmatter é aplicado na ordem de declaração.
-Middleware de layout é aplicado antes do middleware da página.
+Middleware declared in the frontmatter is applied in declaration order.
+Layout middleware is applied before page middleware.
 
 ---
 
 ## 40. Layout Components (Built-ins)
 
-PJX inclui componentes de layout built-in inspirados em Chakra UI. São
-compilados diretamente pelo compilador (sem necessidade de import).
+PJX includes built-in layout components inspired by Chakra UI. They are
+compiled directly by the compiler (no import needed).
 
-### Componentes disponíveis
+### Available components
 
-| Componente      | Descrição                                      | Props principais                  |
+| Component       | Description                                    | Main props                        |
 | --------------- | ---------------------------------------------- | --------------------------------- |
-| `<Center>`      | Centraliza conteúdo horizontal e verticalmente | `w`, `h`                          |
-| `<HStack>`      | Stack horizontal com gap                       | `gap`, `align`, `justify`, `wrap` |
-| `<VStack>`      | Stack vertical com gap                         | `gap`, `align`, `justify`         |
-| `<Grid>`        | Grid CSS responsivo                            | `cols`, `gap`, `min`, `max`       |
-| `<Spacer>`      | Espaço flexível entre itens                    | —                                 |
-| `<Container>`   | Largura máxima centralizada                    | `max`, `px`                       |
-| `<Divider>`     | Linha divisória                                | `orientation`, `color`            |
-| `<Wrap>`        | Flex wrap com gap                              | `gap`, `align`, `justify`         |
-| `<AspectRatio>` | Mantém proporção do conteúdo                   | `ratio`                           |
-| `<Hide>`        | Oculta conteúdo por breakpoint                 | `below`, `above`                  |
+| `<Center>`      | Centers content horizontally and vertically    | `w`, `h`                          |
+| `<HStack>`      | Horizontal stack with gap                      | `gap`, `align`, `justify`, `wrap` |
+| `<VStack>`      | Vertical stack with gap                        | `gap`, `align`, `justify`         |
+| `<Grid>`        | Responsive CSS grid                            | `cols`, `gap`, `min`, `max`       |
+| `<Spacer>`      | Flexible space between items                   | —                                 |
+| `<Container>`   | Centered maximum width                         | `max`, `px`                       |
+| `<Divider>`     | Dividing line                                  | `orientation`, `color`            |
+| `<Wrap>`        | Flex wrap with gap                             | `gap`, `align`, `justify`         |
+| `<AspectRatio>` | Maintains content aspect ratio                 | `ratio`                           |
+| `<Hide>`        | Hides content by breakpoint                    | `below`, `above`                  |
 
-### Exemplos
+### Examples
 
 ```html
 <Container max="1200px">
@@ -1609,11 +1634,11 @@ compilados diretamente pelo compilador (sem necessidade de import).
 </Container>
 ```
 
-### Compilação
+### Compilation
 
-Layout components são compilados para HTML + CSS utilitário:
+Layout components are compiled to HTML + utility CSS:
 
-| DSL                          | HTML compilado                                                            |
+| DSL                          | Compiled HTML                                                             |
 | ---------------------------- | ------------------------------------------------------------------------- |
 | `<Center>`                   | `<div style="display:flex;align-items:center;justify-content:center">`    |
 | `<HStack gap="1rem">`        | `<div style="display:flex;flex-direction:row;gap:1rem">`                  |
@@ -1628,16 +1653,16 @@ Layout components são compilados para HTML + CSS utilitário:
 
 ## 41. Non-Goals
 
-- **Não é um framework frontend JS** — Alpine.js lida com reatividade client
-- **Não compila para React/Vue/Solid** — o alvo é Jinja2 + HTMX
-- **Não é um bundler JS completo** — npm + build simples para vendor/
-- **Não suporta TypeScript** — a DSL é Python-typed
-- **Não faz SSG** — foco em server-rendered dinâmico
-- **Não substitui Jinja2** — compila *para* Jinja2
+- **Not a frontend JS framework** — Alpine.js handles client reactivity
+- **Does not compile to React/Vue/Solid** — the target is Jinja2 + HTMX
+- **Not a full JS bundler** — npm + simple build for vendor/
+- **Does not support TypeScript** — the DSL is Python-typed
+- **Does not do SSG** — focus on dynamic server-rendered
+- **Does not replace Jinja2** — compiles *to* Jinja2
 
 ---
 
-## 42. Referências
+## 42. References
 
 - [HTMX](https://htmx.org/docs/)
 - [Alpine.js](https://alpinejs.dev/)

@@ -1,64 +1,64 @@
-# PJX — Plano de Implementação
+# PJX — Implementation Plan
 
-> Roadmap técnico com fases, dependências e critérios de conclusão.
-> Referência completa da DSL em `IDEA.md`. Especificação técnica em `SPEC.md`.
-
----
-
-## Visão Geral das Fases
-
-| Fase | Nome             | Módulos                                         | Depende de |
-| ---- | ---------------- | ----------------------------------------------- | ---------- |
-| 1    | Core             | errors, ast_nodes, lexer, parser, compiler, css | —          |
-| 2    | Component System | config, registry, props, slots                  | Fase 1     |
-| 3    | Runtime          | engine, integration, log, sse                   | Fases 1-2  |
-| 4    | CLI              | cli/* , assets                                  | Fases 1-3  |
-| 5    | Frontend Tooling | npm integration, vendor build, tailwind         | Fase 4     |
+> Technical roadmap with phases, dependencies, and completion criteria.
+> Full DSL reference in `IDEA.md`. Technical specification in `SPEC.md`.
 
 ---
 
-## Fase 1 — Core
+## Phase Overview
 
-Objetivo: parsear um arquivo `.jinja` e compilar para Jinja2 + Alpine + HTMX.
+| Phase | Name             | Modules                                         | Depends on  | Status |
+| ----- | ---------------- | ----------------------------------------------- | ----------- | ------ |
+| 1     | Core             | errors, ast_nodes, lexer, parser, compiler, css | —           | ✅     |
+| 2     | Component System | config, registry, props, slots                  | Phase 1     | ✅     |
+| 3     | Runtime          | engine, integration, log, sse                   | Phases 1-2  | ✅     |
+| 4     | CLI              | cli/* , assets                                  | Phases 1-3  | ✅     |
+| 5     | Frontend Tooling | npm integration, vendor build, tailwind         | Phase 4     |        |
+| 6     | Improvements     | attrs, validation, assets, inline, check, AST   | Phases 1-4  | ✅     |
 
-### 1.1 `errors.py` — Hierarquia de Exceções
+---
 
-**Responsabilidade**: Exceções base com localização (arquivo, linha, coluna).
+## Phase 1 — Core ✅
 
-**Entregáveis**:
+Goal: parse a `.jinja` file and compile to Jinja2 + Alpine + HTMX.
+
+### 1.1 `errors.py` — Exception Hierarchy
+
+**Responsibility**: Base exceptions with location (file, line, column).
+
+**Deliverables**:
 
 - `PJXError(Exception)` — base
-- `ParseError(PJXError)` — erro de sintaxe no `.jinja`
-- `LexError(ParseError)` — erro na tokenização do frontmatter
-- `CompileError(PJXError)` — erro na compilação AST → output
-- `PropValidationError(PJXError)` — validação de props
-- `ImportResolutionError(PJXError)` — import não encontrado
-- `ConfigError(PJXError)` — configuração inválida
+- `ParseError(PJXError)` — syntax error in `.jinja`
+- `LexError(ParseError)` — error in frontmatter tokenization
+- `CompileError(PJXError)` — error in AST → output compilation
+- `PropValidationError(PJXError)` — prop validation
+- `ImportResolutionError(PJXError)` — import not found
+- `ConfigError(PJXError)` — invalid configuration
 
-Todas devem incluir `path: Path | None`, `line: int | None`,
-`col: int | None` para mensagens de erro ricas.
+All must include `path: Path | None`, `line: int | None`,
+`col: int | None` for rich error messages.
 
-**Testes**:
+**Tests**:
 
-- Instanciação com e sem localização
-- Formatação da mensagem com path:line:col
-- Herança correta entre exceções
+- Instantiation with and without location
+- Message formatting with path:line:col
+- Correct inheritance between exceptions
 
-**Critério de done**: Todas as exceções documentadas, testadas e importáveis.
+**Done criteria**: All exceptions documented, tested, and importable.
 
-### 1.2 `ast_nodes.py` — Representação Intermediária
+### 1.2 `ast_nodes.py` — Intermediate Representation
 
-**Responsabilidade**: Dataclasses imutáveis que representam um componente
-parseado.
+**Responsibility**: Immutable dataclasses representing a parsed component.
 
-**Entregáveis**:
+**Deliverables**:
 
 ```python
-# Nó raiz
+# Root node
 Component(path, extends, from_imports, imports, props, slots, stores,
           variables, states, computed, body, style)
 
-# Declarações do frontmatter
+# Frontmatter declarations
 ExtendsDecl(source)
 FromImportDecl(module, names)
 ImportDecl(names, source, alias, wildcard)
@@ -70,7 +70,7 @@ LetDecl(name, expr) / ConstDecl(name, expr)
 StateDecl(name, value)
 ComputedDecl(name, expr)
 
-# Nodes do body
+# Body nodes
 ElementNode(tag, attrs, children, self_closing)
 TextNode(content)
 ExprNode(expr)
@@ -94,22 +94,22 @@ CompiledComponent(jinja_source, css, alpine_data, scope_hash)
 ScopedStyle(source, hash)
 ```
 
-Todos com `@dataclass(frozen=True, slots=True)`.
-`Node` como type alias union de todos os node types.
+All with `@dataclass(frozen=True, slots=True)`.
+`Node` as type alias union of all node types.
 
-**Testes**:
+**Tests**:
 
-- Instanciação de cada dataclass
-- Imutabilidade (frozen)
-- Type union correta
+- Instantiation of each dataclass
+- Immutability (frozen)
+- Correct type union
 
-**Critério de done**: Todas as dataclasses da spec representáveis, testadas.
+**Done criteria**: All spec dataclasses representable, tested.
 
 ### 1.3 `lexer.py` — Tokenizer
 
-**Responsabilidade**: Tokenizar o conteúdo do frontmatter em tokens.
+**Responsibility**: Tokenize the frontmatter content into tokens.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `TokenKind(StrEnum)` — EXTENDS, IMPORT, FROM, AS, PROPS, SLOT, STORE,
   LET, CONST, STATE, COMPUTED, IDENT, STRING, NUMBER, LBRACE, RBRACE,
@@ -120,14 +120,14 @@ Todos com `@dataclass(frozen=True, slots=True)`.
 
 **Design**:
 
-- Cada linha começa com keyword → lexer identifica por prefixo
-- Strings: `"..."` e `'...'`
-- Números: inteiros e floats
+- Each line starts with a keyword → lexer identifies by prefix
+- Strings: `"..."` and `'...'`
+- Numbers: integers and floats
 - Identifiers: `[a-zA-Z_][a-zA-Z0-9_]*`
-- Comentários: `#` até fim da linha (ignorados)
-- Erros: `LexError` com posição
+- Comments: `#` until end of line (ignored)
+- Errors: `LexError` with position
 
-**Testes**:
+**Tests**:
 
 - `test_tokenize_extends`
 - `test_tokenize_from_import`
@@ -145,44 +145,44 @@ Todos com `@dataclass(frozen=True, slots=True)`.
 - `test_tokenize_error_unterminated_string`
 - `test_tokenize_error_invalid_char`
 
-**Critério de done**: Tokeniza todos os exemplos do IDEA.md sem erro.
+**Done criteria**: Tokenizes all examples from IDEA.md without errors.
 
-### 1.4 `parser.py` — Parser Completo
+### 1.4 `parser.py` — Full Parser
 
-**Responsabilidade**: Parsear um arquivo `.jinja` completo em `Component` AST.
+**Responsibility**: Parse a complete `.jinja` file into a `Component` AST.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `parse(source: str, path: Path) -> Component`
 - `parse_file(path: Path) -> Component`
 - `_extract_blocks(source) -> tuple[str | None, str | None, str]`
-  — separa script, style, body
+  — separates script, style, body
 - `_parse_script(tokens) -> ScriptDeclarations`
   — recursive descent LL(1)
 - `_parse_body(html, known_components) -> list[Node]`
-  — subclass de `html.parser.HTMLParser`
+  — subclass of `html.parser.HTMLParser`
 
-**Design do body parser**:
+**Body parser design**:
 
-- Tags uppercase (`<Show>`, `<For>`, `<Switch>`, etc.) → control flow nodes
-- Tags PascalCase registradas → ComponentNode
-- Tags lowercase → ElementNode
+- Uppercase tags (`<Show>`, `<For>`, `<Switch>`, etc.) → control flow nodes
+- Registered PascalCase tags → ComponentNode
+- Lowercase tags → ElementNode
 - `<Slot:name>` → SlotRenderNode
 - `<slot:name>` → SlotPassNode
 - `{{ expr }}` → ExprNode
-- Texto livre → TextNode
-- Atributos preservados como `dict[str, str | bool]` para o compiler
+- Free text → TextNode
+- Attributes preserved as `dict[str, str | bool]` for the compiler
 
-**Testes**:
+**Tests**:
 
-- `test_parse_empty_component` (só body, sem frontmatter)
+- `test_parse_empty_component` (body only, no frontmatter)
 - `test_parse_full_component` (frontmatter + style + body)
-- `test_extract_blocks_*` (com/sem frontmatter, com/sem style)
+- `test_extract_blocks_*` (with/without frontmatter, with/without style)
 - `test_parse_extends`
 - `test_parse_from_import`
 - `test_parse_script_imports_*` (default, named, wildcard, alias)
 - `test_parse_script_props_pydantic` (Literal, Annotated, EmailStr)
-- `test_parse_script_slots_*` (com/sem fallback)
+- `test_parse_script_slots_*` (with/without fallback)
 - `test_parse_script_store`
 - `test_parse_script_variables_*` (let, const, state, computed)
 - `test_parse_body_show` / `test_parse_body_show_fallback`
@@ -196,20 +196,20 @@ Todos com `@dataclass(frozen=True, slots=True)`.
 - `test_parse_body_self_closing_component`
 - `test_parse_error_*` (unterminated tags, unknown keywords, etc.)
 
-**Critério de done**: Parseia o exemplo completo do Dashboard (IDEA.md §16)
-produzindo AST correto.
+**Done criteria**: Parses the complete Dashboard example (IDEA.md §16)
+producing correct AST.
 
 ### 1.5 `css.py` — Scoped CSS
 
-**Responsabilidade**: Extrair e escopar CSS de componentes.
+**Responsibility**: Extract and scope CSS from components.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `generate_scope_hash(path: Path) -> str` — sha256[:7]
 - `scope_css(css_source: str, scope_hash: str) -> str`
   — regex-based selector prefixing
 
-**Regras de rewrite**:
+**Rewrite rules**:
 
 ```text
 .alert { ... }           → [data-pjx-a1b2c3] .alert { ... }
@@ -220,7 +220,7 @@ div.card { ... }         → [data-pjx-a1b2c3] div.card { ... }
 @media (...) { .a {} }   → @media (...) { [data-pjx-a1b2c3] .a {} }
 ```
 
-**Testes**:
+**Tests**:
 
 - `test_scope_hash_deterministic`
 - `test_scope_hash_unique_per_path`
@@ -232,23 +232,23 @@ div.card { ... }         → [data-pjx-a1b2c3] div.card { ... }
 - `test_scope_css_nested_rules`
 - `test_scope_css_preserves_properties`
 
-**Critério de done**: Todos os padrões CSS comuns escopados corretamente.
+**Done criteria**: All common CSS patterns scoped correctly.
 
-### 1.6 `compiler.py` — AST para Output
+### 1.6 `compiler.py` — AST to Output
 
-**Responsabilidade**: Compilar `Component` AST em Jinja2 + Alpine + HTMX.
+**Responsibility**: Compile `Component` AST into Jinja2 + Alpine + HTMX.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `Compiler(registry: ComponentRegistry)`
 - `Compiler.compile(component: Component) -> CompiledComponent`
-- `_compile_preamble(component) -> str` — `{% set %}` para let/const/computed
+- `_compile_preamble(component) -> str` — `{% set %}` for let/const/computed
 - `_compile_node(node: Node) -> str` — recursive walker
-- `_compile_attrs(attrs: dict) -> str` — transforma DSL attrs
+- `_compile_attrs(attrs: dict) -> str` — transforms DSL attrs
 
-**Regras de atributos** (consolidadas da SPEC.md §§9-13):
+**Attribute rules** (consolidated from SPEC.md §§9-13):
 
-| Prefixo/nome        | Transformação              |
+| Prefix/name         | Transformation             |
 | ------------------- | -------------------------- |
 | `bind:text`         | `x-text`                   |
 | `bind:model[.mod]`  | `x-model[.mod]`            |
@@ -285,7 +285,7 @@ div.card { ... }         → [data-pjx-a1b2c3] div.card { ... }
 | `reactive`          | `x-data="..."`             |
 | `loading:*`         | HTMX indicator patterns    |
 
-**Testes**:
+**Tests**:
 
 - `test_compile_let_const` → `{% set %}`
 - `test_compile_state_to_alpine_data`
@@ -312,19 +312,19 @@ div.card { ... }         → [data-pjx-a1b2c3] div.card { ... }
 - `test_compile_builtins` (has_slot, url_for, static)
 - `test_compile_dashboard_example` (IDEA.md §17 end-to-end)
 
-**Critério de done**: Compila o Dashboard do IDEA.md para Jinja2 válido.
+**Done criteria**: Compiles the Dashboard from IDEA.md to valid Jinja2.
 
 ---
 
-## Fase 2 — Component System
+## Phase 2 — Component System ✅
 
-Objetivo: resolver imports, validar props, resolver slots, carregar config.
+Goal: resolve imports, validate props, resolve slots, load config.
 
-### 2.1 `config.py` — Configuração
+### 2.1 `config.py` — Configuration
 
-**Responsabilidade**: Carregar config de `pjx.toml` e env vars.
+**Responsibility**: Load config from `pjx.toml` and env vars.
 
-**Entregáveis**:
+**Deliverables**:
 
 ```python
 class PJXConfig(BaseSettings):
@@ -345,16 +345,16 @@ class PJXConfig(BaseSettings):
     tailwind: bool = False
 ```
 
-**Testes**: Load from TOML, env override, defaults.
+**Tests**: Load from TOML, env override, defaults.
 
-**Critério de done**: Config carrega de pjx.toml e env vars corretamente.
+**Done criteria**: Config loads from pjx.toml and env vars correctly.
 
 ### 2.2 `registry.py` — Component Registry
 
-**Responsabilidade**: Resolver imports, cachear componentes, detectar
+**Responsibility**: Resolve imports, cache components, detect
 circular imports.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `ComponentRegistry(root_dirs: list[Path])`
 - `resolve(import_decl, from_path) -> list[ResolvedComponent]`
@@ -364,12 +364,12 @@ circular imports.
 
 **Design**:
 
-- Cache: `dict[str, Component]` (por nome) + `dict[Path, Component]` (por path)
-- Resolução: relativa ao arquivo importador
-- Circular: set de paths "em resolução" → `ImportResolutionError`
-- Invalidação (dev): check mtime antes de servir do cache
+- Cache: `dict[str, Component]` (by name) + `dict[Path, Component]` (by path)
+- Resolution: relative to the importing file
+- Circular: set of paths "being resolved" → `ImportResolutionError`
+- Invalidation (dev): check mtime before serving from cache
 
-**Testes**:
+**Tests**:
 
 - `test_resolve_relative_import`
 - `test_resolve_named_import_from_dir`
@@ -379,20 +379,20 @@ circular imports.
 - `test_cache_hit`
 - `test_cache_invalidation_mtime`
 
-**Critério de done**: Resolve todos os padrões de import do IDEA.md §2.
+**Done criteria**: Resolves all import patterns from IDEA.md §2.
 
-### 2.3 `props.py` — Props para Pydantic
+### 2.3 `props.py` — Props to Pydantic
 
-**Responsabilidade**: Gerar `BaseModel` dinâmico a partir de `PropsDecl`.
+**Responsibility**: Generate dynamic `BaseModel` from `PropsDecl`.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `generate_props_model(decl: PropsDecl) -> type[BaseModel]`
 - `validate_props(model, data) -> BaseModel`
 
-**Mapping** (DSL usa tipos Pydantic nativos):
+**Mapping** (DSL uses native Pydantic types):
 
-| DSL                            | BaseModel gerado                                 |
+| DSL                            | Generated BaseModel                              |
 | ------------------------------ | ------------------------------------------------ |
 | `name: str`                    | `name: str`                                      |
 | `age: int = 0`                 | `age: int = 0`                                   |
@@ -403,7 +403,7 @@ circular imports.
 | `score: Annotated[int, Gt(0)]` | `score: Annotated[int, Gt(0)]`                   |
 | `url: HttpUrl \| None = None`  | `url: HttpUrl \| None = None`                    |
 
-**Testes**:
+**Tests**:
 
 - `test_generate_required_field`
 - `test_generate_optional_field`
@@ -418,60 +418,60 @@ circular imports.
 - `test_validate_props_invalid_choice`
 - `test_validate_props_constraint_violation`
 
-**Critério de done**: Gera models para todos os exemplos de props do IDEA.md §3.
+**Done criteria**: Generates models for all prop examples from IDEA.md §3.
 
-### 2.4 `slots.py` — Resolução de Slots
+### 2.4 `slots.py` — Slot Resolution
 
-**Responsabilidade**: Resolver slots declarados com conteúdo passado pelo pai.
+**Responsibility**: Resolve declared slots with content passed by the parent.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `resolve_slots(declarations, passed_slots, children) -> dict[str, str]`
 
-**Testes**:
+**Tests**:
 
 - `test_resolve_slot_with_content`
 - `test_resolve_slot_fallback`
 - `test_resolve_slot_default_children`
 - `test_resolve_slot_empty`
 
-**Critério de done**: Resolve todos os padrões de slot do IDEA.md §5.
+**Done criteria**: Resolves all slot patterns from IDEA.md §5.
 
 ---
 
-## Fase 3 — Runtime
+## Phase 3 — Runtime ✅
 
-Objetivo: renderizar templates e integrar com FastAPI.
+Goal: render templates and integrate with FastAPI.
 
 ### 3.1 `log.py` — Logging
 
-**Responsabilidade**: Configurar logging com Rich.
+**Responsibility**: Configure logging with Rich.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `setup_logging(debug: bool) -> None`
 - `logger = logging.getLogger("pjx")`
 
-**Critério de done**: Logs formatados com Rich, níveis configuráveis.
+**Done criteria**: Logs formatted with Rich, configurable levels.
 
 ### 3.2 `engine.py` — Template Engine
 
-**Responsabilidade**: Interface unificada sobre Jinja2 e MiniJinja.
+**Responsibility**: Unified interface over Jinja2 and MiniJinja.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `EngineProtocol` (Protocol)
-- `Jinja2Engine` — wrapper sobre `jinja2.Environment`
-- `MiniJinjaEngine` — wrapper sobre `minijinja.Environment`
+- `Jinja2Engine` — wrapper over `jinja2.Environment`
+- `MiniJinjaEngine` — wrapper over `minijinja.Environment`
 - `create_engine(config) -> EngineProtocol`
 
 **Design**:
 
-- `auto` → Jinja2 (padrão atual)
-- Ambos implementam: `render`, `render_string`, `add_template`, `add_global`
-- Templates compilados são registrados via `add_template`
+- `auto` → Jinja2 (current default)
+- Both implement: `render`, `render_string`, `add_template`, `add_global`
+- Compiled templates are registered via `add_template`
 
-**Testes**:
+**Tests**:
 
 - `test_jinja2_engine_render`
 - `test_jinja2_engine_render_string`
@@ -479,99 +479,99 @@ Objetivo: renderizar templates e integrar com FastAPI.
 - `test_create_engine_auto_returns_jinja2`
 - `test_create_engine_explicit`
 
-**Critério de done**: Ambos engines renderizam templates compilados pelo
+**Done criteria**: Both engines render templates compiled by the
 compiler.
 
 ### 3.3 `integration.py` — FastAPI
 
-**Responsabilidade**: Decorators `@pjx.page` e `@pjx.component`, mounting
-de static files.
+**Responsibility**: Decorators `@pjx.page` and `@pjx.component`, mounting
+of static files.
 
-**Entregáveis**:
+**Deliverables**:
 
 - `PJX(app, template_dirs?, config?)`
 - `PJX.page(path, template, **kwargs) -> decorator`
 - `PJX.component(template) -> decorator`
 - `PJX.render(request, template, context) -> HTMLResponse`
 
-**Fluxo**:
+**Flow**:
 
-1. Decorator registra rota no FastAPI
+1. Decorator registers route in FastAPI
 2. Handler → context dict
-3. Registry resolve template (com cache)
-4. Props validados via Pydantic
-5. Engine renderiza
-6. Retorna HTMLResponse
+3. Registry resolves template (with cache)
+4. Props validated via Pydantic
+5. Engine renders
+6. Returns HTMLResponse
 
-**Testes**:
+**Tests**:
 
 - `test_page_decorator_registers_route`
 - `test_page_decorator_renders_template`
 - `test_component_decorator_renders_partial`
 - `test_props_validation_error_response`
 - `test_render_manual`
-- Testes de integração com `httpx.AsyncClient` + FastAPI TestClient
+- Integration tests with `httpx.AsyncClient` + FastAPI TestClient
 
-**Critério de done**: Uma página e um componente parcial renderizam
-corretamente via FastAPI.
+**Done criteria**: A page and a partial component render
+correctly via FastAPI.
 
 ### 3.4 `sse.py` — Server-Sent Events
 
-**Responsabilidade**: Helpers para endpoints SSE.
+**Responsibility**: Helpers for SSE endpoints.
 
-**Entregáveis**:
+**Deliverables**:
 
-- `EventStream` — async context com `send(event, data)` e
+- `EventStream` — async context with `send(event, data)` and
   `send_html(event, template, context)`
 - `PJX.sse(path) -> decorator`
 
-**Testes**:
+**Tests**:
 
 - `test_sse_stream_sends_event`
 - `test_sse_stream_renders_template`
 
-**Critério de done**: SSE endpoint funciona com `live="/url"` no template.
+**Done criteria**: SSE endpoint works with `live="/url"` in the template.
 
 ---
 
-## Fase 4 — CLI
+## Phase 4 — CLI ✅
 
-Objetivo: CLI completa para desenvolvimento.
+Goal: complete CLI for development.
 
-### 4.1 `cli/__init__.py` — App Typer
+### 4.1 `cli/__init__.py` — Typer App
 
-**Entregáveis**:
+**Deliverables**:
 
 - `app = typer.Typer(name="pjx")`
-- Entry point no pyproject.toml: `[project.scripts] pjx = "pjx.cli:app"`
+- Entry point in pyproject.toml: `[project.scripts] pjx = "pjx.cli:app"`
 
 ### 4.2 `cli/init.py` — `pjx init`
 
-Scaffolda estrutura de diretórios, cria `pjx.toml`, `package.json` com
+Scaffolds directory structure, creates `pjx.toml`, `package.json` with
 Alpine + HTMX.
 
 ### 4.3 `cli/dev.py` — `pjx dev` / `pjx run`
 
-- `dev`: `uvicorn app:app --reload --host --port` (do config)
+- `dev`: `uvicorn app:app --reload --host --port` (from config)
 - `run`: `uvicorn app:app --host --port --workers N`
 
 ### 4.4 `cli/build.py` — `pjx build` / `check` / `format`
 
-- `build`: Compila todos os `.jinja` + bundle CSS + `npm run build`
-- `check`: Parseia todos os `.jinja`, reporta erros com localização
-- `format`: Re-emite `.jinja` com formatting consistente
+- `build`: Compiles all `.jinja` + bundle CSS + `npm run build`
+- `check`: Parses all `.jinja`, reports errors with location
+- `format`: Re-emits `.jinja` with consistent formatting
 
 ### 4.5 `cli/packages.py` — `pjx add` / `remove`
 
-- `add <pkg>`: `npm install <pkg>` + copia dist para `static/vendor/`
-- `remove <pkg>`: `npm uninstall <pkg>` + limpa vendor
+- `add <pkg>`: `npm install <pkg>` + copies dist to `static/vendor/`
+- `remove <pkg>`: `npm uninstall <pkg>` + cleans vendor
 
 ### 4.6 `assets.py` — Static Files
 
-**Responsabilidade**: Descobrir e gerenciar arquivos estáticos, copiar
+**Responsibility**: Discover and manage static files, copy
 vendor builds.
 
-**Testes para toda a CLI**:
+**Tests for the entire CLI**:
 
 - `test_cli_init_creates_dirs`
 - `test_cli_check_valid_files`
@@ -579,101 +579,101 @@ vendor builds.
 - `test_cli_add_runs_npm`
 - `test_cli_build_compiles_all`
 
-**Critério de done**: Todos os comandos executam sem erro e produzem output
-correto.
+**Done criteria**: All commands execute without errors and produce correct
+output.
 
 ---
 
-## Fase 5 — Frontend Tooling
+## Phase 5 — Frontend Tooling
 
-Objetivo: integração com npm, build pipeline, Tailwind.
+Goal: integration with npm, build pipeline, Tailwind.
 
 ### 5.1 npm Integration
 
-- `pjx init` cria `package.json` com Alpine.js + HTMX como deps
+- `pjx init` creates `package.json` with Alpine.js + HTMX as deps
 - `pjx add <pkg>` → `npm install <pkg>`
 - `pjx remove <pkg>` → `npm uninstall <pkg>`
-- `pjx build` → `npm run build` (configurado com script no package.json)
+- `pjx build` → `npm run build` (configured with script in package.json)
 
 ### 5.2 Vendor Build
 
-- ESLint para lint do JS customizado
-- Script de build copia dist files para `static/vendor/`:
+- ESLint for custom JS linting
+- Build script copies dist files to `static/vendor/`:
   - `node_modules/alpinejs/dist/cdn.min.js` → `static/vendor/alpine.min.js`
   - `node_modules/htmx.org/dist/htmx.min.js` → `static/vendor/htmx.min.js`
 
-### 5.3 Tailwind CSS (opcional)
+### 5.3 Tailwind CSS (optional)
 
-- Se `tailwind = true` no config:
-  - `pjx init` adiciona `tailwindcss` ao package.json
-  - `pjx build` roda `npx tailwindcss -i input.css -o static/css/tailwind.css`
-  - Template base inclui `<link>` para tailwind.css
+- If `tailwind = true` in config:
+  - `pjx init` adds `tailwindcss` to package.json
+  - `pjx build` runs `npx tailwindcss -i input.css -o static/css/tailwind.css`
+  - Base template includes `<link>` for tailwind.css
 
-**Critério de done**: `pjx init && pjx add alpinejs && pjx build` produz
-vendor/ funcional.
+**Done criteria**: `pjx init && pjx add alpinejs && pjx build` produces
+functional vendor/.
 
 ---
 
-## Fase 6 — Melhorias (concluída)
+## Phase 6 — Improvements (completed)
 
-Objetivo: fechar gaps críticos para produção — attrs passthrough, asset
-pipeline, validação runtime, inline rendering, e static analysis.
+Goal: close critical gaps for production — attrs passthrough, asset
+pipeline, runtime validation, inline rendering, and static analysis.
 
 ### 6.1 Attrs Passthrough ✅
 
-- `separate_attrs()` em `src/pjx/props.py` — separa props de extras
-- Compilador resolve `PropsDecl` do filho via registry
-- Extras renderizados como `{% set attrs %}...{% endset %}`
-- 6 testes em `tests/unit/test_props.py::TestSeparateAttrs`
-- 4 testes em `tests/unit/test_compiler.py::TestComponentAttrsPassthrough`
+- `separate_attrs()` in `src/pjx/props.py` — separates props from extras
+- Compiler resolves child's `PropsDecl` via registry
+- Extras rendered as `{% set attrs %}...{% endset %}`
+- 6 tests in `tests/unit/test_props.py::TestSeparateAttrs`
+- 4 tests in `tests/unit/test_compiler.py::TestComponentAttrsPassthrough`
 
 ### 6.2 Runtime Prop Validation ✅
 
-- `validate_props: bool = True` em `PJXConfig`
-- Cache de Pydantic models em `PJX._props_models`
-- Validação antes de render — `PropValidationError` com mensagem clara
-- 4 testes em `tests/integration/test_integration.py::TestRuntimePropValidation`
+- `validate_props: bool = True` in `PJXConfig`
+- Cache of Pydantic models in `PJX._props_models`
+- Validation before render — `PropValidationError` with clear message
+- 4 tests in `tests/integration/test_integration.py::TestRuntimePropValidation`
 
 ### 6.3 Asset Pipeline ✅
 
-- `AssetDecl(kind, path)` em `ast_nodes.py`
-- Tokens `CSS`/`JS` no lexer, `_parse_asset()` no parser
-- `AssetCollector` em `src/pjx/assets.py` — dedup, render `<link>`/`<script>`
-- `pjx_assets` global disponível nos templates
-- 7 testes em `tests/unit/test_assets.py`
-- 4 testes em `tests/unit/test_parser.py::TestAssetDeclarations`
+- `AssetDecl(kind, path)` in `ast_nodes.py`
+- Tokens `CSS`/`JS` in lexer, `_parse_asset()` in parser
+- `AssetCollector` in `src/pjx/assets.py` — dedup, render `<link>`/`<script>`
+- `pjx_assets` global available in templates
+- 7 tests in `tests/unit/test_assets.py`
+- 4 tests in `tests/unit/test_parser.py::TestAssetDeclarations`
 
 ### 6.4 Inline Render Mode ✅
 
-- `render_mode: Literal["include", "inline"]` em `PJXConfig`
-- `Compiler.inline_includes()` — substitui `{% include %}` recursivamente
-- MiniJinja inline: 10-74x mais rápido que Jinja2 ad-hoc
-- 5 testes em `tests/unit/test_compiler.py::TestInlineIncludes`
-- 1 teste em `tests/integration/test_integration.py::TestInlineRenderMode`
+- `render_mode: Literal["include", "inline"]` in `PJXConfig`
+- `Compiler.inline_includes()` — substitutes `{% include %}` recursively
+- MiniJinja inline: 10-74x faster than Jinja2 ad-hoc
+- 5 tests in `tests/unit/test_compiler.py::TestInlineIncludes`
+- 1 test in `tests/integration/test_integration.py::TestInlineRenderMode`
 
 ### 6.5 Static Analysis (`pjx check`) ✅
 
 - `src/pjx/checker.py` — `check_imports`, `check_props`, `check_slots`
-- `_walk_nodes()` — walker recursivo do AST
-- CLI `pjx check` atualizado com 2 fases: parse+register, depois check
-- 10 testes em `tests/unit/test_checker.py`
+- `_walk_nodes()` — recursive AST walker
+- CLI `pjx check` updated with 2 phases: parse+register, then check
+- 10 tests in `tests/unit/test_checker.py`
 
 ### 6.6 AST Node Compiler Coverage ✅
 
-- Testes para `ErrorBoundaryNode`, `AwaitNode`, `TransitionNode`, `StoreDecl`
-- 10 testes adicionados em `tests/unit/test_compiler.py`
+- Tests for `ErrorBoundaryNode`, `AwaitNode`, `TransitionNode`, `StoreDecl`
+- 10 tests added in `tests/unit/test_compiler.py`
 
-**Total: 300 testes passando** (364 com benchmarks).
+**Total: 300 tests passing** (364 with benchmarks).
 
 ---
 
-## Estratégia de Testes
+## Testing Strategy
 
-### Estrutura
+### Structure
 
 ```text
 tests/
-├── conftest.py                # Fixtures globais
+├── conftest.py                # Global fixtures
 ├── unit/
 │   ├── test_errors.py
 │   ├── test_ast_nodes.py
@@ -700,54 +700,54 @@ tests/
 
 ### Fixtures (conftest.py)
 
-- `sample_component_source` — string `.jinja` com frontmatter completo
-- `parsed_component` — `Component` AST pronto
-- `compiled_component` — `CompiledComponent` pronto
-- `pjx_app` — FastAPI app com PJX montado
-- `test_client` — `httpx.AsyncClient` com a app
-- `tmp_templates` — diretório temporário com `.jinja` de exemplo
+- `sample_component_source` — `.jinja` string with full frontmatter
+- `parsed_component` — ready `Component` AST
+- `compiled_component` — ready `CompiledComponent`
+- `pjx_app` — FastAPI app with PJX mounted
+- `test_client` — `httpx.AsyncClient` with the app
+- `tmp_templates` — temporary directory with example `.jinja` files
 
-### Convenções
+### Conventions
 
-- Nomes: `test_<unit>_<scenario>_<expected>`
-- Parametrize para cobrir variantes (ex: todos os tipos de bind:*)
+- Names: `test_<unit>_<scenario>_<expected>`
+- Parametrize to cover variants (e.g.: all bind:* types)
 - Markers: `@pytest.mark.slow`, `@pytest.mark.integration`, `@pytest.mark.e2e`
-- Coverage mínima: 90% para core (lexer, parser, compiler)
-- Property-based (Hypothesis): gerar frontmatter válido/inválido random
-  para fuzz do lexer e parser
+- Minimum coverage: 90% for core (lexer, parser, compiler)
+- Property-based (Hypothesis): generate random valid/invalid frontmatter
+  for lexer and parser fuzzing
 
 ---
 
-## Componentes de Exemplo
+## Example Components
 
-Criar em `examples/` para validação e documentação:
+Create in `examples/` for validation and documentation:
 
-| Arquivo                    | Cobre                                      |
+| File                       | Covers                                     |
 | -------------------------- | ------------------------------------------ |
 | `Counter.jinja`            | state, on:click, bind:text, reactive       |
 | `TodoItem.jinja`           | props, slots, Show, For, scoped CSS        |
 | `UserCard.jinja`           | Pydantic types (EmailStr, Literal)         |
-| `Dashboard.jinja`          | Exemplo completo do IDEA.md §17            |
-| `TreeNode.jinja`           | Componente recursivo                       |
-| `layouts/Base.jinja`       | Layout base com slots head/content/footer  |
+| `Dashboard.jinja`          | Full example from IDEA.md §17              |
+| `TreeNode.jinja`           | Recursive component                        |
+| `layouts/Base.jinja`       | Base layout with head/content/footer slots |
 | `pages/Home.jinja`         | extends, slot:head, prop spreading         |
-| `errors/404.jinja`         | Página de erro com extends                 |
+| `errors/404.jinja`         | Error page with extends                    |
 
-Estes exemplos servem como test fixtures e documentação de uso real.
+These examples serve as test fixtures and real usage documentation.
 
 ---
 
-## Reestruturação de Diretório
+## Directory Restructuring
 
-A estrutura atual `src/main.py` precisa migrar para `src/pjx/`:
+The current `src/main.py` structure needs to migrate to `src/pjx/`:
 
 ```text
-# Antes
+# Before
 src/
 ├── __init__.py
 └── main.py
 
-# Depois
+# After
 src/
 └── pjx/
     ├── __init__.py
@@ -776,38 +776,38 @@ src/
         └── packages.py
 ```
 
-Atualizar `pyproject.toml` com `[project.scripts]` para o CLI entry point.
+Update `pyproject.toml` with `[project.scripts]` for the CLI entry point.
 
 ---
 
-## Ordem de Implementação (dependências)
+## Implementation Order (dependencies)
 
 ```text
-Fase 1 (paralelo onde possível):
+Phase 1 (parallel where possible):
   errors.py ──────┐
   ast_nodes.py ───┤
   css.py ─────────┼──→ lexer.py ──→ parser.py ──→ compiler.py
                   │
-Fase 2:           │
+Phase 2:          │
   config.py ──────┤
   props.py ───────┤
   slots.py ───────┼──→ registry.py
                   │
-Fase 3:           │
+Phase 3:          │
   log.py ─────────┤
   engine.py ──────┼──→ integration.py ──→ sse.py
                   │
-Fase 4:           │
+Phase 4:          │
   assets.py ──────┼──→ cli/*
                   │
-Fase 5:           └──→ frontend tooling
+Phase 5:          └──→ frontend tooling
 ```
 
 ---
 
-## Validação End-to-End
+## End-to-End Validation
 
-Ao final de cada fase, validar com:
+At the end of each phase, validate with:
 
 ```bash
 rtk uv run ruff format --check .
@@ -817,14 +817,14 @@ rtk uv run pytest -v
 rtk uv run rumdl check .
 ```
 
-### Teste E2E final (após Fase 3)
+### Final E2E Test (after Phase 3)
 
-1. Criar um componente `TodoItem.jinja` com props, state, slots
-2. Criar uma página `Home.jinja` que usa `TodoItem`
-3. Montar FastAPI app com `PJX`
-4. Verificar que GET `/` retorna HTML válido com:
-   - `{% if %}` / `{% for %}` corretos
-   - `x-data` com states
-   - `hx-get` / `hx-post` com URLs
-   - CSS escopado com `data-pjx-*`
-   - Slots resolvidos
+1. Create a `TodoItem.jinja` component with props, state, slots
+2. Create a `Home.jinja` page that uses `TodoItem`
+3. Mount FastAPI app with `PJX`
+4. Verify that GET `/` returns valid HTML with:
+   - Correct `{% if %}` / `{% for %}`
+   - `x-data` with states
+   - `hx-get` / `hx-post` with URLs
+   - Scoped CSS with `data-pjx-*`
+   - Resolved slots

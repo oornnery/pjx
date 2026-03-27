@@ -1,14 +1,14 @@
-# PJX DSL — Especificação Completa
+# PJX DSL — Complete Specification
 
-> DSL Python para componentes `.jinja` reativos, inspirada no SolidJS, Svelte e Vue.
-> Compila para Jinja2 + HTMX + Alpine.js + SSE.
+> Python DSL for reactive `.jinja` components, inspired by SolidJS, Svelte and Vue.
+> Compiles to Jinja2 + HTMX + Alpine.js + SSE.
 
 ---
 
-## 1. Estrutura de um Componente `.jinja`
+## 1. `.jinja` Component Structure
 
-Todo componente é um arquivo `.jinja` com um frontmatter declarativo delimitado
-por `---` no topo e HTML reativo no corpo.
+Every component is a `.jinja` file with a declarative frontmatter delimited
+by `---` at the top and reactive HTML in the body.
 
 ```html
 ---
@@ -39,7 +39,7 @@ computed is_valid = remaining >= 0
 ---
 
 <li id="todo-{{ props.id }}" class="{{ css_class }}" reactive>
-    <!-- corpo do componente -->
+    <!-- component body -->
 </li>
 ```
 
@@ -47,31 +47,31 @@ computed is_valid = remaining >= 0
 
 ## 2. Imports
 
-### Importar componentes
+### Import components
 
 ```python
-# ── Importar componente (nome = nome do arquivo) ──────────────
+# ── Import component (name = file name) ──────────────────
 import Button from "./Button.jinja"
 import Modal from "../shared/Modal.jinja"
 
-# ── Alias ─────────────────────────────────────────────────────
+# ── Alias ─────────────────────────────────────────────────
 import Button from "./Button.jinja" as PrimaryButton
 
-# ── Importar múltiplos de um diretório ────────────────────────
+# ── Import multiple from a directory ──────────────────────
 import { Card, Badge, Avatar } from "./components/"
 
-# ── Importar sub-componentes de um arquivo multi-export ───────
+# ── Import sub-components from a multi-export file ────────
 import { CardHeader, CardBody, CardFooter } from "./Card.jinja"
 
-# ── Wildcard (todos do diretório) ─────────────────────────────
+# ── Wildcard (all from directory) ─────────────────────────
 import * from "./ui/"
 ```
 
-### Importar tipos Python/Pydantic
+### Import Python/Pydantic types
 
-Tipos primitivos (`str`, `int`, `bool`, `float`, `list`, `dict`, `Callable`,
-`Any`, `None`) são auto-importados. Tipos Pydantic e constraints precisam de
-import explícito com syntax Python:
+Primitive types (`str`, `int`, `bool`, `float`, `list`, `dict`, `Callable`,
+`Any`, `None`) are auto-imported. Pydantic types and constraints require
+explicit import with Python syntax:
 
 ```python
 from typing import Literal, Annotated
@@ -79,69 +79,69 @@ from pydantic import EmailStr, HttpUrl
 from annotated_types import Gt, Lt, Ge, Le, MinLen, MaxLen
 ```
 
-### Extends (herança de layout)
+### Extends (layout inheritance)
 
 ```python
 extends "layouts/Base.jinja"
 ```
 
-Indica que a página herda de um layout. O corpo da página é injetado no
-`<Slot:content />` do layout. Veja seção 18 (Layouts).
+Indicates that the page inherits from a layout. The page body is injected into
+the layout's `<Slot:content />`. See section 18 (Layouts).
 
-### Compilação
+### Compilation
 
-| Escrito                               | Efeito interno                                        |
-| ------------------------------------- | ----------------------------------------------------- |
-| `import Button from "./Button.jinja"` | Registra `Button` no preprocessor, carrega o template |
-| `import Button from "..." as Btn`     | Registra como `Btn`                                   |
-| `import { A, B } from "./dir/"`       | Carrega `dir/A.jinja` e `dir/B.jinja`                 |
-| `from pydantic import EmailStr`       | Disponibiliza `EmailStr` como tipo em props           |
-| `extends "layouts/Base.jinja"`        | Wrapa a página no layout (template inheritance)       |
+| Written                               | Internal effect                                            |
+| ------------------------------------- | ---------------------------------------------------------- |
+| `import Button from "./Button.jinja"` | Registers `Button` in the preprocessor, loads the template |
+| `import Button from "..." as Btn`     | Registers as `Btn`                                         |
+| `import { A, B } from "./dir/"`       | Loads `dir/A.jinja` and `dir/B.jinja`                      |
+| `from pydantic import EmailStr`       | Makes `EmailStr` available as a type in props              |
+| `extends "layouts/Base.jinja"`        | Wraps the page in the layout (template inheritance)        |
 
 ---
 
 ## 3. Props
 
-Declaração tipada usando tipos Pydantic nativos.
+Typed declaration using native Pydantic types.
 
 ```python
 props {
   name:     str,                                        # required
   age:      int                        = 0,             # optional
   role:     Literal["admin", "mod", "user"] = "user",   # choices via Literal
-  email:    EmailStr,                                    # tipo Pydantic
+  email:    EmailStr,                                    # Pydantic type
   bio:      str | None                 = None,           # nullable
   tags:     list[str]                  = [],             # list factory
   meta:     dict[str, Any]            = {},              # dict factory
   score:    Annotated[int, Gt(0), Lt(100)] = 50,         # constraints
-  url:      HttpUrl | None             = None,           # URL validada
+  url:      HttpUrl | None             = None,           # validated URL
   on_click: Callable                   = None,           # callback
 }
 ```
 
-**Tipos Pydantic suportados:**
+**Supported Pydantic types:**
 
-| Tipo DSL                      | Pydantic         |
+| DSL type                      | Pydantic         |
 | ----------------------------- | ---------------- |
-| `str`, `int`, `bool`, `float` | Tipos nativos    |
+| `str`, `int`, `bool`, `float` | Native types     |
 | `str \| None`                 | Union / Optional |
-| `list[str]`, `dict[str, Any]` | Genéricos        |
-| `Literal["a", "b"]`           | Enum inline      |
-| `EmailStr`, `HttpUrl`         | Tipos Pydantic   |
+| `list[str]`, `dict[str, Any]` | Generics         |
+| `Literal["a", "b"]`           | Inline enum      |
+| `EmailStr`, `HttpUrl`         | Pydantic types   |
 | `Annotated[int, Gt(0)]`       | Constraints      |
 | `Callable`                    | Callbacks        |
 
-**Acesso no template:**
+**Access in template:**
 
 ```html
 <span>{{ props.name }}</span>
 <span>{{ props.role }}</span>
 ```
 
-**Compilação interna:**
+**Internal compilation:**
 
 ```python
-# Gera automaticamente um BaseModel:
+# Automatically generates a BaseModel:
 class UserCardProps(BaseModel):
     name: str
     age: int = 0
@@ -157,148 +157,149 @@ class UserCardProps(BaseModel):
 
 ---
 
-## 4. Variáveis
+## 4. Variables
 
 ```python
-# ── let — variável server-side (disponível no template) ───────
+# ── let — server-side variable (available in template) ────
 let greeting = "Hello, " + props.name
 let item_count = len(props.items)
 let css_class = "card card--" + props.variant
 
-# ── const — constante imutável ────────────────────────────────
+# ── const — immutable constant ────────────────────────────
 const MAX_ITEMS = 50
 const API_URL = "/api/v1"
 
-# ── state — variável reativa CLIENT-SIDE (Alpine.js) ──────────
+# ── state — CLIENT-SIDE reactive variable (Alpine.js) ─────
 state count = 0
 state open = false
 state search = ""
 state selected = []
 state form = { name: "", email: "" }
 
-# ── computed — derivada reativa (recalcula quando deps mudam) ─
+# ── computed — reactive derived (recalculates when deps change) ─
 computed total = len(props.items)
 computed done_count = len([i for i in props.items if i.done])
 computed progress = (done_count / total * 100) if total > 0 else 0
 computed is_empty = total == 0
 ```
 
-**Compilação:**
+**Compilation:**
 
-| Escrito                 | Server (Jinja2)          | Client (Alpine.js)         |
-| ----------------------- | ------------------------ | -------------------------- |
-| `let x = 1`             | `{% set x = 1 %}`        | —                          |
-| `const X = 1`           | `{% set X = 1 %}`        | —                          |
-| `state count = 0`       | `{{ count }}` para SSR   | `x-data` inclui `count: 0` |
-| `computed total = expr` | `{% set total = expr %}` | —                          |
+| Written                 | Server (Jinja2)          | Client (Alpine.js)            |
+| ----------------------- | ------------------------ | ----------------------------- |
+| `let x = 1`             | `{% set x = 1 %}`        | —                             |
+| `const X = 1`           | `{% set X = 1 %}`        | —                             |
+| `state count = 0`       | `{{ count }}` for SSR    | `x-data` includes `count: 0`  |
+| `computed total = expr` | `{% set total = expr %}` | —                             |
 
 ---
 
 ## 5. Slots
 
 ```python
-# ── Declarar slot no frontmatter ──────────────────────────────
-slot header                                    # slot sem fallback
-slot footer = <span>© 2025 PJX</span>         # com fallback
-slot actions                                   # slot vazio se não fornecido
+# ── Declare slot in frontmatter ───────────────────────────
+slot header                                    # slot without fallback
+slot footer = <span>© 2025 PJX</span>         # with fallback
+slot actions                                   # empty slot if not provided
 ```
 
-**Renderizar slot no template:**
+**Render slot in template:**
 
 ```html
-<!-- Self-closing: renderiza ou vazio -->
+<!-- Self-closing: renders or empty -->
 <Slot:header />
 
-<!-- Com fallback inline -->
+<!-- With inline fallback -->
 <Slot:header>
-    <h2>Título padrão</h2>
+    <h2>Default title</h2>
 </Slot:header>
 
-<!-- Slot com condicional -->
+<!-- Slot with conditional -->
 <Show when="has_slot('header')">
     <header><Slot:header /></header>
 </Show>
 ```
 
-**Passar slot ao usar componente:**
+**Pass slot when using component:**
 
 ```html
 <Card title="Hello">
-    <!-- children = slot default -->
-    <p>Corpo do card</p>
+    <!-- children = default slot -->
+    <p>Card body</p>
 
-    <!-- slot nomeado -->
+    <!-- named slot -->
     <slot:header>
         <h1>Custom Header</h1>
     </slot:header>
 
     <slot:footer>
-        <button on:click="close()">Fechar</button>
+        <button on:click="cancel()">Cancel</button>
+        <button on:click="confirm()">Confirm</button>
     </slot:footer>
 </Card>
 ```
 
-**Compilação:**
+**Compilation:**
 
-| Escrito                          | Resultado                                                        |
+| Written                          | Result                                                           |
 | -------------------------------- | ---------------------------------------------------------------- |
 | `<Slot:header />`                | `{{ _slot_header \| default('') }}`                              |
 | `<Slot:header>fb</Slot:header>`  | `{% if _slot_header %}{{ _slot_header }}{% else %}fb{% endif %}` |
-| `<slot:name>content</slot:name>` | Passa `content` como slot nomeado ao componente pai              |
+| `<slot:name>content</slot:name>` | Passes `content` as a named slot to the parent component         |
 
 ---
 
-## 6. Control Flow — Tags HTML
+## 6. Control Flow — HTML Tags
 
-### `<Show>` — Condicional
+### `<Show>` — Conditional
 
 ```html
-<!-- Simples -->
+<!-- Simple -->
 <Show when="user.is_admin">
     <button>Delete</button>
 </Show>
 
-<!-- Com fallback -->
-<Show when="items" fallback="<p>Nenhum item.</p>">
+<!-- With fallback -->
+<Show when="items" fallback="<p>No items.</p>">
     <ul>...</ul>
 </Show>
 
-<!-- Negação -->
+<!-- Negation -->
 <Show when="not loading">
-    <div>Conteúdo carregado</div>
+    <div>Content loaded</div>
 </Show>
 
-<!-- Expressão complexa -->
+<!-- Complex expression -->
 <Show when="user.age >= 18 and user.verified">
-    <span>Acesso liberado</span>
+    <span>Access granted</span>
 </Show>
 ```
 
-| Escrito                                    | Compilado                               |
+| Written                                    | Compiled                                |
 | ------------------------------------------ | --------------------------------------- |
 | `<Show when="x">...body...</Show>`         | `{% if x %}...body...{% endif %}`       |
 | `<Show when="x" fallback="fb">body</Show>` | `{% if x %}body{% else %}fb{% endif %}` |
 
 ---
 
-### `<For>` — Iteração
+### `<For>` — Iteration
 
 ```html
-<!-- Básico -->
+<!-- Basic -->
 <For each="users" as="user">
     <li>{{ user.name }}</li>
 </For>
 
-<!-- Com index (usa loop.index0 do Jinja2) -->
+<!-- With index (uses Jinja2's loop.index0) -->
 <For each="items" as="item">
     <li>{{ loop.index }}. {{ item }}</li>
 </For>
 
-<!-- Com fallback vazio -->
+<!-- With empty fallback -->
 <For each="results" as="result">
     <div>{{ result.title }}</div>
 <Empty>
-    <p>Nenhum resultado encontrado.</p>
+    <p>No results found.</p>
 </Empty>
 </For>
 
@@ -310,28 +311,28 @@ slot actions                                   # slot vazio se não fornecido
     </For>
 </For>
 
-<!-- Com filtro inline -->
+<!-- With inline filter -->
 <For each="users | selectattr('active')" as="user">
     <li>{{ user.name }}</li>
 </For>
 ```
 
-| Escrito                 | Compilado          |
+| Written                 | Compiled           |
 | ----------------------- | ------------------ |
 | `<For each="x" as="i">` | `{% for i in x %}` |
 | `<Empty>`               | `{% else %}`       |
 | `</For>`                | `{% endfor %}`     |
 
-**Variáveis de loop disponíveis (herdadas do Jinja2):**
+**Available loop variables (inherited from Jinja2):**
 
-| Variável              | Descrição                |
-| --------------------- | ------------------------ |
-| `loop.index`          | Iteração atual (1-based) |
-| `loop.index0`         | Iteração atual (0-based) |
-| `loop.first`          | `true` se primeiro item  |
-| `loop.last`           | `true` se último item    |
-| `loop.length`         | Total de itens           |
-| `loop.cycle('a','b')` | Alterna entre valores    |
+| Variable              | Description                 |
+| --------------------- | --------------------------- |
+| `loop.index`          | Current iteration (1-based) |
+| `loop.index0`         | Current iteration (0-based) |
+| `loop.first`          | `true` if first item        |
+| `loop.last`           | `true` if last item         |
+| `loop.length`         | Total items                 |
+| `loop.cycle('a','b')` | Alternates between values   |
 
 ---
 
@@ -340,20 +341,20 @@ slot actions                                   # slot vazio se não fornecido
 ```html
 <Switch on="status">
     <Case value="active">
-        <Badge text="Ativo" variant="success" />
+        <Badge text="Active" variant="success" />
     </Case>
     <Case value="pending">
-        <Badge text="Pendente" variant="warning" />
+        <Badge text="Pending" variant="warning" />
     </Case>
     <Case value="blocked">
-        <Badge text="Bloqueado" variant="danger" />
+        <Badge text="Blocked" variant="danger" />
     </Case>
     <Default>
-        <Badge text="Desconhecido" variant="muted" />
+        <Badge text="Unknown" variant="muted" />
     </Default>
 </Switch>
 
-<!-- Switch com números -->
+<!-- Switch with numbers -->
 <Switch on="props.level">
     <Case value="1"><h1>{{ title }}</h1></Case>
     <Case value="2"><h2>{{ title }}</h2></Case>
@@ -362,31 +363,31 @@ slot actions                                   # slot vazio se não fornecido
 </Switch>
 ```
 
-| Escrito                  | Compilado               |
-| ------------------------ | ----------------------- |
-| `<Switch on="x">`        | `{% set _sw = x %}`     |
-| `<Case value="v">` (1º)  | `{% if _sw == "v" %}`   |
-| `<Case value="v">` (2º+) | `{% elif _sw == "v" %}` |
-| `<Default>`              | `{% else %}`            |
-| `</Switch>`              | `{% endif %}`           |
+| Written                   | Compiled                |
+| ------------------------- | ----------------------- |
+| `<Switch on="x">`         | `{% set _sw = x %}`     |
+| `<Case value="v">` (1st)  | `{% if _sw == "v" %}`   |
+| `<Case value="v">` (2nd+) | `{% elif _sw == "v" %}` |
+| `<Default>`               | `{% else %}`            |
+| `</Switch>`               | `{% endif %}`           |
 
 ---
 
 ### `<Portal>` — Out-of-Band Swap (HTMX OOB)
 
 ```html
-<!-- Teleporta conteúdo para outro lugar do DOM via HTMX OOB -->
+<!-- Teleports content to another place in the DOM via HTMX OOB -->
 <Portal target="notifications">
-    <div class="toast toast-success">Item salvo!</div>
+    <div class="toast toast-success">Item saved!</div>
 </Portal>
 
-<!-- Substituir sidebar -->
+<!-- Replace sidebar -->
 <Portal target="sidebar" swap="outerHTML">
-    <nav>Menu atualizado</nav>
+    <nav>Updated menu</nav>
 </Portal>
 ```
 
-| Escrito                                 | Compilado                               |
+| Written                                 | Compiled                                |
 | --------------------------------------- | --------------------------------------- |
 | `<Portal target="id">`                  | `<div id="id" hx-swap-oob="true">`      |
 | `<Portal target="id" swap="outerHTML">` | `<div id="id" hx-swap-oob="outerHTML">` |
@@ -394,98 +395,98 @@ slot actions                                   # slot vazio se não fornecido
 
 ---
 
-### `<Component>` — Renderização de Componente
+### `<Component>` — Component Rendering
 
 ```html
-<!-- Self-closing (sem children) -->
+<!-- Self-closing (no children) -->
 <Badge text="Novo" variant="success" />
 
-<!-- Com children -->
+<!-- With children -->
 <Card title="Welcome" variant="primary">
-    <p>Conteúdo do card.</p>
+    <p>Card content.</p>
 </Card>
 
-<!-- Com slots nomeados -->
-<Modal title="Confirmar">
-    <p>Tem certeza?</p>
+<!-- With named slots -->
+<Modal title="Confirm">
+    <p>Are you sure?</p>
 
     <slot:footer>
-        <button on:click="cancel()">Cancelar</button>
-        <button on:click="confirm()">Confirmar</button>
+        <button on:click="cancel()">Cancel</button>
+        <button on:click="confirm()">Confirm</button>
     </slot:footer>
 </Modal>
 
-<!-- Componente dinâmico -->
+<!-- Dynamic component -->
 <Component is="{{ widget_type }}" data="{{ widget_data }}" />
 
-<!-- Prop spreading — espalha dict como props -->
+<!-- Prop spreading — spreads dict as props -->
 <Button ...btn_props />
 <Button ...btn_props label="Override" />
 
-<!-- Componente recursivo (tree) -->
+<!-- Recursive component (tree) -->
 <TreeNode node="{{ child }}" />
 ```
 
 ---
 
-### `<ErrorBoundary>` — Tratamento de Erros
+### `<ErrorBoundary>` — Error Handling
 
 ```html
-<ErrorBoundary fallback="<p>Algo deu errado.</p>">
+<ErrorBoundary fallback="<p>Something went wrong.</p>">
     <UserProfile user="{{ user }}" />
 </ErrorBoundary>
 
-<!-- Com componente de erro customizado -->
+<!-- With custom error component -->
 <ErrorBoundary>
     <RiskyComponent />
     <slot:error>
         <div class="error-box">
-            <h3>Erro ao carregar</h3>
+            <h3>Error loading</h3>
             <button action:get="/retry" target="closest div" swap="outerHTML">
-                Tentar novamente
+                Try again
             </button>
         </div>
     </slot:error>
 </ErrorBoundary>
 ```
 
-| Escrito                                             | Compilado                                                   |
-| --------------------------------------------------- | ----------------------------------------------------------- |
-| `<ErrorBoundary fallback="fb">body</ErrorBoundary>` | `try/except` wrapper que renderiza fallback em caso de erro |
+| Written                                             | Compiled                                            |
+| --------------------------------------------------- | --------------------------------------------------- |
+| `<ErrorBoundary fallback="fb">body</ErrorBoundary>` | `try/except` wrapper that renders fallback on error |
 
 ---
 
-### `<Await>` — Carregamento Assíncrono
+### `<Await>` — Async Loading
 
 ```html
-<!-- Placeholder enquanto carrega via HTMX -->
+<!-- Placeholder while loading via HTMX -->
 <Await src="/api/users" trigger="load">
     <slot:loading>
-        <div class="skeleton">Carregando...</div>
+        <div class="skeleton">Loading...</div>
     </slot:loading>
 
     <slot:error>
-        <p>Erro ao carregar dados.</p>
+        <p>Error loading data.</p>
     </slot:error>
 </Await>
 ```
 
-| Escrito                             | Compilado                                                                |
-| ----------------------------------- | ------------------------------------------------------------------------ |
-| `<Await src="/url" trigger="load">` | `<div hx-get="/url" hx-trigger="load" hx-swap="innerHTML">` com skeleton |
+| Written                             | Compiled                                                                  |
+| ----------------------------------- | ------------------------------------------------------------------------- |
+| `<Await src="/url" trigger="load">` | `<div hx-get="/url" hx-trigger="load" hx-swap="innerHTML">` with skeleton |
 
 ---
 
-### `<Transition>` — Animações
+### `<Transition>` — Animations
 
 ```html
 <Transition enter="fade-in 300ms" leave="fade-out 200ms">
     <Show when="visible">
-        <div class="modal">Conteúdo</div>
+        <div class="modal">Content</div>
     </Show>
 </Transition>
 
-<!-- Transition de lista -->
+<!-- List transition -->
 <TransitionGroup tag="ul" enter="slide-in" leave="slide-out" move="shuffle">
     <For each="items" as="item">
         <li key="{{ item.id }}">{{ item.name }}</li>
@@ -493,16 +494,16 @@ slot actions                                   # slot vazio se não fornecido
 </TransitionGroup>
 ```
 
-| Escrito                            | Compilado                                                   |
-| ---------------------------------- | ----------------------------------------------------------- |
-| `<Transition enter="x" leave="y">` | Wrapper com `x-transition:enter="x" x-transition:leave="y"` |
+| Written                            | Compiled                                                     |
+| ---------------------------------- | ------------------------------------------------------------ |
+| `<Transition enter="x" leave="y">` | Wrapper with `x-transition:enter="x" x-transition:leave="y"` |
 
 ---
 
-### `<Fragment>` — Wrapper sem elemento DOM
+### `<Fragment>` — Wrapper without DOM element
 
 ```html
-<!-- Renderiza filhos sem criar um elemento wrapper -->
+<!-- Renders children without creating a wrapper element -->
 <Fragment>
     <li>Item 1</li>
     <li>Item 2</li>
@@ -512,33 +513,33 @@ slot actions                                   # slot vazio se não fornecido
 
 ---
 
-### `<Teleport>` — Renderizar em outro local do DOM (client-side)
+### `<Teleport>` — Render in another DOM location (client-side)
 
 ```html
-<!-- Diferente do Portal (OOB server): Teleport é client-side via Alpine -->
+<!-- Different from Portal (server OOB): Teleport is client-side via Alpine -->
 <Teleport to="#modal-root">
-    <div class="modal">Conteúdo teleportado</div>
+    <div class="modal">Teleported content</div>
 </Teleport>
 ```
 
 ---
 
-## 7. Atributos Reativos (Alpine.js)
+## 7. Reactive Attributes (Alpine.js)
 
-### `reactive` — Inicializa x-data
+### `reactive` — Initializes x-data
 
 ```html
-<!-- Bare: gera x-data com todos os state declarados -->
+<!-- Bare: generates x-data with all declared state -->
 <div reactive>
 
-<!-- Explicit: x-data customizado -->
+<!-- Explicit: custom x-data -->
 <div reactive="{ count: 0, open: false }">
 
-<!-- Com escopo de store -->
+<!-- With store scope -->
 <div reactive:store="todos">
 ```
 
-| Escrito                 | Compilado                       |
+| Written                 | Compiled                        |
 | ----------------------- | ------------------------------- |
 | `reactive`              | `x-data="{{ alpine_data }}"`    |
 | `reactive="{ x: 0 }"`   | `x-data="{ x: 0 }"`             |
@@ -563,10 +564,10 @@ slot actions                                   # slot vazio se não fornecido
 <button bind:disabled="!isValid"></button>      <!-- :disabled -->
 <div bind:id="'item-' + id"></div>              <!-- :id -->
 
-<!-- Cloak (evita flash de conteúdo não-renderizado) -->
+<!-- Cloak (prevents flash of unrendered content) -->
 <div bind:cloak></div>                          <!-- x-cloak -->
 
-<!-- Ref (referência ao elemento) -->
+<!-- Ref (element reference) -->
 <input bind:ref="searchInput" />                <!-- x-ref -->
 
 <!-- Transition -->
@@ -574,11 +575,11 @@ slot actions                                   # slot vazio se não fornecido
 <div bind:transition.opacity></div>             <!-- x-transition.opacity -->
 <div bind:transition.duration.500ms></div>      <!-- x-transition.duration.500ms -->
 
-<!-- Init (executa ao inicializar) -->
+<!-- Init (executes on initialization) -->
 <div bind:init="fetchData()"></div>             <!-- x-init -->
 ```
 
-| Escrito                         | Compilado                    |
+| Written                         | Compiled                     |
 | ------------------------------- | ---------------------------- |
 | `bind:text="x"`                 | `x-text="x"`                 |
 | `bind:html="x"`                 | `x-html="x"`                 |
@@ -597,12 +598,12 @@ slot actions                                   # slot vazio se não fornecido
 
 ---
 
-## 8. Eventos
+## 8. Events
 
 ### `on:` — Event Handlers (Alpine.js client-side)
 
 ```html
-<!-- Básico -->
+<!-- Basic -->
 <button on:click="count++">+</button>
 <button on:click="handleClick()">Click</button>
 
@@ -619,11 +620,11 @@ slot actions                                   # slot vazio se não fornecido
 <input on:input.debounce.300ms="search()">
 <button on:click.once="init()">
 
-<!-- Self (apenas se o target for o próprio elemento) -->
+<!-- Self (only if target is the element itself) -->
 <div on:click.self="close()">
 ```
 
-| Escrito                       | Compilado                   |
+| Written                       | Compiled                    |
 | ----------------------------- | --------------------------- |
 | `on:click="x"`                | `@click="x"`                |
 | `on:click.prevent="x"`        | `@click.prevent="x"`        |
@@ -639,17 +640,17 @@ slot actions                                   # slot vazio se não fornecido
 
 ## 9. HTMX — Server Interaction
 
-### `action:` — Verbos HTTP
+### `action:` — HTTP Verbs
 
 ```html
-<button action:get="/api/items">Carregar</button>
-<form action:post="/api/items">Criar</form>
-<button action:put="/api/items/1">Atualizar</button>
+<button action:get="/api/items">Load</button>
+<form action:post="/api/items">Create</form>
+<button action:put="/api/items/1">Update</button>
 <button action:patch="/api/items/1/toggle">Toggle</button>
-<button action:delete="/api/items/1">Deletar</button>
+<button action:delete="/api/items/1">Delete</button>
 ```
 
-| Escrito                | Compilado          |
+| Written                | Compiled           |
 | ---------------------- | ------------------ |
 | `action:get="/url"`    | `hx-get="/url"`    |
 | `action:post="/url"`   | `hx-post="/url"`   |
@@ -663,15 +664,15 @@ slot actions                                   # slot vazio se não fornecido
 
 ```html
 <div swap="innerHTML">            <!-- default -->
-<div swap="outerHTML">             <!-- substitui o elemento inteiro -->
-<div swap="beforebegin">           <!-- insere antes do elemento -->
-<div swap="afterbegin">            <!-- insere no início (primeiro filho) -->
-<div swap="beforeend">             <!-- insere no final (último filho) -->
-<div swap="afterend">              <!-- insere depois do elemento -->
-<div swap="delete">                <!-- remove o elemento -->
-<div swap="none">                  <!-- sem swap (fire-and-forget) -->
+<div swap="outerHTML">             <!-- replaces the entire element -->
+<div swap="beforebegin">           <!-- inserts before the element -->
+<div swap="afterbegin">            <!-- inserts at the beginning (first child) -->
+<div swap="beforeend">             <!-- inserts at the end (last child) -->
+<div swap="afterend">              <!-- inserts after the element -->
+<div swap="delete">                <!-- removes the element -->
+<div swap="none">                  <!-- no swap (fire-and-forget) -->
 
-<!-- Com modifiers -->
+<!-- With modifiers -->
 <div swap="innerHTML transition:true">
 <div swap="innerHTML settle:300ms">
 <div swap="innerHTML scroll:top">
@@ -679,31 +680,31 @@ slot actions                                   # slot vazio se não fornecido
 <div swap="innerHTML focus-scroll:true">
 
 <!-- Target -->
-<button target="#result">          <!-- onde colocar a resposta -->
-<button target="closest li">      <!-- CSS selector relativo -->
+<button target="#result">          <!-- where to place the response -->
+<button target="closest li">      <!-- relative CSS selector -->
 <button target="next .panel">
 <button target="previous .item">
-<button target="find .content">   <!-- dentro do elemento -->
+<button target="find .content">   <!-- within the element -->
 
 <!-- Trigger -->
-<div trigger="load">               <!-- dispara ao carregar -->
-<div trigger="revealed">           <!-- dispara quando visível (viewport) -->
+<div trigger="load">               <!-- fires on load -->
+<div trigger="revealed">           <!-- fires when visible (viewport) -->
 <div trigger="intersect">          <!-- IntersectionObserver -->
 <div trigger="every 5s">           <!-- polling -->
 <input trigger="input changed delay:300ms">
 <form trigger="submit">
-<div trigger="click[ctrlKey]">     <!-- com filtro JS -->
+<div trigger="click[ctrlKey]">     <!-- with JS filter -->
 
-<!-- Select (qual parte da resposta usar) -->
-<div select=".content">            <!-- pega só .content da resposta -->
-<div select-oob="#sidebar">        <!-- OOB swap adicional -->
+<!-- Select (which part of the response to use) -->
+<div select=".content">            <!-- picks only .content from the response -->
+<div select-oob="#sidebar">        <!-- additional OOB swap -->
 
-<!-- Into (shorthand para target + swap) -->
+<!-- Into (shorthand for target + swap) -->
 <button into="#result">             <!-- hx-target="#result" hx-swap="innerHTML" -->
 <button into="#result:outerHTML">   <!-- hx-target="#result" hx-swap="outerHTML" -->
 ```
 
-| Escrito                          | Compilado                              |
+| Written                          | Compiled                               |
 | -------------------------------- | -------------------------------------- |
 | `swap="x"`                       | `hx-swap="x"`                          |
 | `target="x"`                     | `hx-target="x"`                        |
@@ -726,10 +727,10 @@ slot actions                                   # slot vazio se não fornecido
 
 ---
 
-### Trigger Modifiers Compostos
+### Compound Trigger Modifiers
 
 ```html
-<!-- once — dispara apenas uma vez -->
+<!-- once — fires only once -->
 <div trigger="load once">
 <button trigger="click once">
 
@@ -744,36 +745,36 @@ slot actions                                   # slot vazio se não fornecido
 <button trigger="click queue:last">
 <button trigger="click queue:all">
 
-<!-- from (escutar evento de outro elemento) -->
+<!-- from (listen to event from another element) -->
 <div trigger="click from:#other-button">
 
-<!-- Combinar triggers -->
+<!-- Combine triggers -->
 <div trigger="load, click, keyup[key=='Enter'] from:body">
 ```
 
-| Escrito            | Compilado                                 |
+| Written            | Compiled                                  |
 | ------------------ | ----------------------------------------- |
-| `once`             | adiciona `once` ao `hx-trigger`           |
-| `debounce="500ms"` | adiciona `delay:500ms` ao `hx-trigger`    |
-| `throttle="500ms"` | adiciona `throttle:500ms` ao `hx-trigger` |
+| `once`             | adds `once` to `hx-trigger`               |
+| `debounce="500ms"` | adds `delay:500ms` to `hx-trigger`        |
+| `throttle="500ms"` | adds `throttle:500ms` to `hx-trigger`     |
 
 ---
 
 ### `boost` — Boost (Progressive Enhancement)
 
 ```html
-<!-- Transforma links/forms em AJAX automaticamente -->
+<!-- Transforms links/forms into AJAX automatically -->
 <nav boost>
-    <a href="/about">About</a>    <!-- vira hx-get="/about" -->
+    <a href="/about">About</a>    <!-- becomes hx-get="/about" -->
     <a href="/contact">Contact</a>
 </nav>
 
 <form boost action="/submit" method="post">
-    <!-- vira hx-post="/submit" -->
+    <!-- becomes hx-post="/submit" -->
 </form>
 ```
 
-| Escrito | Compilado         |
+| Written | Compiled          |
 | ------- | ----------------- |
 | `boost` | `hx-boost="true"` |
 
@@ -785,19 +786,19 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
 (`htmx-ext-sse@2`) via a `<script>` tag.
 
 ```html
-<!-- Conectar a um endpoint SSE -->
+<!-- Connect to an SSE endpoint -->
 <div live="/events/dashboard">
-    <!-- Receber eventos específicos -->
+    <!-- Receive specific events -->
     <span channel="user-count">0</span>
     <div channel="notifications" swap="beforeend"></div>
     <div channel="stats-update" swap="outerHTML"></div>
 </div>
 
-<!-- Fechar conexão em condição -->
+<!-- Close connection on condition -->
 <div live="/events/chat" close="closeChat">
 ```
 
-| Escrito                    | Compilado                         |
+| Written                    | Compiled                          |
 | -------------------------- | --------------------------------- |
 | `live="/url"`              | `hx-ext="sse" sse-connect="/url"` |
 | `channel="event"`          | `sse-swap="event"`                |
@@ -809,7 +810,7 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
 ## 11. WebSocket
 
 ```html
-<!-- Conectar via WebSocket -->
+<!-- Connect via WebSocket -->
 <div socket="/ws/chat">
     <div channel="message" swap="beforeend"></div>
     <form send="message">
@@ -818,7 +819,7 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
 </div>
 ```
 
-| Escrito         | Compilado                       |
+| Written         | Compiled                        |
 | --------------- | ------------------------------- |
 | `socket="/url"` | `hx-ext="ws" ws-connect="/url"` |
 | `send="event"`  | `ws-send="event"`               |
@@ -828,30 +829,30 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
 ## 12. Loading States
 
 ```html
-<!-- Indicator global -->
+<!-- Global indicator -->
 <button action:post="/api/save"
         indicator="#spinner">
-    Salvar
+    Save
 </button>
 <span id="spinner" class="htmx-indicator">⏳</span>
 
-<!-- Indicator inline com DSL -->
+<!-- Inline indicator with DSL -->
 <button action:post="/api/save" loading>
-    <span loading:hide>Salvar</span>
-    <span loading:show>Salvando...</span>
+    <span loading:hide>Save</span>
+    <span loading:show>Saving...</span>
 </button>
 
-<!-- Classes durante request -->
+<!-- Classes during request -->
 <button action:post="/api/save"
         loading:class="opacity-50 cursor-wait"
         loading:disabled>
-    Salvar
+    Save
 </button>
 
-<!-- Desabilitar durante request -->
+<!-- Disable during request -->
 <button action:post="/api/save"
         disabled-elt="this">
-    Salvar
+    Save
 </button>
 
 <!-- Skeleton loading -->
@@ -862,14 +863,14 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
 </div>
 ```
 
-| Escrito                    | Compilado                          |
+| Written                    | Compiled                           |
 | -------------------------- | ---------------------------------- |
-| `loading`                  | Adiciona classe `htmx-indicator`   |
-| `loading:show`             | Elemento visível durante request   |
-| `loading:hide`             | Elemento escondido durante request |
-| `loading:class="x"`        | Adiciona classes durante request   |
-| `loading:disabled`         | `disabled` durante request         |
-| `loading:aria-busy="true"` | `aria-busy` durante request        |
+| `loading`                  | Adds `htmx-indicator` class        |
+| `loading:show`             | Element visible during request     |
+| `loading:hide`             | Element hidden during request      |
+| `loading:class="x"`        | Adds classes during request        |
+| `loading:disabled`         | `disabled` during request          |
+| `loading:aria-busy="true"` | `aria-busy` during request         |
 | `disabled-elt="this"`      | `hx-disabled-elt="this"`           |
 
 ---
@@ -877,7 +878,7 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
 ## 13. Forms
 
 ```html
-<!-- Form reativo com validação client-side -->
+<!-- Reactive form with client-side validation -->
 <form action:post="/api/users"
       swap="outerHTML"
       reactive="{ valid: false }">
@@ -897,12 +898,12 @@ Requires `sse-starlette` dependency. Layouts must load the HTMX SSE extension
             bind:disabled="!valid"
             loading:class="opacity-50"
             disabled-elt="this">
-        <span loading:hide>Criar usuário</span>
-        <span loading:show>Criando...</span>
+        <span loading:hide>Create user</span>
+        <span loading:show>Creating...</span>
     </button>
 </form>
 
-<!-- Upload de arquivo -->
+<!-- File upload -->
 <form action:post="/api/upload"
       encoding="multipart/form-data"
       swap="none">
@@ -921,7 +922,7 @@ import Button from "./Button.jinja"
 props { type: str = "info" }
 ---
 
-<!-- Estilos com escopo automático (atributo data-pjx-HASH no componente) -->
+<!-- Styles with automatic scoping (data-pjx-HASH attribute on component) -->
 <style scoped>
   .alert { padding: 1rem; border-radius: 8px; }
   .alert-success { background: #d1fae5; color: #065f46; }
@@ -935,49 +936,49 @@ props { type: str = "info" }
 
 ---
 
-## 15. Asset Includes — JS, CSS e Arquivos Estáticos
+## 15. Asset Includes — JS, CSS and Static Files
 
-Componentes podem declarar dependências de arquivos externos (scripts, folhas
-de estilo, fontes) usando tags `<script>` e `<link>` no body. O PJX coleta
-todas as dependências e as deduplica no HTML final.
+Components can declare external file dependencies (scripts, stylesheets,
+fonts) using `<script>` and `<link>` tags in the body. PJX collects
+all dependencies and deduplicates them in the final HTML.
 
-### Include de CSS externo
+### External CSS include
 
 ```html
 <link rel="stylesheet" href="/static/css/datepicker.css" />
 ```
 
-### Include de JS externo
+### External JS include
 
 ```html
 <script src="/static/vendor/chart.js" defer></script>
 ```
 
-### Estrutura de diretórios para assets
+### Directory structure for assets
 
 ```text
 project-root/
 ├── templates/
-│   ├── pages/           # Páginas (extends layouts)
-│   ├── components/      # Componentes reutilizáveis
-│   ├── layouts/         # Layouts base
-│   └── ui/              # Biblioteca de UI
+│   ├── pages/           # Pages (extends layouts)
+│   ├── components/      # Reusable components
+│   ├── layouts/         # Base layouts
+│   └── ui/              # UI library
 ├── static/
-│   ├── vendor/          # JS/CSS de terceiros (Alpine, HTMX, etc.)
+│   ├── vendor/          # Third-party JS/CSS (Alpine, HTMX, etc.)
 │   │   ├── alpine.min.js
 │   │   └── htmx.min.js
-│   ├── css/             # CSS compilado (Tailwind, bundles PJX)
+│   ├── css/             # Compiled CSS (Tailwind, PJX bundles)
 │   │   └── pjx-components.css
-│   ├── js/              # JS do projeto
-│   └── images/          # Imagens e outros assets
-├── pjx.toml             # Configuração do projeto
-└── app.py               # Aplicação FastAPI
+│   ├── js/              # Project JS
+│   └── images/          # Images and other assets
+├── pjx.toml             # Project configuration
+└── app.py               # FastAPI application
 ```
 
-### Layout base com includes
+### Base layout with includes
 
-O layout base (`templates/layouts/Base.jinja`) é responsável por incluir os
-assets globais (Alpine.js, HTMX, CSS base). Páginas extendem esse layout:
+The base layout (`templates/layouts/Base.jinja`) is responsible for including
+global assets (Alpine.js, HTMX, base CSS). Pages extend this layout:
 
 ```html
 <!-- templates/layouts/Base.jinja -->
@@ -1017,10 +1018,10 @@ assets globais (Alpine.js, HTMX, CSS base). Páginas extendem esse layout:
 </html>
 ```
 
-### Componente com assets próprios
+### Component with its own assets
 
-Componentes podem incluir scripts e estilos inline ou externos. O `<script>`
-no body é passado direto para o HTML (não é processado pelo frontmatter):
+Components can include inline or external scripts and styles. The `<script>`
+in the body is passed directly to the HTML (not processed by the frontmatter):
 
 ```html
 ---
@@ -1041,13 +1042,13 @@ props {
 <script src="/static/js/chart-init.js" defer></script>
 ```
 
-### `pjx build` e bundling de CSS
+### `pjx build` and CSS bundling
 
-O comando `pjx build` compila todos os componentes e gera um bundle CSS
-unificado em `static/css/pjx-components.css` contendo todos os estilos
-scoped. Esse arquivo pode ser incluído no layout base.
+The `pjx build` command compiles all components and generates a unified CSS
+bundle at `static/css/pjx-components.css` containing all scoped styles.
+This file can be included in the base layout.
 
-### Configuração de diretórios (`pjx.toml`)
+### Directory configuration (`pjx.toml`)
 
 ```toml
 engine = "hybrid"
@@ -1059,7 +1060,7 @@ static_dir = "static"
 
 ---
 
-## 16. Tabela Completa de Compilação
+## 16. Complete Compilation Table
 
 ### Control Flow
 
@@ -1071,19 +1072,19 @@ static_dir = "static"
 | `<For each="xs" as="x">body<Empty>fb</Empty></For>`                    | `{% for x in xs %}body{% else %}fb{% endfor %}` |
 | `<Switch on="v"><Case value="a">A</Case><Default>?</Default></Switch>` | `{% if v=="a" %}A{% else %}?{% endif %}`        |
 | `<ErrorBoundary fallback="fb">body</ErrorBoundary>`                    | `try/except` wrapper                            |
-| `<Fragment>body</Fragment>`                                            | `body` (sem wrapper)                            |
+| `<Fragment>body</Fragment>`                                            | `body` (no wrapper)                             |
 | `<Portal target="id">body</Portal>`                                    | `<div id="id" hx-swap-oob="true">body</div>`    |
-| `<Component is="name" />`                                              | Renderização dinâmica por nome                  |
+| `<Component is="name" />`                                              | Dynamic rendering by name                       |
 | `<Await src="/url">`                                                   | `<div hx-get="/url" hx-trigger="load">`         |
 
-### Variáveis
+### Variables
 
-| DSL                 | Efeito                                 |
-| ------------------- | -------------------------------------- |
-| `let x = val`       | `{% set x = val %}` (server)           |
-| `const X = val`     | `{% set X = val %}` (imutável, server) |
-| `state x = val`     | Alpine `x-data` inclui `x: val`        |
-| `computed x = expr` | `{% set x = expr %}` + reativo         |
+| DSL                 | Effect                                  |
+| ------------------- | --------------------------------------- |
+| `let x = val`       | `{% set x = val %}` (server)            |
+| `const X = val`     | `{% set X = val %}` (immutable, server) |
+| `state x = val`     | Alpine `x-data` includes `x: val`       |
+| `computed x = expr` | `{% set x = expr %}` + reactive         |
 
 ### Alpine (client)
 
@@ -1144,7 +1145,7 @@ static_dir = "static"
 
 ---
 
-## 17. Exemplo Completo — Dashboard
+## 17. Complete Example — Dashboard
 
 ```html
 ---
@@ -1185,11 +1186,11 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
     <Slot:header>
         <header>
             <h1>Dashboard</h1>
-            <p>Bem-vindo, {{ props.user.name }}</p>
+            <p>Welcome, {{ props.user.name }}</p>
         </header>
     </Slot:header>
 
-    <!-- Stats com SSE live -->
+    <!-- Stats with SSE live -->
     <section class="stat-grid" live="/events/stats" channel="stats-update">
         <For each="props.stats" as="stat">
             <Card variant="stat">
@@ -1213,7 +1214,7 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
         <!-- Search & Filter -->
         <div class="toolbar">
             <input type="search"
-                   placeholder="Buscar pedidos..."
+                   placeholder="Search orders..."
                    bind:model.debounce.300ms="search"
                    action:get="/api/orders"
                    trigger="input changed delay:300ms"
@@ -1239,7 +1240,7 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
                    searchable="true"
                    paginated="true">
             <slot:empty>
-                <p class="empty">Nenhum pedido encontrado.</p>
+                <p class="empty">No orders found.</p>
             </slot:empty>
         </DataTable>
 
@@ -1249,14 +1250,14 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
                    data="{{ props.orders }}"
                    x="date"
                    y="amount"
-                   title="Receita" />
+                   title="Revenue" />
         </Show>
     </main>
 
     <!-- Sidebar -->
     <aside>
         <Slot:sidebar>
-            <h3>Equipe Online</h3>
+            <h3>Team Online</h3>
             <For each="props.team" as="member">
                 <div class="team-member"
                      on:click="selected_order = null"
@@ -1278,7 +1279,7 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
                     </Switch>
                 </div>
             <Empty>
-                <p>Ninguém online.</p>
+                <p>Nobody online.</p>
             </Empty>
             </For>
             <div id="user-detail"></div>
@@ -1287,20 +1288,20 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
 
     <!-- Modal -->
     <Show when="show_modal">
-        <Modal title="Detalhes do Pedido">
+        <Modal title="Order Details">
             <div id="order-detail"
                  live="/events/order"
                  channel="order-update">
-                Selecione um pedido.
+                Select an order.
             </div>
             <slot:footer>
-                <button on:click="show_modal = false">Fechar</button>
+                <button on:click="show_modal = false">Close</button>
                 <button action:post="/api/orders/approve"
                         swap="none"
                         loading:disabled
                         loading:class="opacity-50">
-                    <span loading:hide>Aprovar</span>
-                    <span loading:show>Aprovando...</span>
+                    <span loading:hide>Approve</span>
+                    <span loading:show>Approving...</span>
                 </button>
             </slot:footer>
         </Modal>
@@ -1310,36 +1311,36 @@ computed filtered_orders = active_orders if filter == "active" else props.orders
 
 ---
 
-## 18. Comparação com Frameworks
+## 18. Framework Comparison
 
-| Conceito    | PJX                     | SolidJS            | Svelte              | Vue                |
+| Concept     | PJX                     | SolidJS            | Svelte              | Vue                |
 | ----------- | ----------------------- | ------------------ | ------------------- | ------------------ |
-| Condicional | `<Show when="x">`       | `<Show when={x}>`  | `{#if x}`           | `v-if="x"`         |
+| Conditional | `<Show when="x">`       | `<Show when={x}>`  | `{#if x}`           | `v-if="x"`         |
 | Loop        | `<For each="x" as="i">` | `<For each={x}>`   | `{#each x as i}`    | `v-for="i in x"`   |
 | Switch      | `<Switch on="x">`       | `<Switch>/<Match>` | —                   | —                  |
 | Slot        | `<Slot:name />`         | `props.children`   | `<slot name="">`    | `<slot name="">`   |
 | Slot pass   | `<slot:name>`           | —                  | `<svelte:fragment>` | `<template #name>` |
-| Reatividade | `state x = 0`           | `createSignal()`   | `let x = 0`         | `ref(0)`           |
+| Reactivity  | `state x = 0`           | `createSignal()`   | `let x = 0`         | `ref(0)`           |
 | Computed    | `computed x = expr`     | `createMemo()`     | `$: x = expr`       | `computed()`       |
 | Binding     | `bind:model="x"`        | —                  | `bind:value={x}`    | `v-model="x"`      |
-| Evento      | `on:click="fn()"`       | `onClick={fn}`     | `on:click={fn}`     | `@click="fn()"`    |
+| Event       | `on:click="fn()"`       | `onClick={fn}`     | `on:click={fn}`     | `@click="fn()"`    |
 | HTTP        | `action:post="/url"`    | `fetch()`          | `fetch()`           | `axios`            |
 | SSE         | `live="/url"`           | custom             | custom              | custom             |
 | CSS scoped  | `<style scoped>`        | CSS modules        | `<style>` (auto)    | `<style scoped>`   |
 
 ---
 
-## 19. Layouts e Herança
+## 19. Layouts and Inheritance
 
-PJX suporta dois mecanismos de layout:
+PJX supports two layout mechanisms:
 
-1. **Runtime layout** via `PJX(layout=...)` — wrapa `{{ body }}` no template
-2. **Template inheritance** via `extends` — herança estática no frontmatter
+1. **Runtime layout** via `PJX(layout=...)` — wraps `{{ body }}` in the template
+2. **Template inheritance** via `extends` — static inheritance in frontmatter
 
 ### Runtime Layout (`PJX(layout=...)`)
 
-Definido na instância PJX, o layout runtime wrapa automaticamente todas as
-páginas. O conteúdo renderizado é injetado na variável `{{ body }}`:
+Defined on the PJX instance, the runtime layout automatically wraps all
+pages. The rendered content is injected into the `{{ body }}` variable:
 
 ```python
 from pjx import PJX, PJXConfig, SEO
@@ -1352,18 +1353,18 @@ pjx = PJX(
 )
 ```
 
-O layout recebe todas as variáveis do contexto da página, mais:
+The layout receives all page context variables, plus:
 
-| Variável         | Tipo     | Descrição                              |
-| ---------------- | -------- | -------------------------------------- |
-| `body`           | `Markup` | HTML renderizado da página             |
-| `seo`            | `SEO`    | SEO merged (global + per-page)         |
-| `head_css`       | `list`   | CSS extras para `<head>`               |
-| `head_scripts`   | `list`   | JS extras para `<head>`                |
-| `body_scripts`   | `list`   | JS extras antes de `</body>`           |
-| `favicon`        | `str`    | Caminho do favicon                     |
+| Variable       | Type     | Description                    |
+| -------------- | -------- | ------------------------------ |
+| `body`         | `Markup` | Rendered HTML of the page      |
+| `seo`          | `SEO`    | Merged SEO (global + per-page) |
+| `head_css`     | `list`   | Extra CSS for `<head>`         |
+| `head_scripts` | `list`   | Extra JS for `<head>`          |
+| `body_scripts` | `list`   | Extra JS before `</body>`      |
+| `favicon`      | `str`    | Favicon path                   |
 
-Para desabilitar o layout em uma página específica:
+To disable the layout on a specific page:
 
 ```python
 @pjx.page("/api-docs", layout=None)
@@ -1373,10 +1374,10 @@ async def api_docs():
 
 ### Template Inheritance (`extends`)
 
-Layouts definem a estrutura base da página (html, head, body, nav, footer).
-Páginas herdam de layouts via `extends`.
+Layouts define the base page structure (html, head, body, nav, footer).
+Pages inherit from layouts via `extends`.
 
-### Layout base
+### Base layout
 
 ```html
 ---
@@ -1413,7 +1414,7 @@ slot footer
 </html>
 ```
 
-### Página que herda do layout
+### Page that inherits from the layout
 
 ```html
 ---
@@ -1431,20 +1432,20 @@ props {
     <link rel="canonical" href="/" />
 </slot:head>
 
-<h1>Bem-vindo, {{ props.user.name }}</h1>
+<h1>Welcome, {{ props.user.name }}</h1>
 <For each="props.items" as="item">
     <p>{{ item.title }}</p>
 </For>
 ```
 
-O corpo da página (fora de `<slot:*>`) é automaticamente injetado no
-`<Slot:content />` do layout.
+The page body (outside `<slot:*>`) is automatically injected into the
+layout's `<Slot:content />`.
 
 ---
 
 ## 20. Prop Spreading
 
-Espalhar um dict como props de um componente.
+Spread a dict as component props.
 
 ```html
 ---
@@ -1455,26 +1456,26 @@ let btn_props = {
 }
 ---
 
-<!-- Espalha todas as props -->
+<!-- Spread all props -->
 <Button ...btn_props />
 
-<!-- Espalha + override -->
-<Button ...btn_props label="Salvar" disabled="true" />
+<!-- Spread + override -->
+<Button ...btn_props label="Save" disabled="true" />
 ```
 
-Props explícitos têm prioridade sobre o spread. O spread é resolvido em
-compile-time se o valor é estático, ou em runtime se é dinâmico.
+Explicit props take priority over the spread. The spread is resolved at
+compile-time if the value is static, or at runtime if dynamic.
 
-| Escrito                         | Compilado                                                  |
-| ------------------------------- | ---------------------------------------------------------- |
-| `<Button ...props />`           | Merge `props` com attrs explícitos, passa via `{% with %}` |
-| `<Button ...props label="x" />` | `label="x"` sobrescreve `props.label`                      |
+| Written                         | Compiled                                                    |
+| ------------------------------- | ----------------------------------------------------------- |
+| `<Button ...props />`           | Merges `props` with explicit attrs, passes via `{% with %}` |
+| `<Button ...props label="x" />` | `label="x"` overrides `props.label`                         |
 
 ---
 
 ## 21. Global State (Alpine Stores)
 
-### Declarar store
+### Declare store
 
 ```html
 ---
@@ -1487,7 +1488,7 @@ store todos = {
 ---
 ```
 
-### Usar store em componentes
+### Use store in components
 
 ```html
 <div reactive:store="todos">
@@ -1498,29 +1499,29 @@ store todos = {
 </div>
 ```
 
-| Escrito                       | Compilado                                          |
+| Written                       | Compiled                                           |
 | ----------------------------- | -------------------------------------------------- |
-| `store name = { ... }`        | `Alpine.store('name', { ... })` no script de init  |
+| `store name = { ... }`        | `Alpine.store('name', { ... })` in the init script |
 | `reactive:store="name"`       | `x-data="Alpine.store('name')"`                    |
-| `$store.name.prop`            | Acesso direto ao Alpine store                      |
+| `$store.name.prop`            | Direct access to the Alpine store                  |
 
-Stores são inicializados via `<script>` gerado no layout base, alimentados
-com dados do servidor.
+Stores are initialized via a `<script>` generated in the base layout, fed
+with data from the server.
 
 ---
 
-## 22. Funções Built-in nos Templates
+## 22. Built-in Template Functions
 
-Funções disponíveis em expressões dentro do template body:
+Functions available in expressions within the template body:
 
-| Função                  | Descrição                                      |
-| ----------------------- | ---------------------------------------------- |
-| `has_slot('name')`      | `true` se o slot `name` foi fornecido pelo pai |
-| `len(x)`                | Comprimento de lista/string                    |
-| `range(n)`              | Gera sequência 0..n-1                          |
-| `enumerate(x)`          | Pares (index, item)                            |
-| `url_for('route_name')` | Gera URL reversa para rota FastAPI             |
-| `static('path')`        | Gera URL para arquivo estático                 |
+| Function                | Description                                  |
+| ----------------------- | -------------------------------------------- |
+| `has_slot('name')`      | `true` if slot `name` was provided by parent |
+| `len(x)`                | Length of list/string                        |
+| `range(n)`              | Generates sequence 0..n-1                    |
+| `enumerate(x)`          | (index, item) pairs                          |
+| `url_for('route_name')` | Generates reverse URL for FastAPI route      |
+| `static('path')`        | Generates URL for static file                |
 
 ```html
 <Show when="has_slot('header')">
@@ -1528,14 +1529,14 @@ Funções disponíveis em expressões dentro do template body:
 </Show>
 
 <img src="{{ static('images/logo.png') }}" />
-<a href="{{ url_for('user_profile', user_id=user.id) }}">Perfil</a>
+<a href="{{ url_for('user_profile', user_id=user.id) }}">Profile</a>
 ```
 
 ---
 
-## 23. Páginas de Erro
+## 23. Error Pages
 
-### Páginas customizadas
+### Custom pages
 
 ```html
 ---
@@ -1548,12 +1549,12 @@ props {
 
 <div class="error-page">
     <h1>404</h1>
-    <p>Página <code>{{ props.path }}</code> não encontrada.</p>
-    <a href="/">Voltar ao início</a>
+    <p>Page <code>{{ props.path }}</code> not found.</p>
+    <a href="/">Back to home</a>
 </div>
 ```
 
-### Registro via FastAPI
+### Registration via FastAPI
 
 ```python
 @pjx.error(404, "errors/404.jinja")
@@ -1567,9 +1568,9 @@ async def server_error(request: Request):
 
 ---
 
-## 24. Componentes Recursivos
+## 24. Recursive Components
 
-Componentes podem importar a si mesmos para renderizar estruturas em árvore.
+Components can import themselves to render tree structures.
 
 ```html
 ---
@@ -1595,54 +1596,54 @@ props {
 </div>
 ```
 
-O compilador detecta imports circulares e limita profundidade via
-`max_depth` (padrão: 10). Ultrapassar o limite gera `CompileError`.
+The compiler detects circular imports and limits depth via
+`max_depth` (default: 10). Exceeding the limit raises `CompileError`.
 
 ---
 
 ## 25. File-Based Routing
 
-PJX suporta roteamento baseado no sistema de arquivos, inspirado em Next.js e
-SvelteKit. O método `pjx.auto_routes()` escaneia o diretório `pages/` e gera
-rotas FastAPI automaticamente.
+PJX supports file system-based routing, inspired by Next.js and
+SvelteKit. The `pjx.auto_routes()` method scans the `pages/` directory and
+generates FastAPI routes automatically.
 
-### Ativação
+### Activation
 
 ```python
 pjx = PJX(app, config=PJXConfig(toml_path="pjx.toml"))
 pjx.auto_routes()
 ```
 
-### Convenções de arquivo
+### File conventions
 
-| Padrão de arquivo              | Rota gerada                  | Descrição                         |
-| ------------------------------ | ---------------------------- | --------------------------------- |
-| `pages/index.jinja`            | `/`                          | Página raiz                       |
-| `pages/about.jinja`            | `/about`                     | Rota estática                     |
-| `pages/blog/index.jinja`       | `/blog`                      | Index de diretório                |
-| `pages/blog/[slug].jinja`      | `/blog/{slug}`               | Parâmetro dinâmico                |
-| `pages/docs/[...slug].jinja`   | `/docs/{slug:path}`          | Catch-all (segmentos variáveis)   |
-| `pages/(auth)/login.jinja`     | `/login`                     | Route group (sem prefixo na URL)  |
-| `pages/layout.jinja`           | —                            | Layout compartilhado              |
-| `pages/loading.jinja`          | —                            | Skeleton de carregamento          |
-| `pages/error.jinja`            | —                            | Página de erro do diretório       |
+| File pattern                   | Generated route                | Description                       |
+| ------------------------------ | ------------------------------ | --------------------------------- |
+| `pages/index.jinja`            | `/`                            | Root page                         |
+| `pages/about.jinja`            | `/about`                       | Static route                      |
+| `pages/blog/index.jinja`       | `/blog`                        | Directory index                   |
+| `pages/blog/[slug].jinja`      | `/blog/{slug}`                 | Dynamic parameter                 |
+| `pages/docs/[...slug].jinja`   | `/docs/{slug:path}`            | Catch-all (variable segments)     |
+| `pages/(auth)/login.jinja`     | `/login`                       | Route group (no prefix in URL)    |
+| `pages/layout.jinja`           | —                              | Shared layout                     |
+| `pages/loading.jinja`          | —                              | Loading skeleton                  |
+| `pages/error.jinja`            | —                              | Directory error page              |
 
-### Arquivos especiais
+### Special files
 
-- **`layout.jinja`** — Wrapa automaticamente todas as páginas e sub-diretórios
-  do mesmo nível. Layouts aninhados: `pages/layout.jinja` wrapa
-  `pages/blog/layout.jinja` que wrapa `pages/blog/[slug].jinja`.
-- **`loading.jinja`** — Skeleton exibido via HTMX `hx-indicator` enquanto a
-  página carrega.
-- **`error.jinja`** — Renderizado quando um handler retorna erro. Recebe
-  `status_code` e `message` no contexto.
-- **Route groups `(name)/`** — Diretórios entre parênteses agrupam páginas sem
-  afetar a URL. Útil para aplicar layouts/middleware a um subset de rotas.
+- **`layout.jinja`** — Automatically wraps all pages and subdirectories
+  at the same level. Nested layouts: `pages/layout.jinja` wraps
+  `pages/blog/layout.jinja` which wraps `pages/blog/[slug].jinja`.
+- **`loading.jinja`** — Skeleton displayed via HTMX `hx-indicator` while the
+  page loads.
+- **`error.jinja`** — Rendered when a handler returns an error. Receives
+  `status_code` and `message` in the context.
+- **Route groups `(name)/`** — Directories in parentheses group pages without
+  affecting the URL. Useful for applying layouts/middleware to a subset of routes.
 
 ### Colocated Handlers
 
-Handlers Python podem ser colocados ao lado dos templates usando
-`RouteHandler` e `APIRoute`:
+Python handlers can be placed alongside templates using
+`RouteHandler` and `APIRoute`:
 
 ```python
 from pjx.routing import RouteHandler, APIRoute
@@ -1658,7 +1659,7 @@ async def post(form: Annotated[ItemForm, FormData()]):
     await create_item(form)
     return {"items": await fetch_items()}
 
-# Endpoint JSON servido sob /api/
+# JSON endpoint served under /api/
 api = APIRoute()
 
 @api.get
@@ -1670,9 +1671,9 @@ async def list_items():
 
 ## 26. Middleware
 
-### Declaração no frontmatter
+### Declaration in frontmatter
 
-Componentes e páginas podem declarar middleware:
+Components and pages can declare middleware:
 
 ```html
 ---
@@ -1680,10 +1681,10 @@ middleware "auth", "rate_limit"
 ---
 ```
 
-Aceita uma ou mais strings separadas por vírgula. Cada string referencia um
-middleware registrado no runtime PJX.
+Accepts one or more comma-separated strings. Each string references a
+middleware registered in the PJX runtime.
 
-### Registro no runtime
+### Registration in the runtime
 
 ```python
 @pjx.middleware("auth")
@@ -1700,30 +1701,146 @@ async def rate_limit_middleware(request: Request, call_next):
     return response
 ```
 
-Middleware declarado no frontmatter é aplicado na ordem de declaração.
-Middleware de layout é aplicado antes do middleware da página.
+Middleware declared in the frontmatter is applied in declaration order.
+Layout middleware is applied before page middleware.
 
 ---
 
-## 27. Layout Components (Built-ins)
+## 27. Security and Production
 
-PJX inclui componentes de layout built-in inspirados em Chakra UI. São
-compilados diretamente pelo compilador (sem necessidade de import).
+### CSRF Protection
 
-| Componente      | Descrição                                      | Props principais                      |
-| --------------- | ---------------------------------------------- | ------------------------------------- |
-| `<Center>`      | Centraliza conteúdo horizontal e verticalmente | `w`, `h`                              |
-| `<HStack>`      | Stack horizontal com gap                       | `gap`, `align`, `justify`, `wrap`     |
-| `<VStack>`      | Stack vertical com gap                         | `gap`, `align`, `justify`             |
-| `<Grid>`        | Grid CSS responsivo                            | `cols`, `gap`, `min`, `max`           |
-| `<Spacer>`      | Espaço flexível entre itens                    | —                                     |
-| `<Container>`   | Largura máxima centralizada                    | `max`, `px`                           |
-| `<Divider>`     | Linha divisória                                | `orientation`, `color`                |
-| `<Wrap>`        | Flex wrap com gap                              | `gap`, `align`, `justify`             |
-| `<AspectRatio>` | Mantém proporção do conteúdo                   | `ratio`                               |
-| `<Hide>`        | Oculta conteúdo por breakpoint                 | `below`, `above`                      |
+PJX includes CSRF middleware based on double-submit cookie with HMAC
+signature. Enabled via `csrf=True` in the `PJX` constructor:
 
-### Exemplo
+```python
+pjx = PJX(
+    app,
+    csrf=True,
+    csrf_secret="your-secret-key",
+    csrf_exempt_paths={"/api/webhooks", "/sse/clock"},
+)
+```
+
+The middleware:
+
+1. Generates a signed CSRF token and sets it as a `_csrf` cookie on every response
+2. On unsafe methods (POST, PUT, DELETE, PATCH), validates that the token sent
+   via `X-CSRFToken` header or `csrf_token` form field matches the cookie
+3. Rejects with HTTP 403 if the token does not match or is missing
+
+For HTMX, just add `hx-headers` in the layout:
+
+```html
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token() }}"}'>
+```
+
+For traditional forms:
+
+```html
+<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+```
+
+### Signed Sessions
+
+Use Starlette's `SessionMiddleware` for signed cookies with
+`itsdangerous`. Never store sensitive data in plain-text cookies:
+
+```python
+from starlette.middleware.sessions import SessionMiddleware
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=os.environ["PJX_SECRET_KEY"],
+    session_cookie="session",
+    max_age=3600,
+    https_only=True,
+    same_site="lax",
+)
+```
+
+Access via `request.session["user"]` in handlers.
+
+### Rate Limiting
+
+Recommended on authentication and mutation endpoints. The example uses `slowapi`:
+
+```python
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
+limiter = Limiter(key_func=get_remote_address)
+
+@app.post("/auth/login")
+@limiter.limit("5/minute")
+async def login(request: Request): ...
+```
+
+### SSE Connection Limits
+
+`EventStream` supports per-IP limits and maximum duration to prevent DoS:
+
+```python
+stream = EventStream(
+    request,
+    max_connections_per_ip=10,
+    max_duration=3600,
+)
+```
+
+Connections beyond the limit receive HTTP 429.
+
+### Health Checks
+
+For container orchestration (Kubernetes, ECS), enable with
+`health=True`:
+
+- `/health` — liveness probe (`{"status": "ok"}`)
+- `/ready` — readiness probe (verifies that template directories exist)
+
+### CORS
+
+Configured via `pjx.toml`. When `cors_origins` is non-empty, Starlette's
+`CORSMiddleware` is registered automatically:
+
+```toml
+cors_origins = ["https://example.com"]
+cors_methods = ["GET", "POST"]
+cors_headers = ["Authorization"]
+cors_credentials = true
+```
+
+### Structured Logging
+
+For production, enable JSON logging for integration with ELK, Datadog or
+CloudWatch:
+
+```toml
+log_json = true
+log_level = "WARNING"
+```
+
+---
+
+## 28. Layout Components (Built-ins)
+
+PJX includes built-in layout components inspired by Chakra UI. They are
+compiled directly by the compiler (no import needed).
+
+| Component       | Description                                 | Main props                        |
+| --------------- | ------------------------------------------- | --------------------------------- |
+| `<Center>`      | Centers content horizontally and vertically | `w`, `h`                          |
+| `<HStack>`      | Horizontal stack with gap                   | `gap`, `align`, `justify`, `wrap` |
+| `<VStack>`      | Vertical stack with gap                     | `gap`, `align`, `justify`         |
+| `<Grid>`        | Responsive CSS grid                         | `cols`, `gap`, `min`, `max`       |
+| `<Spacer>`      | Flexible space between items                | —                                 |
+| `<Container>`   | Centered maximum width                      | `max`, `px`                       |
+| `<Divider>`     | Divider line                                | `orientation`, `color`            |
+| `<Wrap>`        | Flex wrap with gap                          | `gap`, `align`, `justify`         |
+| `<AspectRatio>` | Maintains content aspect ratio              | `ratio`                           |
+| `<Hide>`        | Hides content by breakpoint                 | `below`, `above`                  |
+
+### Example
 
 ```html
 <Container max="1200px">
@@ -1748,9 +1865,9 @@ compilados diretamente pelo compilador (sem necessidade de import).
 </Container>
 ```
 
-### Compilação
+### Compilation
 
-| DSL                          | HTML compilado                                                            |
+| DSL                          | Compiled HTML                                                             |
 | ---------------------------- | ------------------------------------------------------------------------- |
 | `<Center>`                   | `<div style="display:flex;align-items:center;justify-content:center">`    |
 | `<HStack gap="1rem">`        | `<div style="display:flex;flex-direction:row;gap:1rem">`                  |
@@ -1763,21 +1880,21 @@ compilados diretamente pelo compilador (sem necessidade de import).
 
 ---
 
-## 28. Frontmatter — Regras de Parsing
+## 29. Frontmatter — Parsing Rules
 
-O frontmatter é delimitado por `---` na **primeira linha** e fechado pelo
-próximo `---` em uma linha isolada. Regras:
+The frontmatter is delimited by `---` on the **first line** and closed by
+the next `---` on an isolated line. Rules:
 
-- `---` deve estar **sozinho na linha** (sem espaços antes/depois)
-- Strings dentro do frontmatter podem conter `---` sem ambiguidade:
-  `let x = "foo --- bar"` é válido
-- Comentários: `#` até o fim da linha (ignorados pelo lexer)
-- Linhas em branco são ignoradas
-- Multi-line: props blocks (`{ ... }`) podem ocupar várias linhas
-- O `---` de fechamento marca o início do body HTML + `<style scoped>`
+- `---` must be **alone on the line** (no spaces before/after)
+- Strings inside the frontmatter can contain `---` without ambiguity:
+  `let x = "foo --- bar"` is valid
+- Comments: `#` until end of line (ignored by the lexer)
+- Blank lines are ignored
+- Multi-line: props blocks (`{ ... }`) can span multiple lines
+- The closing `---` marks the beginning of the HTML body + `<style scoped>`
 
 ```text
----                       ← abertura (linha 1 do arquivo)
+---                       ← opening (line 1 of the file)
 import ...
 from pydantic import ...
 extends "..."
@@ -1788,14 +1905,14 @@ store ...
 css "path/to/style.css"
 js "path/to/script.js"
 middleware "name", ...
----                       ← fechamento (próximo --- isolado)
-<style scoped>...</style> ← opcional
-<div>...</div>            ← body HTML
+---                       ← closing (next isolated ---)
+<style scoped>...</style> ← optional
+<div>...</div>            ← HTML body
 ```
 
-### Assets no Frontmatter
+### Assets in Frontmatter
 
-Componentes podem declarar dependências de CSS e JS:
+Components can declare CSS and JS dependencies:
 
 ```html
 ---
@@ -1804,6 +1921,6 @@ js "components/card.js"
 ---
 ```
 
-Assets são coletados recursivamente (incluindo imports), deduplicados por
-`(kind, path)`, e disponibilizados no template via `{{ pjx_assets.render() }}`.
-CSS é renderizado como `<link>`, JS como `<script type="module">`.
+Assets are collected recursively (including imports), deduplicated by
+`(kind, path)`, and made available in the template via `{{ pjx_assets.render() }}`.
+CSS is rendered as `<link>`, JS as `<script type="module">`.
