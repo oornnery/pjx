@@ -1,0 +1,7 @@
+---
+props {
+  class: str = "",
+}
+---
+
+<div class="pjx-spacer{{ ' ' + props.class if props.class else '' }}" {{ attrs }}></div>

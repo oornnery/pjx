@@ -1,0 +1,13 @@
+---
+props {
+  below: str = "",
+  above: str = "",
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-hide{{ ' pjx-hide-below-' + props.below|replace('px','') if props.below else '' }}{{ ' pjx-hide-above-' + props.above|replace('px','') if props.above else '' }}{{ ' ' + props.class if props.class else '' }}" {{ attrs }}>
+  <Slot />
+</div>

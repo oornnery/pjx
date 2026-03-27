@@ -1,0 +1,14 @@
+---
+props {
+  gap: str = "",
+  min: str = "",
+  cols: str = "",
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-grid{{ ' ' + props.class if props.class else '' }}" style="{% if props.gap %}--pjx-gap:{{ props.gap }};{% endif %}{% if props.min %}--pjx-min:{{ props.min }};{% endif %}{% if props.cols %}grid-template-columns:repeat({{ props.cols }}, minmax(var(--pjx-min, 250px), 1fr));{% endif %}" {{ attrs }}>
+  <Slot />
+</div>

@@ -1,0 +1,14 @@
+---
+props {
+  gap: str = "",
+  align: str = "",
+  justify: str = "",
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-vstack{{ ' ' + props.class if props.class else '' }}" style="{% if props.gap %}--pjx-gap:{{ props.gap }};{% endif %}{% if props.align %}align-items:{{ props.align }};{% endif %}{% if props.justify %}justify-content:{{ props.justify }};{% endif %}" {{ attrs }}>
+  <Slot />
+</div>

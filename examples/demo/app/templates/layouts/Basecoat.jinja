@@ -1,0 +1,65 @@
+---
+import Navbar from "../components/Navbar.jinja"
+
+css "/static/vendor/basecoat-css/basecoat.cdn.css"
+js "/static/vendor/basecoat-css/js/all.min.js"
+
+props {
+  title: str = "PJX App",
+}
+
+slot default
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ seo.title|default(props.title) }}</title>
+
+  {{ pjx_assets.render_css() }}
+
+  <style>
+    /* Navbar bridge — keep demo navbar consistent */
+    .bc-navbar {
+      background: oklch(0.205 0 0);
+      color: white;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      height: 56px;
+    }
+    .bc-navbar a { color: oklch(0.8 0 0); text-decoration: none; font-size: 0.875rem; }
+    .bc-navbar a:hover { color: white; }
+    .bc-navbar__brand { font-weight: 700; font-size: 1.125rem; color: white; text-decoration: none; }
+    .bc-navbar__links { display: flex; gap: 1.5rem; list-style: none; }
+    .bc-main { max-width: 960px; margin: 0 auto; padding: 2rem; }
+  </style>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
+</head>
+<body hx-headers='{% if csrf_token is defined %}{"X-CSRFToken": "{{ csrf_token() }}"}{% endif %}'>
+  <nav class="bc-navbar">
+    <a href="/" class="bc-navbar__brand">PJX</a>
+    <div class="bc-navbar__links">
+      <a href="/">Dashboard</a>
+      <a href="/counter">Counter</a>
+      <a href="/todos">Todos</a>
+      <a href="/clock">Clock</a>
+      <a href="/search">Search</a>
+      <a href="/components">Components</a>
+      <a href="/protected">Protected</a>
+      <a href="/login">Login</a>
+    </div>
+  </nav>
+
+  <main class="bc-main">
+    <Slot />
+  </main>
+
+  {{ pjx_assets.render_js() }}
+</body>
+</html>

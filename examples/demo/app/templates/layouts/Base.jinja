@@ -71,7 +71,7 @@ slot default
   <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
   <script src="https://unpkg.com/htmx-ext-sse@2/sse.js"></script>
 </head>
-<body>
+<body hx-headers='{% if csrf_token is defined %}{"X-CSRFToken": "{{ csrf_token() }}"}{% endif %}'>
   <div class="layout">
     <Navbar />
     <main class="layout__main">

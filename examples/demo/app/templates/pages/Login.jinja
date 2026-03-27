@@ -14,7 +14,7 @@ css "/static/css/components.css"
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
   <script src="https://unpkg.com/htmx.org@2/dist/htmx.min.js"></script>
 </head>
-<body class="login-page">
+<body class="login-page" hx-headers='{% if csrf_token is defined %}{"X-CSRFToken": "{{ csrf_token() }}"}{% endif %}'>
   <div class="login-card">
     <h1 class="login-card__title">Sign In</h1>
     <p class="login-card__subtitle">Enter your username to continue</p>
@@ -23,6 +23,9 @@ css "/static/css/components.css"
       hx-post="/auth/login"
       hx-target="#login-toast"
       hx-swap="innerHTML">
+      {% if csrf_token is defined %}
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      {% endif %}
       <div class="login-card__field">
         <label for="username">Username</label>
         <input type="text" id="username" name="username" placeholder="Your username" required autofocus />

@@ -1,0 +1,11 @@
+---
+props {
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-center{{ ' ' + props.class if props.class else '' }}" {{ attrs }}>
+  <Slot />
+</div>

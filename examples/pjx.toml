@@ -1,7 +1,0 @@
-engine = "hybrid"
-debug = true
-validate_props = true
-render_mode = "include"
-
-template_dirs = ["templates"]
-static_dir = "static"

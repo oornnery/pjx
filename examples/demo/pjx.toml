@@ -1,0 +1,23 @@
+engine = "hybrid"
+debug = true
+validate_props = true
+render_mode = "include"
+
+template_dirs = ["app/templates"]
+static_dir = "app/static"
+pages_dir = "app/templates/pages"
+components_dir = "app/templates/components"
+layouts_dir = "app/templates/layouts"
+ui_dir = "app/templates/ui"
+vendor_templates_dir = "app/templates/vendor"
+vendor_static_dir = "app/static/vendor"
+
+# Logging (production: log_json = true, log_level = "WARNING")
+# log_json = false
+# log_level = "INFO"
+
+# CORS (uncomment and configure for cross-origin access)
+# cors_origins = ["https://example.com"]
+# cors_methods = ["GET", "POST"]
+# cors_headers = []
+# cors_credentials = false

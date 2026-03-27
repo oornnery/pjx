@@ -1,0 +1,12 @@
+---
+props {
+  max: str = "",
+  class: str = "",
+}
+
+slot default
+---
+
+<div class="pjx-container{{ ' ' + props.class if props.class else '' }}" style="{% if props.max %}--pjx-max-w:{{ props.max }};{% endif %}" {{ attrs }}>
+  <Slot />
+</div>
