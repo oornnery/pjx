@@ -6,11 +6,18 @@ from pjx.engine import Jinja2Engine
 from pjx.sse import EventStream
 
 
+class MockClient:
+    """Minimal mock of a client address."""
+
+    host: str = "127.0.0.1"
+
+
 class MockRequest:
     """Minimal mock of a FastAPI Request for SSE testing."""
 
     def __init__(self) -> None:
         self._disconnected = False
+        self.client = MockClient()
 
     async def is_disconnected(self) -> bool:
         return self._disconnected

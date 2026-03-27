@@ -60,16 +60,26 @@ def _ensure_npm() -> None:
         raise typer.Exit(1)
 
 
+_VENDOR_PATTERNS = ("*.min.js", "*.min.css", "*.cdn.css", "*.cdn.min.css")
+
+
 def _copy_vendor(package: str, config: PJXConfig) -> None:
     """Copy dist files from node_modules to vendor directory."""
-    node_modules = Path("node_modules") / package / "dist"
-    if not node_modules.exists():
+    dist_root = Path("node_modules") / package / "dist"
+    if not dist_root.exists():
         return
 
-    vendor_dir = config.vendor_static_dir
+    vendor_dir = config.vendor_static_dir / package
     vendor_dir.mkdir(parents=True, exist_ok=True)
 
-    for dist_file in node_modules.glob("*.min.js"):
-        dest = vendor_dir / dist_file.name
-        shutil.copy2(dist_file, dest)
-        typer.echo(f"  Copied {dist_file.name} → {dest}")
+    seen: set[Path] = set()
+    for pattern in _VENDOR_PATTERNS:
+        for dist_file in dist_root.rglob(pattern):
+            if dist_file in seen:
+                continue
+            seen.add(dist_file)
+            rel = dist_file.relative_to(dist_root)
+            dest = vendor_dir / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(dist_file, dest)
+            typer.echo(f"  Copied {rel} → {dest}")

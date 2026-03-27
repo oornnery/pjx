@@ -18,10 +18,10 @@ class TestInit:
         result = runner.invoke(app, ["init"])
         assert result.exit_code == 0
         assert "initialized" in result.output.lower()
-        assert (tmp_path / "templates" / "pages").exists()
-        assert (tmp_path / "templates" / "components").exists()
-        assert (tmp_path / "templates" / "layouts").exists()
-        assert (tmp_path / "static").exists()
+        assert (tmp_path / "app" / "templates" / "pages").exists()
+        assert (tmp_path / "app" / "templates" / "components").exists()
+        assert (tmp_path / "app" / "templates" / "layouts").exists()
+        assert (tmp_path / "app" / "static").exists()
 
     def test_creates_toml(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
@@ -30,14 +30,71 @@ class TestInit:
         runner.invoke(app, ["init"])
         assert (tmp_path / "pjx.toml").exists()
 
+    def test_creates_app_package(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        assert (tmp_path / "app" / "__init__.py").exists()
+        assert (tmp_path / "app" / "main.py").exists()
+        assert (tmp_path / "app" / "core" / "config.py").exists()
+        assert (tmp_path / "app" / "models" / "__init__.py").exists()
+        assert (tmp_path / "app" / "services" / "__init__.py").exists()
+        assert (tmp_path / "app" / "pages" / "__init__.py").exists()
+        assert (tmp_path / "app" / "api" / "v1" / "__init__.py").exists()
+        assert (tmp_path / "app" / "middleware" / "__init__.py").exists()
+
     def test_creates_base_layout(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.chdir(tmp_path)
         runner.invoke(app, ["init"])
-        layout = tmp_path / "templates" / "layouts" / "Base.jinja"
+        layout = tmp_path / "app" / "templates" / "layouts" / "Base.jinja"
         assert layout.exists()
-        assert "Slot:content" in layout.read_text()
+        content = layout.read_text()
+        assert "<Slot />" in content
+        assert "props" in content
+
+    def test_init_subdirectory(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        result = runner.invoke(app, ["init", "myapp"])
+        assert result.exit_code == 0
+        assert (tmp_path / "myapp" / "pjx.toml").exists()
+        assert (tmp_path / "myapp" / "app" / "main.py").exists()
+        assert (tmp_path / "myapp" / "app" / "__init__.py").exists()
+        assert (tmp_path / "myapp" / "app" / "core" / "config.py").exists()
+        assert (tmp_path / "myapp" / "app" / "api" / "v1" / "__init__.py").exists()
+        assert (
+            tmp_path / "myapp" / "app" / "templates" / "pages" / "Home.jinja"
+        ).exists()
+        assert (
+            tmp_path / "myapp" / "app" / "templates" / "layouts" / "Base.jinja"
+        ).exists()
+
+    def test_creates_example_app_files(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        assert (tmp_path / "app" / "services" / "counter.py").exists()
+        assert (tmp_path / "app" / "pages" / "routes.py").exists()
+        assert (tmp_path / "app" / "templates" / "pages" / "Home.jinja").exists()
+        assert (tmp_path / "app" / "templates" / "pages" / "About.jinja").exists()
+        assert (
+            tmp_path / "app" / "templates" / "components" / "Counter.jinja"
+        ).exists()
+        assert (tmp_path / "app" / "static" / "css" / "style.css").exists()
+
+    def test_init_existing_dir_no_overwrite(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        runner.invoke(app, ["init"])
+        (tmp_path / "pjx.toml").write_text("custom = true\n")
+        runner.invoke(app, ["init"])
+        assert "custom" in (tmp_path / "pjx.toml").read_text()
 
 
 class TestCheck:

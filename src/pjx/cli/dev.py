@@ -14,14 +14,19 @@ app = typer.Typer()
 def _discover_app(directory: Path) -> str:
     """Auto-discover the ASGI app in a directory.
 
-    Looks for common patterns: ``app.py``, ``main.py``, or ``server.py``
-    containing a FastAPI/Starlette ``app`` object.
+    Looks for common patterns:
+    - ``app/main.py`` (new scaffold) → ``app.main:app``
+    - ``app.py``, ``main.py``, ``server.py`` (flat) → ``<name>:app``
     """
+    # New scaffold: app/ package with main.py
+    if (directory / "app" / "main.py").exists():
+        return "app.main:app"
+    # Flat layout
     for name in ("app", "main", "server"):
         candidate = directory / f"{name}.py"
         if candidate.exists():
             return f"{name}:app"
-    return "app:app"
+    return "app.main:app"
 
 
 @app.command()
@@ -39,7 +44,12 @@ def dev(
     port: int = typer.Option(None, "--port", "-p", help="Port to bind to"),
 ) -> None:
     """Start the development server with auto-reload."""
+    import sys
+
     import uvicorn
+
+    from pjx.cli.build import run_build
+    from pjx.errors import PJXError
 
     directory = directory.resolve()
     toml_path = directory / "pjx.toml"
@@ -47,6 +57,13 @@ def dev(
 
     if app_path is None:
         app_path = _discover_app(directory)
+
+    # Auto-build templates before starting
+    try:
+        count = run_build(config)
+        typer.echo(f"Built {count} components.")
+    except PJXError as e:
+        typer.echo(f"Build warning: {e}", err=True)
 
     # Watch templates and static dirs for reload
     reload_dirs = [str(directory)]
@@ -56,8 +73,6 @@ def dev(
             reload_dirs.append(str(tpl))
 
     # Ensure the project directory is importable
-    import sys
-
     dir_str = str(directory)
     if dir_str not in sys.path:
         sys.path.insert(0, dir_str)

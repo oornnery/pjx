@@ -370,6 +370,8 @@ class Compiler:
         for name, value in attrs:
             if value is True:
                 parts.append(name)
+            elif '"' in str(value):
+                parts.append(f"{name}='{value}'")
             else:
                 parts.append(f'{name}="{value}"')
         return " " + " ".join(parts)

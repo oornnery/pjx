@@ -1,14 +1,21 @@
 """Shared fixtures and test configuration."""
 
+import sys
 from pathlib import Path
 
 import pytest
 
-from pjx.ast_nodes import (
+# Add examples/demo to sys.path so `from app.xxx` imports work
+# when running tests from the project root.
+_DEMO_DIR = str(Path(__file__).resolve().parent.parent / "examples" / "demo")
+if _DEMO_DIR not in sys.path:
+    sys.path.insert(0, _DEMO_DIR)
+
+from pjx.ast_nodes import (  # noqa: E402
     Component,
 )
-from pjx.compiler import Compiler
-from pjx.parser import parse
+from pjx.compiler import Compiler  # noqa: E402
+from pjx.parser import parse  # noqa: E402
 
 
 @pytest.fixture()

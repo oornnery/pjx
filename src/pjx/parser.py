@@ -513,9 +513,156 @@ _VOID_ELEMENTS = frozenset(
 
 _EXPR_RE = re.compile(r"\{\{(.+?)\}\}")
 
+# Matches {% ... %} blocks (non-greedy).
+_JINJA_BLOCK_RE = re.compile(r"\{%.*?%\}", re.DOTALL)
+
+
+def _find_tag_end(html: str, start: int) -> int:
+    """Find the closing ``>`` of an HTML tag, respecting quotes and ``{% %}`` blocks.
+
+    Args:
+        html: Full HTML source.
+        start: Index of the opening ``<``.
+
+    Returns:
+        Index of the closing ``>`` or ``-1`` if not found.
+    """
+    i = start + 1
+    in_single = False
+    in_double = False
+    in_jinja = False
+    while i < len(html):
+        if in_jinja:
+            if html[i : i + 2] == "%}":
+                in_jinja = False
+                i += 2
+                continue
+        elif in_single:
+            if html[i] == "'":
+                in_single = False
+        elif in_double:
+            if html[i] == '"':
+                in_double = False
+        elif html[i : i + 2] == "{%":
+            in_jinja = True
+            i += 2
+            continue
+        elif html[i] == "'":
+            in_single = True
+        elif html[i] == '"':
+            in_double = True
+        elif html[i] == ">":
+            return i
+        i += 1
+    return -1
+
+
+def _has_unquoted_jinja_block(tag_text: str) -> bool:
+    """Check if an HTML opening tag contains ``{% %}`` outside of attribute quotes."""
+    in_single = False
+    in_double = False
+    i = 0
+    while i < len(tag_text):
+        c = tag_text[i]
+        if in_single:
+            if c == "'":
+                in_single = False
+        elif in_double:
+            if c == '"':
+                in_double = False
+        elif c == "'":
+            in_single = True
+        elif c == '"':
+            in_double = True
+        elif tag_text[i : i + 2] == "{%":
+            return True
+        i += 1
+    return False
+
+
+def _rewrite_tag_with_jinja(tag_text: str) -> str:
+    """Strip unquoted ``{% %}`` blocks from an HTML tag and emit them before it.
+
+    This is intentionally lossy — conditional attributes lose their
+    wrapping logic — but it prevents :class:`~html.parser.HTMLParser` from
+    silently dropping the entire element tree.  Template authors should
+    place ``{% %}`` blocks inside quoted attribute values or use PJX
+    control-flow components instead.
+    """
+    m = re.match(r"<([a-zA-Z][a-zA-Z0-9]*)", tag_text)
+    if not m:
+        return tag_text
+    tag_name = m.group(1)
+    rest = tag_text[m.end() : -1]  # between tagname and closing >
+
+    blocks: list[str] = []
+    parts: list[str] = []
+    i = 0
+    frag_start = 0
+    in_single = False
+    in_double = False
+    while i < len(rest):
+        c = rest[i]
+        if in_single:
+            if c == "'":
+                in_single = False
+        elif in_double:
+            if c == '"':
+                in_double = False
+        elif c == "'":
+            in_single = True
+        elif c == '"':
+            in_double = True
+        elif rest[i : i + 2] == "{%":
+            if i > frag_start:
+                parts.append(rest[frag_start:i])
+            end = rest.find("%}", i + 2)
+            if end >= 0:
+                blocks.append(rest[i : end + 2])
+                i = end + 2
+                frag_start = i
+                continue
+        i += 1
+    if frag_start < len(rest):
+        parts.append(rest[frag_start:])
+
+    clean_attrs = "".join(parts).strip()
+    prefix = "".join(blocks)
+    tag_out = f"<{tag_name} {clean_attrs}>" if clean_attrs else f"<{tag_name}>"
+    return f"{prefix}{tag_out}"
+
+
+def _extract_jinja_from_tags(html: str) -> str:
+    """Move ``{% ... %}`` blocks out of HTML opening tags.
+
+    Python's :class:`~html.parser.HTMLParser` cannot parse Jinja2 block
+    syntax (``{% ... %}``) embedded inside an HTML opening tag (e.g.
+    ``<body{% if X %} attr{% endif %}>``).  The block becomes part of the
+    tag name and the parser silently drops the entire element tree.
+
+    ``{% ... %}`` inside quoted attribute values is fine and left untouched.
+    """
+    i = 0
+    out: list[str] = []
+    while i < len(html):
+        if html[i] == "<" and i + 1 < len(html) and html[i + 1 : i + 2].isalpha():
+            tag_end = _find_tag_end(html, i)
+            if tag_end >= 0:
+                tag_text = html[i : tag_end + 1]
+                if _has_unquoted_jinja_block(tag_text):
+                    out.append(_rewrite_tag_with_jinja(tag_text))
+                else:
+                    out.append(tag_text)
+                i = tag_end + 1
+                continue
+        out.append(html[i])
+        i += 1
+    return "".join(out)
+
 
 def _parse_body(html: str, known_components: set[str]) -> tuple[Node, ...]:
     """Parse HTML body into AST nodes."""
+    html = _extract_jinja_from_tags(html)
     parser = _BodyParser(known_components)
     parser.feed(html)
     return tuple(parser.root_nodes())

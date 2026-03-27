@@ -55,6 +55,12 @@ class PJXConfig(BaseSettings):
     tailwind: bool = False
     validate_props: bool = True
     render_mode: Literal["include", "inline"] = "include"
+    log_json: bool = False
+    log_level: str = "INFO"
+    cors_origins: list[str] = []
+    cors_methods: list[str] = ["GET"]
+    cors_headers: list[str] = []
+    cors_credentials: bool = False
 
     def __init__(self, toml_path: Path | str = "pjx.toml", **kwargs: Any) -> None:
         toml = Path(toml_path)

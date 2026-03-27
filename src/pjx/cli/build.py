@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import typer
@@ -14,13 +15,21 @@ from pjx.registry import ComponentRegistry
 
 app = typer.Typer()
 
+log = logging.getLogger("pjx.build")
 
-@app.command()
-def build(
-    directory: Path = typer.Argument(Path("."), help="Project directory"),
-) -> None:
-    """Compile all .jinja components and bundle CSS."""
-    config = PJXConfig()
+
+def run_build(config: PJXConfig) -> int:
+    """Compile all .jinja components and bundle CSS.
+
+    Args:
+        config: Resolved PJX configuration.
+
+    Returns:
+        Number of compiled components.
+
+    Raises:
+        PJXError: If any template fails to parse or compile.
+    """
     registry = ComponentRegistry([Path(d) for d in config.template_dirs])
     compiler = Compiler(registry=registry)
 
@@ -32,24 +41,33 @@ def build(
         if not tpl_path.exists():
             continue
         for jinja_file in sorted(tpl_path.rglob("*.jinja")):
-            try:
-                component = parse_file(jinja_file)
-                compiled = compiler.compile(component)
-                if compiled.css:
-                    css_parts.append(compiled.css.source)
-                count += 1
-            except PJXError as e:
-                typer.echo(f"ERROR: {e}", err=True)
-                raise typer.Exit(1) from e
+            component = parse_file(jinja_file)
+            compiled = compiler.compile(component)
+            if compiled.css:
+                css_parts.append(compiled.css.source)
+            count += 1
 
-    # Write bundled CSS
     if css_parts:
         css_dir = config.static_dir / "css"
         css_dir.mkdir(parents=True, exist_ok=True)
         bundle_path = css_dir / "pjx-components.css"
         bundle_path.write_text("\n".join(css_parts))
-        typer.echo(f"Bundled CSS → {bundle_path}")
+        log.info("Bundled CSS → %s", bundle_path)
 
+    return count
+
+
+@app.command()
+def build(
+    directory: Path = typer.Argument(Path("."), help="Project directory"),
+) -> None:
+    """Compile all .jinja components and bundle CSS."""
+    config = PJXConfig()
+    try:
+        count = run_build(config)
+    except PJXError as e:
+        typer.echo(f"ERROR: {e}", err=True)
+        raise typer.Exit(1) from e
     typer.echo(f"Compiled {count} components.")
 
 

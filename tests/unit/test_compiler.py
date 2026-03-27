@@ -369,6 +369,56 @@ class TestAttrs:
         result = _compile(comp)
         assert 'hx-boost="true"' in result
 
+    def test_compile_attrs_into_beforeend(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"into": "#container:beforeend"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-target="#container"' in result
+        assert 'hx-swap="beforeend"' in result
+
+    def test_compile_attrs_action_delete(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="button", attrs={"action:delete": "/api/item/1"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-delete="/api/item/1"' in result
+
+    def test_compile_attrs_action_put(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="form", attrs={"action:put": "/api/item/1"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-put="/api/item/1"' in result
+
+    def test_compile_attrs_confirm(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="button", attrs={"confirm": "Are you sure?"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-confirm="Are you sure?"' in result
+
+    def test_compile_attrs_push_url(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="a", attrs={"push-url": "true"}),),
+        )
+        result = _compile(comp)
+        assert 'hx-push-url="true"' in result
+
+    def test_compile_attrs_include(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="form", attrs={"include": "#filter"}),),
+        )
+        result = _compile(comp)
+        assert 'include="#filter"' in result
+
+    def test_compile_attrs_passthrough_data_attr(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"data-user-id": "5"}),),
+        )
+        result = _compile(comp)
+        assert 'data-user-id="5"' in result
+
 
 # ---------------------------------------------------------------------------
 # Components

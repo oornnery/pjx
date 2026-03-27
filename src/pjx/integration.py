@@ -96,6 +96,10 @@ class PJX:
         config: PJXConfig | None = None,
         layout: str | None = None,
         seo: SEO | None = None,
+        csrf: bool = False,
+        csrf_secret: str | None = None,
+        csrf_exempt_paths: set[str] | None = None,
+        health: bool = False,
     ) -> None:
         self.app = app
         self.config = config or PJXConfig()
@@ -106,6 +110,7 @@ class PJX:
         self.registry = ComponentRegistry(tpl_dirs)
         self.engine: EngineProtocol = create_engine(self.config.engine)
         self.compiler = Compiler(registry=self.registry)
+        self._csrf_middleware: Any | None = None
 
         # Pre-register built-in layout components so the compiler can
         # separate declared props from extra attrs (e.g. x-data).
@@ -124,6 +129,50 @@ class PJX:
             from fastapi.staticfiles import StaticFiles
 
             app.mount("/static", StaticFiles(directory=static_dir), name="static")
+
+        # CSRF protection
+        if csrf:
+            from pjx.middleware.csrf import CSRFMiddleware
+
+            secret = csrf_secret or "pjx-csrf-change-me"
+            mw = CSRFMiddleware(
+                app,
+                secret_key=secret,
+                exempt_paths=csrf_exempt_paths or set(),
+            )
+            self._csrf_middleware = mw
+            app.add_middleware(
+                CSRFMiddleware,  # ty: ignore[invalid-argument-type]
+                secret_key=secret,
+                exempt_paths=csrf_exempt_paths or set(),
+            )
+
+        # CORS middleware
+        if self.config.cors_origins:
+            from starlette.middleware.cors import CORSMiddleware
+
+            app.add_middleware(
+                CORSMiddleware,  # ty: ignore[invalid-argument-type]
+                allow_origins=self.config.cors_origins,
+                allow_methods=self.config.cors_methods,
+                allow_headers=self.config.cors_headers,
+                allow_credentials=self.config.cors_credentials,
+            )
+
+        # Health check endpoints
+        if health:
+            from pjx.health import health_routes
+
+            health_routes(app, self.config)
+
+        # Configure logging
+        from pjx.log import setup_logging
+
+        setup_logging(
+            debug=self.config.debug,
+            json_output=self.config.log_json,
+            level=self.config.log_level,
+        )
 
         # Pre-compile layout if set
         if self.layout:
@@ -324,6 +373,12 @@ class PJX:
         render_ctx["props"] = _SimpleNamespace(context)
         render_ctx["seo"] = self._merge_seo(render_ctx.get("seo"))
         render_ctx["pjx_assets"] = asset_collector
+
+        # Inject CSRF token helper if middleware is active
+        if self._csrf_middleware is not None and "request" in render_ctx:
+            request = render_ctx["request"]
+            mw = self._csrf_middleware
+            render_ctx["csrf_token"] = lambda: mw.get_token(request)
 
         # Render the page content
         # Hybrid strategy: leaf partials (no layout, no includes) auto-use
@@ -554,7 +609,9 @@ class PJX:
             tpl_root = Path(tpl_dir).resolve()
             candidate = (Path(tpl_dir) / template).resolve()
             # Ensure resolved path is within the template directory
-            if not str(candidate).startswith(str(tpl_root)):
+            try:
+                candidate.relative_to(tpl_root)
+            except ValueError:
                 continue
             if candidate.exists():
                 return candidate

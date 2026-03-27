@@ -70,3 +70,31 @@ class TestScopeCSS:
     def test_empty_css(self) -> None:
         result = scope_css("", "abc")
         assert result == ""
+
+    def test_pseudo_class_scoped(self) -> None:
+        result = scope_css(".card:hover { color: blue; }", "a1b2c3d")
+        assert ".card:hover[data-pjx-a1b2c3d]" in result
+
+    def test_pseudo_element_scoped(self) -> None:
+        result = scope_css(".card::before { content: ''; }", "a1b2c3d")
+        assert ".card::before[data-pjx-a1b2c3d]" in result
+
+    def test_child_combinator_scoped(self) -> None:
+        result = scope_css(".parent > .child { color: red; }", "a1b2c3d")
+        assert ".parent[data-pjx-a1b2c3d]" in result
+        assert ".child[data-pjx-a1b2c3d]" in result
+
+    def test_keyframes_not_scoped(self) -> None:
+        css = "@keyframes fade { from { opacity: 0; } to { opacity: 1; } }"
+        result = scope_css(css, "a1b2c3d")
+        assert "@keyframes fade" in result
+        assert "opacity: 0;" in result
+        assert "opacity: 1;" in result
+        assert "data-pjx" not in result.split("@keyframes")[1]
+
+    def test_nested_media_query(self) -> None:
+        css = "@media (min-width: 768px) { .card { display: flex; } .card .title { font-size: 2rem; } }"
+        result = scope_css(css, "a1b2c3d")
+        assert "@media (min-width: 768px)" in result
+        assert ".card[data-pjx-a1b2c3d]" in result
+        assert ".title[data-pjx-a1b2c3d]" in result

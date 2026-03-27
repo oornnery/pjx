@@ -55,7 +55,7 @@ def scope_css(css_source: str, scope_hash: str) -> str:
     return _scope_block(css_source, attr)
 
 
-def _scope_block(css: str, attr: str) -> str:
+def _scope_block(css: str, attr: str, *, skip_scope: bool = False) -> str:
     """Recursively scope CSS, handling nested at-rules."""
     result: list[str] = []
     pos = 0
@@ -75,7 +75,10 @@ def _scope_block(css: str, attr: str) -> str:
             block_start = m.end()
             block_end = _find_closing_brace(css, block_start)
             inner = css[block_start:block_end]
-            scoped_inner = _scope_block(inner, attr)
+            # Don't scope selectors inside @keyframes — they use
+            # keywords (from/to/percentages), not real selectors.
+            is_keyframes = atrule.strip().startswith("@keyframes")
+            scoped_inner = _scope_block(inner, attr, skip_scope=is_keyframes)
             result.append(f"{atrule}{{{scoped_inner}}}")
             pos = block_end + 1
         else:
@@ -85,11 +88,14 @@ def _scope_block(css: str, attr: str) -> str:
             block_end = _find_closing_brace(css, block_start)
             block = css[block_start:block_end]
 
-            scoped_selectors = ", ".join(
-                _scope_selector(sel.strip(), attr)
-                for sel in _SELECTOR_SPLIT_RE.split(selectors_raw)
-            )
-            result.append(f"{scoped_selectors} {{{block}}}")
+            if skip_scope:
+                result.append(f"{selectors_raw} {{{block}}}")
+            else:
+                scoped_selectors = ", ".join(
+                    _scope_selector(sel.strip(), attr)
+                    for sel in _SELECTOR_SPLIT_RE.split(selectors_raw)
+                )
+                result.append(f"{scoped_selectors} {{{block}}}")
             pos = block_end + 1
 
     return "".join(result)
