@@ -8,7 +8,7 @@ Public API::
     from pjx import PJX, PJXConfig, SEO, parse, Compiler
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from pjx.caching import cache, memo
 from pjx.compiler import Compiler
