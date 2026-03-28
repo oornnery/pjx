@@ -8,6 +8,7 @@ from pjx.cli.build import format_cmd as format_command
 from pjx.cli.demo import demo
 from pjx.cli.dev import dev, run
 from pjx.cli.init import init
+from pjx.cli.inject import inject
 from pjx.cli.packages import add, remove
 
 app = typer.Typer(
@@ -26,5 +27,6 @@ app.command(name="format")(format_command)
 app.command()(analyze)
 app.command()(sitemap)
 app.command()(robots)
+app.command()(inject)
 app.command()(add)
 app.command()(remove)
