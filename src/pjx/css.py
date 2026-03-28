@@ -101,6 +101,9 @@ def _scope_block(css: str, attr: str, *, skip_scope: bool = False) -> str:
     return "".join(result)
 
 
+_COMBINATORS_RE = re.compile(r"(?<=[^\s>+~])([>+~])(?=[^\s>+~])")
+
+
 def _scope_selector(selector: str, attr: str) -> str:
     """Append the scoping attribute to every simple selector in a compound selector.
 
@@ -109,8 +112,14 @@ def _scope_selector(selector: str, attr: str) -> str:
     This ensures the scope matches the element itself (Vue-style), not just
     descendants.
     """
+    # Normalize combinators without spaces: `.a>.b` → `.a > .b`
+    selector = _COMBINATORS_RE.sub(r" \1 ", selector)
     parts = selector.split()
-    scoped = " ".join(f"{part}{attr}" for part in parts if part)
+    scoped = " ".join(
+        f"{part}{attr}" if part not in {">", "+", "~"} else part
+        for part in parts
+        if part
+    )
     return scoped
 
 

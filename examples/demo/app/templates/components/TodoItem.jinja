@@ -14,12 +14,14 @@ props {
       action:post="/htmx/todos/{{ props.idx }}/toggle"
       into="#todo-list" />
     <span class="todo__text">{{ props.text }}</span>
-    <button on:click="editing = true" class="btn btn-sm">Edit</button>
-    <button class="btn btn-sm btn-danger"
-      action:delete="/htmx/todos/{{ props.idx }}"
-      into="#todo-list">
-      &times;
-    </button>
+    <div class="todo__actions">
+      <button on:click="editing = true" class="btn btn-sm">Edit</button>
+      <button class="btn btn-sm btn-danger"
+        action:delete="/htmx/todos/{{ props.idx }}"
+        into="#todo-list">
+        &times;
+      </button>
+    </div>
   </div>
   <form class="todo__edit" x-show="editing"
     action:put="/htmx/todos/{{ props.idx }}"

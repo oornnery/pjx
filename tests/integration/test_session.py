@@ -197,3 +197,31 @@ class TestAuthFlow:
         response = client.get("/protected")
         assert response.status_code == 303
         assert response.headers.get("location") == "/login"
+
+
+class TestMalformedCookies:
+    """Edge cases with corrupt or garbage session cookies."""
+
+    def test_empty_session_cookie_redirects(self, client: TestClient) -> None:
+        """An empty session cookie should be treated as unauthenticated."""
+        response = client.get("/protected", cookies={"session": ""})
+        assert response.status_code == 303
+        assert response.headers.get("location") == "/login"
+
+    def test_garbage_session_cookie_redirects(self, client: TestClient) -> None:
+        """A random garbage string should not crash the app."""
+        response = client.get(
+            "/protected",
+            cookies={"session": "not-a-valid-signed-value!!!"},
+        )
+        assert response.status_code == 303
+        assert response.headers.get("location") == "/login"
+
+    def test_base64_garbage_cookie_redirects(self, client: TestClient) -> None:
+        """A base64-like but invalid cookie should redirect gracefully."""
+        response = client.get(
+            "/protected",
+            cookies={"session": "eyJhbGciOiJIUzI1NiJ9.corrupted.signature"},
+        )
+        assert response.status_code == 303
+        assert response.headers.get("location") == "/login"

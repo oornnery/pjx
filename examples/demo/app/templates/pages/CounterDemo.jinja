@@ -5,19 +5,22 @@ import ServerCounter from "../components/ServerCounter.jinja"
 ---
 
 <Layout>
-  <VStack gap="1.5rem" class="page">
-    <h1>Counter Demo</h1>
-    <HStack gap="2rem" align="start">
-      <VStack gap="0.5rem" class="counter-section">
-        <h2>Client-side (Alpine.js)</h2>
-        <p>State lives in the browser. No server requests — instant updates.</p>
+  <VStack gap="1rem" class="page page--wide" style="align-items: center;">
+    <div>
+      <h1>Counter Demo</h1>
+      <p>Two ways to manage state — pick the one that fits your use case.</p>
+    </div>
+    <div class="counter-grid" style="width: 100%;">
+      <div class="counter-section">
+        <h2>Client-side <span class="badge badge--client">Alpine.js</span></h2>
+        <p>State lives in the browser. No server requests — instant updates. Great for local UI state.</p>
         <Counter />
-      </VStack>
-      <VStack gap="0.5rem" class="counter-section">
-        <h2>Server-side (HTMX)</h2>
-        <p>State lives on the server. Each click sends a request and swaps HTML.</p>
+      </div>
+      <div class="counter-section">
+        <h2>Server-side <span class="badge badge--server">HTMX</span></h2>
+        <p>State lives on the server. Each click sends a request and swaps HTML. Great for shared state.</p>
         <ServerCounter count="{{ server_count }}" />
-      </VStack>
-    </HStack>
+      </div>
+    </div>
   </VStack>
 </Layout>

@@ -59,7 +59,7 @@ jobs:
         run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --group test
+        run: uv sync --group test --extra fast
 
       - name: Run tests
         run: uv run pytest -v --ignore=tests/benchmark --tb=short

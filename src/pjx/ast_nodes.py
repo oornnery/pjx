@@ -121,6 +121,19 @@ class ComputedDecl:
 
 
 @dataclass(frozen=True, slots=True)
+class ActionDecl:
+    """``action add_todo(text: str)`` — declares a server action.
+
+    Server actions are auto-registered as POST routes at
+    ``/_pjx/actions/{template}/{name}`` and can be referenced in
+    templates via ``action:post="@name"``.
+    """
+
+    name: str
+    params: tuple[PropField, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class MiddlewareDecl:
     """``middleware "auth", "rate_limit"``."""
 
@@ -351,5 +364,6 @@ class Component:
     computed: tuple[ComputedDecl, ...] = ()
     assets: tuple[AssetDecl, ...] = ()
     middleware: tuple[MiddlewareDecl, ...] = ()
+    actions: tuple[ActionDecl, ...] = ()
     body: tuple[Node, ...] = ()
     style: str | None = None

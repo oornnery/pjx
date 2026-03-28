@@ -11,7 +11,7 @@ keywords = [
     "web",
 ]
 name = "pjx"
-version = "0.0.1"
+version = "0.2.0"
 description = "Python DSL for reactive Jinja components — compiles to Jinja2 + HTMX + Alpine.js"
 readme = "README.md"
 license = "MIT"
@@ -33,7 +33,6 @@ dependencies = [
     "fastapi>=0.135.2",
     "itsdangerous>=2.2.0",
     "jinja2>=3.1.6",
-    "minijinja>=2.18.0",
     "pydantic-settings>=2.13.1",
     "pydantic[email]>=2.12.5",
     "python-json-logger>=4.0.0",
@@ -42,6 +41,11 @@ dependencies = [
     "sse-starlette>=3.3.3",
     "typer>=0.24.1",
     "uvicorn[standard]>=0.42.0",
+]
+
+[project.optional-dependencies]
+fast = [
+    "minijinja>=2.18.0",
 ]
 
 [project.urls]

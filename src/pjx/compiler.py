@@ -85,6 +85,8 @@ def _compile_attr(name: str, value: str | bool) -> list[tuple[str, str | bool]]:
             return [("hx-boost", "true")]
         if name == "send":
             return [("ws-send", True)]
+        if name.startswith("use:"):
+            return [(f"x-{name[4:]}", True)]
         return [(name, True)]
 
     sval = str(value)
@@ -104,14 +106,28 @@ def _compile_attr(name: str, value: str | bool) -> list[tuple[str, str | bool]]:
         # Generic bind → Alpine shorthand :attr
         return [(f":{suffix}", sval)]
 
-    # on:event[.mods]
+    # on:event[.mods] — lifecycle hooks and events
     if name.startswith("on:"):
         event = name[3:]
+        if event == "mount":
+            return [("x-init", sval)]
+        if event == "destroy":
+            return [("x-init", f"$cleanup(() => {{ {sval} }})")]
         return [(f"@{event}", sval)]
 
-    # action:verb → hx-verb
+    # use:directive → x-directive (Alpine.js plugins)
+    if name.startswith("use:"):
+        directive = name[4:]
+        if value is True or sval == "true":
+            return [(f"x-{directive}", True)]
+        return [(f"x-{directive}", sval)]
+
+    # action:verb → hx-verb (with @action_name resolution)
     if name.startswith("action:"):
         verb = name[7:]
+        if sval.startswith("@"):
+            action_name = sval[1:]
+            return [(f"hx-{verb}", f"/_pjx/actions/{action_name}")]
         return [(f"hx-{verb}", sval)]
 
     # into= shorthand → hx-target + hx-swap

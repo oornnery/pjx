@@ -18,9 +18,11 @@ Run with::
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
 from fastapi import Request
+from fastapi.responses import RedirectResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.sessions import SessionMiddleware
@@ -28,6 +30,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from fastapi import FastAPI
 
 from pjx import PJX, PJXConfig, SEO
+from pjx.streaming import AwaitBlock, StreamingRenderer, streaming_placeholder
 
 from app.core.config import settings
 from app.middleware import generic_exception_handler, require_auth, security_headers
@@ -78,6 +81,28 @@ pjx = PJX(
 )
 
 pjx.middleware("auth")(require_auth)
+
+
+# -- Pattern middleware -------------------------------------------------------
+
+
+@pjx.middleware(pattern="/protected")
+async def auth_guard(request: Request):
+    if "user" not in request.session:
+        return RedirectResponse("/login", status_code=303)
+
+
+# -- Server actions -----------------------------------------------------------
+
+
+@pjx.action("quick_add_todo")
+async def quick_add_todo(request: Request):
+    form = await request.form()
+    text = form.get("text", "")
+    if text:
+        return f'<li class="todo-item">{text}</li>'
+    return ""
+
 
 # -- Routers -----------------------------------------------------------------
 
@@ -137,6 +162,25 @@ async def login() -> dict[str, object]:
 async def protected(request: Request) -> dict[str, object]:
     user = request.session.get("user", "Guest")
     return {"user": user}
+
+
+# -- Streaming demo -----------------------------------------------------------
+
+
+@app.get("/streaming-demo")
+async def streaming_demo():
+    async def fetch_slow():
+        await asyncio.sleep(1)
+        return "<p>Data loaded after 1 second!</p>"
+
+    placeholder = streaming_placeholder("slow-data", "<p>Loading...</p>")
+    shell = f"<main><h1>Streaming Demo</h1>{placeholder}</main>"
+
+    renderer = StreamingRenderer(
+        shell_html=shell,
+        blocks=[AwaitBlock(block_id="slow-data", resolve=fetch_slow)],
+    )
+    return renderer.response()
 
 
 # -- Entrypoint --------------------------------------------------------------

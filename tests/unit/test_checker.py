@@ -5,13 +5,25 @@ from pathlib import Path
 from pjx.ast_nodes import (
     Component,
     ComponentNode,
+    ComputedDecl,
     ImportDecl,
+    LetDecl,
     PropField,
     PropsDecl,
     SlotDecl,
+    StateDecl,
     TextNode,
 )
-from pjx.checker import check_all, check_imports, check_props, check_slots
+from pjx.checker import (
+    check_all,
+    check_computed_cycles,
+    check_imports,
+    check_prop_defaults,
+    check_props,
+    check_slots,
+    check_undefined_vars,
+    check_unused_imports,
+)
 from pjx.registry import ComponentRegistry
 
 
@@ -161,6 +173,170 @@ class TestCheckSlots:
             ),
         )
         errors = check_slots(parent, registry)
+        assert errors == []
+
+
+class TestCheckPropDefaults:
+    def test_valid_default_no_error(self) -> None:
+        comp = _component(
+            props=PropsDecl(
+                fields=(PropField("count", "int", default="0"),),
+            ),
+        )
+        errors = check_prop_defaults(comp)
+        assert errors == []
+
+    def test_invalid_default_reported(self) -> None:
+        comp = _component(
+            props=PropsDecl(
+                fields=(PropField("x", "str", default="def ???"),),
+            ),
+        )
+        errors = check_prop_defaults(comp)
+        assert len(errors) == 1
+        assert "x" in str(errors[0])
+
+    def test_no_props_no_error(self) -> None:
+        comp = _component()
+        errors = check_prop_defaults(comp)
+        assert errors == []
+
+    def test_no_default_no_error(self) -> None:
+        comp = _component(
+            props=PropsDecl(fields=(PropField("name", "str"),)),
+        )
+        errors = check_prop_defaults(comp)
+        assert errors == []
+
+
+class TestCheckUnusedImports:
+    def test_unused_import_reported(self) -> None:
+        comp = _component(
+            imports=(ImportDecl(names=("Button",), source="./Button.jinja"),),
+            body=(),
+        )
+        errors = check_unused_imports(comp)
+        assert len(errors) == 1
+        assert "Button" in str(errors[0])
+
+    def test_used_import_no_error(self) -> None:
+        comp = _component(
+            imports=(ImportDecl(names=("Button",), source="./Button.jinja"),),
+            body=(ComponentNode(name="Button", attrs={}),),
+        )
+        errors = check_unused_imports(comp)
+        assert errors == []
+
+    def test_no_imports_no_error(self) -> None:
+        comp = _component()
+        errors = check_unused_imports(comp)
+        assert errors == []
+
+    def test_partial_usage_reports_unused(self) -> None:
+        comp = _component(
+            imports=(
+                ImportDecl(names=("Button",), source="./Button.jinja"),
+                ImportDecl(names=("Card",), source="./Card.jinja"),
+            ),
+            body=(ComponentNode(name="Button", attrs={}),),
+        )
+        errors = check_unused_imports(comp)
+        assert len(errors) == 1
+        assert "Card" in str(errors[0])
+
+
+class TestCheckComputedCycles:
+    def test_no_cycle_no_error(self) -> None:
+        comp = _component(
+            computed=(
+                ComputedDecl("a", "x + 1"),
+                ComputedDecl("b", "a + 2"),
+            ),
+            states=(StateDecl("x", "0"),),
+        )
+        errors = check_computed_cycles(comp)
+        assert errors == []
+
+    def test_direct_cycle_reported(self) -> None:
+        comp = _component(
+            computed=(
+                ComputedDecl("a", "b + 1"),
+                ComputedDecl("b", "a + 1"),
+            ),
+        )
+        errors = check_computed_cycles(comp)
+        assert len(errors) >= 1
+        assert any("circular" in str(e) for e in errors)
+
+    def test_self_reference_no_false_positive(self) -> None:
+        """Self-reference is excluded from the graph (not a cross-dependency)."""
+        comp = _component(
+            computed=(ComputedDecl("x", "x + 1"),),
+        )
+        errors = check_computed_cycles(comp)
+        assert errors == []
+
+    def test_no_computed_no_error(self) -> None:
+        comp = _component()
+        errors = check_computed_cycles(comp)
+        assert errors == []
+
+    def test_triangle_cycle(self) -> None:
+        comp = _component(
+            computed=(
+                ComputedDecl("a", "c"),
+                ComputedDecl("b", "a"),
+                ComputedDecl("c", "b"),
+            ),
+        )
+        errors = check_computed_cycles(comp)
+        assert len(errors) >= 1
+
+
+class TestCheckUndefinedVars:
+    def test_declared_state_no_error(self) -> None:
+        comp = _component(
+            states=(StateDecl("count", "0"),),
+            computed=(ComputedDecl("doubled", "count * 2"),),
+        )
+        errors = check_undefined_vars(comp)
+        assert errors == []
+
+    def test_undefined_var_in_computed(self) -> None:
+        comp = _component(
+            computed=(ComputedDecl("doubled", "unknown_var * 2"),),
+        )
+        errors = check_undefined_vars(comp)
+        assert len(errors) == 1
+        assert "unknown_var" in str(errors[0])
+
+    def test_props_are_declared(self) -> None:
+        comp = _component(
+            props=PropsDecl(fields=(PropField("name", "str"),)),
+            variables=(LetDecl("greeting", "name"),),
+        )
+        errors = check_undefined_vars(comp)
+        assert errors == []
+
+    def test_builtins_not_flagged(self) -> None:
+        comp = _component(
+            computed=(ComputedDecl("n", "len(items)"),),
+            states=(StateDecl("items", "[]"),),
+        )
+        errors = check_undefined_vars(comp)
+        assert errors == []
+
+    def test_attribute_access_only_checks_root(self) -> None:
+        comp = _component(
+            props=PropsDecl(fields=(PropField("user", "dict"),)),
+            computed=(ComputedDecl("name", "user.name"),),
+        )
+        errors = check_undefined_vars(comp)
+        assert errors == []
+
+    def test_no_expressions_no_error(self) -> None:
+        comp = _component()
+        errors = check_undefined_vars(comp)
         assert errors == []
 
 

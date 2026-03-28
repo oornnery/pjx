@@ -37,11 +37,23 @@ Compiles to:
 - **Component DSL** — props, slots, state, imports, and control flow in a frontmatter block
 - **Reactive state** — `state` compiles to Alpine.js `x-data`; `on:click`, `bind:model` shorthand
 - **HTMX integration** — `action:post`, `target`, `swap`, `into=` shorthand for `hx-*` attributes
-- **File-based routing** — `pages/` filesystem maps to FastAPI routes (`[slug]`, `[...path]`, `(group)`)
+- **Server Actions** — `action name(params)` in frontmatter, `@action_name` refs auto-register as POST routes
+- **File-based routing** — `pages/` filesystem maps to FastAPI routes (`[slug]`, `[...path]`, `(group)`, `@parallel`)
+- **Streaming HTML** — `StreamingRenderer` sends shell immediately, resolves `<Await>` blocks via HTMX OOB swaps
+- **HTTP caching** — `@cache(ttl, revalidate)` decorator, ETag middleware, `@memo` request-scoped memoization
+- **Static site generation** — `pjx build --output dist/` pre-renders static pages to HTML
+- **SEO helpers** — `pjx sitemap`, `pjx robots`, `@metadata` decorator, `SEO` dataclass
 - **Layout components** — `<Center>`, `<HStack>`, `<VStack>`, `<Grid>`, `<Container>` and more
 - **Scoped CSS** — `<style scoped>` compiles to `[data-pjx-HASH]` attribute selectors
 - **Dual engine** — HybridEngine picks Jinja2 or MiniJinja per template (up to 74x faster ad-hoc)
-- **Static analysis** — `pjx check` validates imports, props, and slots at compile time
+- **Static analysis** — `pjx check` validates imports, props, slots, expressions, undefined vars, and computed cycles
+- **Formatter** — `pjx format` enforces canonical frontmatter ordering with `--check` for CI
+- **Route analysis** — `pjx analyze --routes` displays route table, template sizes, and CSS bundle info
+- **TypeScript stubs** — auto-generate `.d.ts` for Alpine.js store types
+- **Pattern middleware** — `@pjx.middleware(pattern="/admin/*")` for route-based guards
+- **Lifecycle hooks** — `on:mount`, `on:destroy` for Alpine.js init/cleanup
+- **Plugin directives** — `use:intersect`, `use:persist` for Alpine.js plugins
+- **Optional fast engine** — `pip install pjx[fast]` adds MiniJinja; core works with Jinja2 only
 - **Production security** — CSRF, signed sessions, rate limiting, SSE limits, health checks
 
 ---
@@ -49,7 +61,8 @@ Compiles to:
 ## Installation
 
 ```bash
-uv add pjx
+uv add pjx          # Core (Jinja2 only)
+uv add pjx[fast]    # With MiniJinja for faster ad-hoc rendering
 ```
 
 ## Quick Start
@@ -172,17 +185,21 @@ slot actions
 
 ### Attribute Mapping
 
-| PJX                 | Compiles to             | Framework |
-| ------------------- | ----------------------- | --------- |
-| `reactive`          | `x-data="{ ... }"`      | Alpine.js |
-| `on:click="..."`    | `@click="..."`          | Alpine.js |
-| `bind:model="..."`  | `x-model="..."`         | Alpine.js |
-| `action:get="..."`  | `hx-get="..."`          | HTMX      |
-| `action:post="..."` | `hx-post="..."`         | HTMX      |
-| `target="..."`      | `hx-target="..."`       | HTMX      |
-| `swap="..."`        | `hx-swap="..."`         | HTMX      |
-| `into="#el:swap"`   | `hx-target` + `hx-swap` | HTMX      |
-| `trigger="..."`     | `hx-trigger="..."`      | HTMX      |
+| PJX                 | Compiles to                        | Framework |
+| ------------------- | ---------------------------------- | --------- |
+| `reactive`          | `x-data="{ ... }"`                 | Alpine.js |
+| `on:click="..."`    | `@click="..."`                     | Alpine.js |
+| `on:mount="..."`    | `x-init="..."`                     | Alpine.js |
+| `on:destroy="..."`  | `x-init="$cleanup(() => { ... })"` | Alpine.js |
+| `bind:model="..."`  | `x-model="..."`                    | Alpine.js |
+| `use:intersect`     | `x-intersect`                      | Alpine.js |
+| `use:persist="key"` | `x-persist="key"`                  | Alpine.js |
+| `action:get="..."`  | `hx-get="..."`                     | HTMX      |
+| `action:post="..."` | `hx-post="..."`                    | HTMX      |
+| `target="..."`      | `hx-target="..."`                  | HTMX      |
+| `swap="..."`        | `hx-swap="..."`                    | HTMX      |
+| `into="#el:swap"`   | `hx-target` + `hx-swap`            | HTMX      |
+| `trigger="..."`     | `hx-trigger="..."`                 | HTMX      |
 
 ### Control Flow
 
@@ -233,15 +250,16 @@ async def search(form: Annotated[SearchForm, FormData()]):
 pjx.auto_routes()  # scans templates/pages/
 ```
 
-| File pattern                 | Route               |
-| ---------------------------- | ------------------- |
-| `pages/index.jinja`          | `/`                 |
-| `pages/about.jinja`          | `/about`            |
-| `pages/blog/[slug].jinja`    | `/blog/{slug}`      |
-| `pages/docs/[...path].jinja` | `/docs/{path:path}` |
-| `pages/(auth)/login.jinja`   | `/login`            |
+| File pattern                   | Route               |
+| ------------------------------ | ------------------- |
+| `pages/index.jinja`            | `/`                 |
+| `pages/about.jinja`            | `/about`            |
+| `pages/blog/[slug].jinja`      | `/blog/{slug}`      |
+| `pages/docs/[...path].jinja`   | `/docs/{path:path}` |
+| `pages/(auth)/login.jinja`     | `/login`            |
+| `pages/dash/@stats/page.jinja` | Parallel slot       |
 
-Special files: `layout.jinja` (nested layouts), `loading.jinja` (HTMX indicator), `error.jinja` (error pages).
+Special files: `layout.jinja` (nested layouts), `loading.jinja` (HTMX indicator), `error.jinja` (error pages), `not-found.jinja` (custom 404).
 
 ## Layout Components
 
@@ -268,14 +286,32 @@ Built-in components inspired by Chakra UI (no import needed):
 
 ---
 
+## Try It
+
+Run the bundled demo without cloning anything:
+
+```bash
+uvx pjx demo
+```
+
+Open [http://localhost:8000](http://localhost:8000) to explore a full working app with
+counter, todos, search, and more.
+
 ## CLI
 
 ```bash
-pjx init <dir>      # Scaffold project
-pjx dev <dir>       # Dev server with hot reload
-pjx build           # Compile templates + bundle CSS
-pjx check           # Validate imports, props, slots
-pjx format          # Re-format .jinja files
+pjx init <dir>          # Scaffold project
+pjx demo               # Run bundled demo app
+pjx dev <dir>          # Dev server with hot reload
+pjx build              # Compile templates + bundle CSS
+pjx build --output dist/  # Also generate static HTML (SSG)
+pjx check              # Validate imports, props, slots, expressions, cycles
+pjx format             # Re-format .jinja frontmatter
+pjx format --check     # Check formatting (exit 1 if diff)
+pjx analyze            # Template, route, and bundle analysis
+pjx analyze --routes   # Show route table
+pjx sitemap            # Generate sitemap.xml
+pjx robots             # Generate robots.txt
 ```
 
 ## Configuration
@@ -293,6 +329,15 @@ static_dir = "app/static"
 
 log_json = true
 log_level = "INFO"
+
+# Caching
+cache_max_size = 1000
+cache_default_ttl = 0
+cache_etag = false
+
+# SEO
+seo_base_url = ""
+seo_robots_disallow = []
 ```
 
 All fields can be overridden with `PJX_` prefixed environment variables:
@@ -372,6 +417,11 @@ Full documentation is available on the [Wiki](https://github.com/oornnery/pjx/wi
 - [Security](https://github.com/oornnery/pjx/wiki/Security)
 - [Deployment](https://github.com/oornnery/pjx/wiki/Deployment)
 - [CLI Reference](https://github.com/oornnery/pjx/wiki/CLI-Reference)
+- [Server Actions](https://github.com/oornnery/pjx/wiki/Server-Actions)
+- [Caching](https://github.com/oornnery/pjx/wiki/Caching)
+- [Static Site Generation](https://github.com/oornnery/pjx/wiki/Static-Site-Generation)
+- [Streaming HTML](https://github.com/oornnery/pjx/wiki/Streaming)
+- [SEO and Metadata](https://github.com/oornnery/pjx/wiki/SEO-and-Metadata)
 
 ---
 
@@ -383,7 +433,7 @@ uv run task format              # Format (ruff)
 uv run task lint                # Lint + autofix (ruff)
 uv run task check               # Format + lint + markdown lint
 uv run task typecheck           # Type check (ty)
-uv run task test                # Run all tests (512 passing)
+uv run task test                # Run all tests (695 passing)
 uv run task cov                 # Tests with coverage report
 uv run task ci                  # Full CI pipeline (check + typecheck + test)
 ```

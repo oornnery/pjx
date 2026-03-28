@@ -9,10 +9,13 @@ props {
 ---
 
 <Layout>
-  <VStack gap="1.5rem" class="dashboard">
-    <h1>{{ props.title }}</h1>
+  <VStack gap="1rem" class="page page--wide">
+    <div>
+      <h1>{{ props.title }}</h1>
+      <p>Manage your team — click Message to send a toast notification via HTMX.</p>
+    </div>
     <div id="toast-container" class="toast-container"></div>
-    <Grid min="320px" gap="1rem">
+    <div class="dashboard__grid">
       <For each="users" as="user">
         <UserCard name="{{ user.name }}" email="{{ user.email }}" avatar="{{ user.avatar }}" data-user-id="{{ user.id }}">
           <Slot:actions>
@@ -24,6 +27,6 @@ props {
           </Slot:actions>
         </UserCard>
       </For>
-    </Grid>
+    </div>
   </VStack>
 </Layout>

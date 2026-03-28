@@ -17,6 +17,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 from pjx.ast_nodes import (
+    ActionDecl,
     AssetDecl,
     AwaitNode,
     CaseNode,
@@ -83,6 +84,7 @@ def parse(source: str, path: Path | None = None) -> Component:
     states: list[StateDecl] = []
     computed: list[ComputedDecl] = []
     middleware: list[MiddlewareDecl] = []
+    actions: list[ActionDecl] = []
 
     if frontmatter is not None:
         tokens = tokenize(frontmatter)
@@ -114,6 +116,8 @@ def parse(source: str, path: Path | None = None) -> Component:
                 computed.append(decl)
             elif isinstance(decl, MiddlewareDecl):
                 middleware.append(decl)
+            elif isinstance(decl, ActionDecl):
+                actions.append(decl)
 
     # Collect known component names for body parser
     known: set[str] = set()
@@ -132,6 +136,7 @@ def parse(source: str, path: Path | None = None) -> Component:
         stores=tuple(stores),
         assets=tuple(assets),
         middleware=tuple(middleware),
+        actions=tuple(actions),
         variables=tuple(variables),
         states=tuple(states),
         computed=tuple(computed),
@@ -194,6 +199,7 @@ _Decl = (
     | StateDecl
     | ComputedDecl
     | MiddlewareDecl
+    | ActionDecl
 )
 
 
@@ -264,6 +270,8 @@ class _ScriptParser:
                 return self._parse_asset("js")
             case TokenKind.MIDDLEWARE:
                 return self._parse_middleware()
+            case TokenKind.ACTION:
+                return self._parse_action()
             case _:
                 raise ParseError(
                     f"unexpected token {tok.value!r}",
@@ -468,6 +476,21 @@ class _ScriptParser:
             self._advance()
             names.append(self._expect(TokenKind.STRING).value)
         return MiddlewareDecl(names=tuple(names))
+
+    def _parse_action(self) -> ActionDecl:
+        """Parse ``action name(param: type, ...)``."""
+        self._advance()  # consume 'action'
+        name = self._expect(TokenKind.IDENT).value
+        self._expect(TokenKind.LPAREN)
+        params: list[PropField] = []
+        self.skip_newlines()
+        while self._peek().kind != TokenKind.RPAREN:
+            params.append(self._parse_prop_field())
+            if self._peek().kind == TokenKind.COMMA:
+                self._advance()
+            self.skip_newlines()
+        self._expect(TokenKind.RPAREN)
+        return ActionDecl(name=name, params=tuple(params))
 
 
 # ---------------------------------------------------------------------------

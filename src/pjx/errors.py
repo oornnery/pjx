@@ -61,5 +61,9 @@ class ImportResolutionError(PJXError):
     """An import could not be resolved."""
 
 
+class RenderError(PJXError):
+    """Error while rendering a compiled template."""
+
+
 class ConfigError(PJXError):
     """Invalid PJX configuration."""

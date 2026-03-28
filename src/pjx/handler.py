@@ -43,6 +43,8 @@ class RouteHandler:
 
     methods: list[str] = field(default_factory=lambda: ["GET"])
     _handlers: dict[str, Callable] = field(default_factory=dict, repr=False)
+    _actions: dict[str, Callable] = field(default_factory=dict, repr=False)
+    _static_params_fn: Callable | None = field(default=None, repr=False)
 
     def get(self, fn: Callable) -> Callable:
         """Register a GET handler."""
@@ -78,6 +80,36 @@ class RouteHandler:
         if "PATCH" not in self.methods:
             self.methods.append("PATCH")
         return fn
+
+    def static_params(self, fn: Callable) -> Callable:
+        """Register a function that returns static parameter combinations.
+
+        Used by ``pjx build`` to pre-render pages with dynamic segments.
+
+        Example::
+
+            @handler.static_params
+            async def get_params():
+                return [{"slug": "hello"}, {"slug": "world"}]
+        """
+        self._static_params_fn = fn
+        return fn
+
+    def action(self, name: str) -> Callable:
+        """Register a server action handler.
+
+        Server actions are auto-registered as POST routes at
+        ``/_pjx/actions/{name}``.
+
+        Args:
+            name: Action identifier matching the frontmatter ``action`` declaration.
+        """
+
+        def decorator(fn: Callable) -> Callable:
+            self._actions[name] = fn
+            return fn
+
+        return decorator
 
 
 @dataclass

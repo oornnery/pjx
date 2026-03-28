@@ -1,5 +1,6 @@
 """Tests for pjx.compiler — AST to Jinja2 + Alpine + HTMX compilation."""
 
+import pytest
 from pathlib import Path
 
 from pjx.ast_nodes import (
@@ -418,6 +419,96 @@ class TestAttrs:
         )
         result = _compile(comp)
         assert 'data-user-id="5"' in result
+
+    # -- use: directive (Alpine.js plugins) ------------------------------------
+
+    def test_compile_attrs_use_intersect(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"use:intersect": True}),),
+        )
+        result = _compile(comp)
+        assert "x-intersect" in result
+
+    def test_compile_attrs_use_persist_with_value(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"use:persist": "theme"}),),
+        )
+        result = _compile(comp)
+        assert 'x-persist="theme"' in result
+
+    # -- on:mount / on:destroy lifecycle hooks --------------------------------
+
+    def test_compile_attrs_on_mount(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"on:mount": "$el.focus()"}),),
+        )
+        result = _compile(comp)
+        assert 'x-init="$el.focus()"' in result
+
+    def test_compile_attrs_on_destroy(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"on:destroy": "cleanup()"}),),
+        )
+        result = _compile(comp)
+        assert "x-init" in result
+        assert "$cleanup" in result
+        assert "cleanup()" in result
+
+    # -- loading:* indicator attrs ------------------------------------------
+
+    def test_compile_attrs_loading_class(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"loading:class": "animate"}),),
+        )
+        result = _compile(comp)
+        assert 'class="htmx-indicator animate"' in result
+
+    def test_compile_attrs_loading_remove(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"loading:remove": "hidden"}),),
+        )
+        result = _compile(comp)
+        assert 'class="htmx-indicator-remove hidden"' in result
+
+    def test_compile_attrs_loading_unknown_passthrough(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"loading:delay": "500ms"}),),
+        )
+        result = _compile(comp)
+        assert 'loading-delay="500ms"' in result
+
+    # -- SSE close attr -----------------------------------------------------
+
+    def test_compile_attrs_sse_close(self) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={"close": "done"}),),
+        )
+        result = _compile(comp)
+        assert 'sse-close="done"' in result
+
+    # -- Parametrized HTMX shorthand attrs ----------------------------------
+
+    @pytest.mark.parametrize(
+        ("dsl_attr", "value", "expected"),
+        [
+            ("select-oob", "#side", 'hx-select-oob="#side"'),
+            ("replace-url", "true", 'hx-replace-url="true"'),
+            ("vals", '{"key": "val"}', "hx-vals="),
+            ("headers", '{"X-Custom": "1"}', "hx-headers="),
+            ("encoding", "multipart/form-data", 'hx-encoding="multipart/form-data"'),
+            ("preserve", "true", 'hx-preserve="true"'),
+            ("sync", "this:replace", 'hx-sync="this:replace"'),
+            ("disabled-elt", "this", 'hx-disabled-elt="this"'),
+        ],
+    )
+    def test_compile_attrs_htmx_shorthand(
+        self, dsl_attr: str, value: str, expected: str
+    ) -> None:
+        comp = _minimal_component(
+            body=(ElementNode(tag="div", attrs={dsl_attr: value}),),
+        )
+        result = _compile(comp)
+        assert expected in result
 
 
 # ---------------------------------------------------------------------------
