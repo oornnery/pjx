@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import typer
+from rich.table import Table
 
+from pjx.cli.common import DirArg, console, load_config
 from pjx.config import PJXConfig
 
 app = typer.Typer()
@@ -13,13 +16,14 @@ app = typer.Typer()
 
 @app.command()
 def analyze(
-    directory: Path = typer.Argument(Path("."), help="Project directory"),
-    routes: bool = typer.Option(False, "--routes", "-r", help="Show route table"),
+    directory: DirArg = Path("."),
+    routes: Annotated[
+        bool, typer.Option("--routes", "-r", help="Show route table")
+    ] = False,
 ) -> None:
     """Analyze templates, routes, and CSS bundle sizes."""
     directory = directory.resolve()
-    toml_path = directory / "pjx.toml"
-    config = PJXConfig(toml_path=toml_path)
+    config = load_config(directory)
 
     template_count = 0
     total_size = 0
@@ -38,10 +42,10 @@ def analyze(
     if css_bundle.exists():
         css_size = css_bundle.stat().st_size
 
-    typer.echo("=== PJX Analysis ===")
-    typer.echo(f"Templates:    {template_count}")
-    typer.echo(f"Template size: {_fmt_size(total_size)}")
-    typer.echo(f"CSS bundle:   {_fmt_size(css_size)}")
+    console.print("=== PJX Analysis ===")
+    console.print(f"Templates:    {template_count}")
+    console.print(f"Template size: {_fmt_size(total_size)}")
+    console.print(f"CSS bundle:   {_fmt_size(css_size)}")
 
     if routes:
         _show_routes(config)
@@ -55,19 +59,21 @@ def _show_routes(config: PJXConfig) -> None:
     entries = router.scan()
 
     if not entries:
-        typer.echo("\nNo routes found.")
+        console.print("\nNo routes found.")
         return
 
-    typer.echo(f"\n=== Routes ({len(entries)}) ===")
-    typer.echo(f"{'Method':<8} {'URL':<40} {'Template':<30} {'Type':<6}")
-    typer.echo("-" * 84)
+    table = Table(title=f"Routes ({len(entries)})")
+    table.add_column("Method", style="cyan")
+    table.add_column("URL", style="green")
+    table.add_column("Template")
+    table.add_column("Type")
 
     for entry in entries:
         methods = ",".join(entry.methods)
         route_type = "API" if entry.is_api else "Page"
-        typer.echo(
-            f"{methods:<8} {entry.url_pattern:<40} {entry.template:<30} {route_type:<6}"
-        )
+        table.add_row(methods, entry.url_pattern, entry.template, route_type)
+
+    console.print(table)
 
 
 def _fmt_size(size: int) -> str:

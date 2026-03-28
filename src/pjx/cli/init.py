@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
 from pjx.assets import ensure_project_dirs
+from pjx.cli.common import console, err_console  # noqa: F401
 from pjx.config import PJXConfig
 
 app = typer.Typer()
@@ -529,7 +531,9 @@ def _write_if_missing(path: Path, content: str) -> bool:
 
 @app.command()
 def init(
-    directory: Path = typer.Argument(Path("."), help="Project directory"),
+    directory: Annotated[
+        Path, typer.Argument(help="Directory to scaffold the project in")
+    ] = Path("."),
 ) -> None:
     """Scaffold a new PJX project with a working example app."""
     directory.mkdir(parents=True, exist_ok=True)
@@ -538,7 +542,7 @@ def init(
     # pjx.toml at project root
     toml_path = directory / "pjx.toml"
     if _write_if_missing(toml_path, _TOML_TEMPLATE):
-        typer.echo(f"  Created {toml_path}")
+        console.print(f"  Created {toml_path}")
 
     config = PJXConfig(toml_path=toml_path)
 
@@ -559,57 +563,57 @@ def init(
         app_dir / "core" / "config.py",
         _CORE_CONFIG_TEMPLATE.format(project_name=project_name),
     ):
-        typer.echo("  Created app/core/config.py")
+        console.print("  Created app/core/config.py")
 
     # Main application
     if _write_if_missing(
         app_dir / "main.py",
         _MAIN_TEMPLATE.format(project_name=project_name),
     ):
-        typer.echo("  Created app/main.py")
+        console.print("  Created app/main.py")
 
     # Counter service
     if _write_if_missing(
         app_dir / "services" / "counter.py",
         _SERVICES_COUNTER_TEMPLATE,
     ):
-        typer.echo("  Created app/services/counter.py")
+        console.print("  Created app/services/counter.py")
 
     # Page routes
     if _write_if_missing(
         app_dir / "pages" / "routes.py",
         _PAGES_ROUTES_TEMPLATE,
     ):
-        typer.echo("  Created app/pages/routes.py")
+        console.print("  Created app/pages/routes.py")
 
     # Layout
     layout = config.layouts_dir / "Base.jinja"
     if _write_if_missing(layout, _LAYOUT_TEMPLATE.format(project_name=project_name)):
-        typer.echo(f"  Created {layout}")
+        console.print(f"  Created {layout}")
 
     # Home page
     home = config.pages_dir / "Home.jinja"
     if _write_if_missing(home, _HOME_TEMPLATE):
-        typer.echo(f"  Created {home}")
+        console.print(f"  Created {home}")
 
     # About page
     about = config.pages_dir / "About.jinja"
     if _write_if_missing(about, _ABOUT_TEMPLATE.format(project_name=project_name)):
-        typer.echo(f"  Created {about}")
+        console.print(f"  Created {about}")
 
     # Counter component
     counter = config.components_dir / "Counter.jinja"
     if _write_if_missing(counter, _COUNTER_COMPONENT):
-        typer.echo(f"  Created {counter}")
+        console.print(f"  Created {counter}")
 
     # CSS
     css_file = config.static_dir / "css" / "style.css"
     if _write_if_missing(css_file, _STYLE_CSS):
-        typer.echo(f"  Created {css_file}")
+        console.print(f"  Created {css_file}")
 
     for d in dirs:
-        typer.echo(f"  {d}/")
+        console.print(f"  {d}/")
 
-    typer.echo(f"\n✨ PJX project initialized in {directory}/")
-    typer.echo(f"\n  cd {directory} && pjx dev .")
-    typer.echo("  Open http://localhost:8000")
+    console.print(f"\n✨ PJX project initialized in {directory}/")
+    console.print(f"\n  cd {directory} && pjx dev .")
+    console.print("  Open http://localhost:8000")

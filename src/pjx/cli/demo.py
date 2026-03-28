@@ -5,13 +5,16 @@ from __future__ import annotations
 import shutil
 import tempfile
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
+from pjx.cli.common import DEFAULT_APP_PATH, console, err_console
+
 
 def demo(
-    port: int = typer.Option(8000, "--port", "-p", help="Port to bind to"),
-    host: str = typer.Option("127.0.0.1", "--host", "-h", help="Host to bind to"),
+    port: Annotated[int, typer.Option("--port", "-p", help="Port")] = 8000,
+    host: Annotated[str, typer.Option("--host", "-h", help="Host")] = "127.0.0.1",
 ) -> None:
     """Launch the bundled PJX demo application."""
     import importlib.resources
@@ -33,9 +36,7 @@ def demo(
         demo_src = project_root / "examples" / "demo"
 
     if not demo_src.exists():
-        typer.echo(
-            "Demo not found. Reinstall pjx or run from the project root.", err=True
-        )
+        err_console.print("Demo not found. Reinstall pjx or run from the project root.")
         raise typer.Exit(1)
 
     # Copy to a temp dir so the demo can write build artifacts
@@ -43,8 +44,8 @@ def demo(
     demo_dir = tmp / "demo"
     shutil.copytree(demo_src, demo_dir)
 
-    typer.echo(f"PJX Demo — http://{host}:{port}")
-    typer.echo(f"Working dir: {demo_dir}")
+    console.print(f"PJX Demo — http://{host}:{port}")
+    console.print(f"Working dir: {demo_dir}")
 
     # Build templates
     toml_path = demo_dir / "pjx.toml"
@@ -52,9 +53,9 @@ def demo(
 
     try:
         count = run_build(config)
-        typer.echo(f"Built {count} components.")
+        console.print(f"Built {count} components.")
     except PJXError as e:
-        typer.echo(f"Build warning: {e}", err=True)
+        err_console.print(f"Build warning: {e}")
 
     # Make the demo importable
     dir_str = str(demo_dir)
@@ -63,7 +64,7 @@ def demo(
 
     try:
         uvicorn.run(
-            "app.main:app",
+            DEFAULT_APP_PATH,
             host=host,
             port=port,
             reload=True,

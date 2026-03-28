@@ -5,8 +5,11 @@ from __future__ import annotations
 import importlib.resources
 import shutil
 from pathlib import Path
+from typing import Annotated
 
 import typer
+
+from pjx.cli.common import DirArg, console
 
 app = typer.Typer()
 
@@ -28,20 +31,6 @@ def _skills_source() -> Path:
     if dev_path.is_dir():
         return dev_path
     return pkg_path
-
-
-def _copy_tree(src: Path, dest: Path) -> list[Path]:
-    """Copy a directory tree, returning list of created files."""
-    created: list[Path] = []
-    for item in sorted(src.rglob("*")):
-        if item.is_dir():
-            continue
-        rel = item.relative_to(src)
-        target = dest / rel
-        target.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(item, target)
-        created.append(target)
-    return created
 
 
 _CLAUDE_MD = """\
@@ -73,17 +62,19 @@ Agent skills are available in `.agents/skills/`.
 
 @app.command()
 def inject(
-    directory: Path = typer.Argument(Path("."), help="Project directory"),
-    skills: bool = typer.Option(
-        True, "--skills/--no-skills", help="Inject skills/ directory"
-    ),
-    claude: bool = typer.Option(
-        False, "--claude", help="Inject .claude/ with CLAUDE.md and skills"
-    ),
-    agents: bool = typer.Option(
-        False, "--agents", help="Inject .agents/skills/ directory"
-    ),
-    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing files"),
+    directory: DirArg = Path("."),
+    skills: Annotated[
+        bool, typer.Option("--skills/--no-skills", help="Inject skills/ directory")
+    ] = True,
+    claude: Annotated[
+        bool, typer.Option("--claude", help="Inject .claude/ with CLAUDE.md and skills")
+    ] = False,
+    agents: Annotated[
+        bool, typer.Option("--agents", help="Inject .agents/skills/ directory")
+    ] = False,
+    force: Annotated[
+        bool, typer.Option("--force", "-f", help="Overwrite existing files")
+    ] = False,
 ) -> None:
     """Inject PJX skill files and AI agent configs into a project.
 
@@ -99,7 +90,9 @@ def inject(
     src = _skills_source()
 
     if not src.exists():
-        typer.echo("ERROR: bundled skills not found in pjx package", err=True)
+        console.print(
+            "[red]ERROR:[/red] bundled skills not found in pjx package", stderr=True
+        )
         raise typer.Exit(1)
 
     total = 0
@@ -115,19 +108,19 @@ def inject(
         claude_md = directory / "CLAUDE.md"
         if not claude_md.exists() or force:
             claude_md.write_text(_CLAUDE_MD, encoding="utf-8")
-            typer.echo("  created CLAUDE.md")
+            console.print("  [green]created[/green] CLAUDE.md")
             total += 1
         else:
-            typer.echo("  skipped CLAUDE.md (exists, use --force)")
+            console.print("  [yellow]skipped[/yellow] CLAUDE.md (exists, use --force)")
 
     if agents:
         dest = directory / ".agents" / "skills"
         total += _inject_dir(src, dest, ".agents/skills/", force)
 
     if total == 0:
-        typer.echo("Nothing to inject. Use --skills, --claude, or --agents.")
+        console.print("Nothing to inject. Use --skills, --claude, or --agents.")
     else:
-        typer.echo(f"\nInjected {total} file(s) into {directory}")
+        console.print(f"\nInjected {total} file(s) into {directory}")
 
 
 def _inject_dir(src: Path, dest: Path, label: str, force: bool) -> int:
@@ -139,10 +132,10 @@ def _inject_dir(src: Path, dest: Path, label: str, force: bool) -> int:
         rel = item.relative_to(src)
         target = dest / rel
         if target.exists() and not force:
-            typer.echo(f"  skipped {label}{rel} (exists)")
+            console.print(f"  [yellow]skipped[/yellow] {label}{rel} (exists)")
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(item, target)
-        typer.echo(f"  created {label}{rel}")
+        console.print(f"  [green]created[/green] {label}{rel}")
         count += 1
     return count
