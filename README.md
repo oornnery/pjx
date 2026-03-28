@@ -312,6 +312,9 @@ pjx analyze            # Template, route, and bundle analysis
 pjx analyze --routes   # Show route table
 pjx sitemap            # Generate sitemap.xml
 pjx robots             # Generate robots.txt
+pjx inject .           # Inject PJX skills into project
+pjx inject . --claude  # + .claude/ with CLAUDE.md
+pjx inject . --agents  # + .agents/skills/
 ```
 
 ## Configuration

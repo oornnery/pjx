@@ -720,6 +720,7 @@ pjx remove alpinejs        # Remove npm package
 pjx analyze                # Route and bundle analysis
 pjx sitemap                # Generate sitemap.xml
 pjx robots                 # Generate robots.txt
+pjx inject                 # Inject PJX skills and AI agent configs into a project (--claude, --agents, --force)
 ```
 
 ---

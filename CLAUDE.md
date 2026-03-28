@@ -35,6 +35,7 @@ rtk uv run pytest tests/test_foo.py::test_bar -v  # Single test
 rtk uv run pjx analyze examples/demo    # Route and bundle analysis
 rtk uv run pjx sitemap examples/demo    # Generate sitemap.xml
 rtk uv run pjx robots examples/demo     # Generate robots.txt
+rtk uv run pjx inject . --claude    # Inject skills + CLAUDE.md
 ```
 
 ## Validation (run in order, fail fast)
