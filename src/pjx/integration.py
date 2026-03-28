@@ -25,8 +25,10 @@ from pjx.setup import (
     setup_cache,
     setup_cors,
     setup_csrf,
+    setup_error_handlers,
     setup_health,
     setup_logging,
+    setup_security_headers,
     setup_static,
 )
 
@@ -135,6 +137,8 @@ class PJX:
 
         # Setup application infrastructure
         setup_static(app, self.config)
+        setup_security_headers(app, self.config)
+        setup_error_handlers(app, self.config)
 
         if csrf:
             self._csrf_middleware = setup_csrf(app, csrf_secret, csrf_exempt_paths)

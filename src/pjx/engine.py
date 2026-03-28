@@ -61,7 +61,7 @@ class Jinja2Engine:
 
 def _minijinja_auto_escape(name: str) -> str:
     """Auto-escape callback for MiniJinja — escape HTML by default."""
-    if name.endswith((".txt", ".text", ".md")):
+    if name.endswith((".txt", ".text")):
         return "none"
     return "html"
 

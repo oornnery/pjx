@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import shutil
 from pathlib import Path
 
@@ -36,13 +37,19 @@ class AssetCollector:
 
     def render_css(self) -> Markup:
         """Render ``<link>`` tags for all collected CSS assets."""
-        tags = [f'<link rel="stylesheet" href="{p}" />' for p in self._css]
+        tags = [
+            f'<link rel="stylesheet" href="{html.escape(p, quote=True)}" />'
+            for p in self._css
+        ]
         return Markup("\n".join(tags))
 
     def render_js(self, *, module: bool = True) -> Markup:
         """Render ``<script>`` tags for all collected JS assets."""
         type_attr = ' type="module"' if module else ""
-        tags = [f'<script src="{p}"{type_attr}></script>' for p in self._js]
+        tags = [
+            f'<script src="{html.escape(p, quote=True)}"{type_attr}></script>'
+            for p in self._js
+        ]
         return Markup("\n".join(tags))
 
     def render(self) -> Markup:
