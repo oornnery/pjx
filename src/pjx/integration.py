@@ -349,6 +349,7 @@ class PJX:
 
         # Build render context
         render_ctx = dict(context)
+        render_ctx.setdefault("attrs", "")
         render_ctx["props"] = _SimpleNamespace(context)
         render_ctx["seo"] = self._merge_seo(render_ctx.get("seo"))
         render_ctx["pjx_assets"] = asset_collector
