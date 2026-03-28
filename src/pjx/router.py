@@ -477,7 +477,7 @@ def _register_action_routes(pjx: PJX, actions: dict[str, Callable]) -> None:
             if isinstance(result, str):
                 return HTMLResponse(result)
             if isinstance(result, dict):
-                return JSONResponse(result)
+                return JSONResponse(result)  # ty: ignore[invalid-return-type]
             return HTMLResponse(str(result))
 
         action_wrapper.__name__ = f"action_{action_name}"

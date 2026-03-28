@@ -163,7 +163,7 @@ class ETagMiddleware(BaseHTTPMiddleware):
 
         # Read body for ETag computation
         body = b""
-        async for chunk in response.body_iterator:  # type: ignore[union-attr]
+        async for chunk in response.body_iterator:  # ty: ignore[unresolved-attribute]
             body += chunk if isinstance(chunk, bytes) else chunk.encode()
 
         etag = f'"{hashlib.md5(body).hexdigest()}"'  # noqa: S324
@@ -205,7 +205,7 @@ def memo(func: Callable) -> Callable:
     @wraps(func)
     async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
         store = _request_memo.get({})
-        key = f"{func.__qualname__}:{args}:{kwargs}"
+        key = f"{func.__qualname__}:{args}:{kwargs}"  # ty: ignore[unresolved-attribute]
         if key in store:
             return store[key]
         result = await func(*args, **kwargs)
@@ -216,7 +216,7 @@ def memo(func: Callable) -> Callable:
     @wraps(func)
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
         store = _request_memo.get({})
-        key = f"{func.__qualname__}:{args}:{kwargs}"
+        key = f"{func.__qualname__}:{args}:{kwargs}"  # ty: ignore[unresolved-attribute]
         if key in store:
             return store[key]
         result = func(*args, **kwargs)

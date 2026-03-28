@@ -146,7 +146,10 @@ def _format_frontmatter(component: Component) -> str:
 
 def _format_prop_field(f: object) -> str:
     """Format a single PropField."""
-    line = f"{f.name}: {f.type_expr}"  # type: ignore[attr-defined]
-    if f.default is not None:  # type: ignore[attr-defined]
-        line += f" = {f.default}"  # type: ignore[attr-defined]
+    name = getattr(f, "name", "")
+    type_expr = getattr(f, "type_expr", "")
+    default = getattr(f, "default", None)
+    line = f"{name}: {type_expr}"
+    if default is not None:
+        line += f" = {default}"
     return line

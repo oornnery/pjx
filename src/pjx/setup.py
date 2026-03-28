@@ -59,7 +59,7 @@ def setup_cache(app: FastAPI, config: PJXConfig) -> None:
     if config.cache_etag:
         from pjx.caching import ETagMiddleware
 
-        app.add_middleware(ETagMiddleware)
+        app.add_middleware(ETagMiddleware)  # ty: ignore[invalid-argument-type]
 
 
 def setup_health(app: FastAPI, config: PJXConfig) -> None:

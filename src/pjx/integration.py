@@ -208,7 +208,7 @@ class PJX:
                 for mw_func in self._get_pattern_middleware(path):
                     result = await mw_func(request)
                     if result is not None:
-                        return result  # ty: ignore[invalid-return-type]
+                        return result
 
                 # Run middleware from template frontmatter
                 for mw_name in tpl_middleware:

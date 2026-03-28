@@ -173,7 +173,7 @@ def metadata(func: Callable) -> Callable:
     Returns:
         The same function with ``_pjx_metadata = True`` set.
     """
-    func._pjx_metadata = True  # type: ignore[attr-defined]
+    func._pjx_metadata = True  # ty: ignore[unresolved-attribute]
     return func
 
 
