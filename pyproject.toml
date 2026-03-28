@@ -11,7 +11,7 @@ keywords = [
     "web",
 ]
 name = "pjx"
-version = "0.1.0"
+version = "0.1.1"
 description = "Python DSL for reactive Jinja components — compiles to Jinja2 + HTMX + Alpine.js"
 readme = "README.md"
 license = "MIT"
