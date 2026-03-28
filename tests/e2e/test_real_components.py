@@ -260,7 +260,7 @@ class TestTodoStatsCompilation:
 class TestNavbarCompilation:
     def test_nav_structure(self) -> None:
         src = _compile_component("Navbar")
-        assert '<nav class="navbar">' in src
+        assert '<nav class="navbar"' in src
         assert "PJX" in src
 
     def test_all_links_present(self) -> None:

@@ -20,6 +20,15 @@ document.body.addEventListener("htmx:afterRequest", (evt) => {
   }
 });
 
+// Animate counter value changes
+document.body.addEventListener("htmx:afterSwap", (evt) => {
+  const counter = evt.detail.target.querySelector?.(".counter__value") || evt.detail.elt.querySelector?.(".counter__value");
+  if (counter) {
+    counter.style.transform = "scale(1.15)";
+    setTimeout(() => { counter.style.transform = ""; }, 150);
+  }
+});
+
 // Log HTMX events in debug mode
 document.addEventListener("htmx:afterRequest", (evt) => {
   const { verb, path } = evt.detail.requestConfig;

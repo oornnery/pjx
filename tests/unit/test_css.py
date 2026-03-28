@@ -98,3 +98,13 @@ class TestScopeCSS:
         assert "@media (min-width: 768px)" in result
         assert ".card[data-pjx-a1b2c3d]" in result
         assert ".title[data-pjx-a1b2c3d]" in result
+
+    def test_pseudo_class_with_arguments(self) -> None:
+        result = scope_css(".card:nth-child(2) { color: red; }", "a1b2c3d")
+        assert ".card:nth-child(2)[data-pjx-a1b2c3d]" in result
+
+    def test_child_combinator_no_spaces(self) -> None:
+        """`.a>.b` (no spaces around >) should scope both parts."""
+        result = scope_css(".a>.b { color: red; }", "a1b2c3d")
+        assert ".a[data-pjx-a1b2c3d]" in result
+        assert ".b[data-pjx-a1b2c3d]" in result

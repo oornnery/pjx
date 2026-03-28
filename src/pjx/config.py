@@ -61,6 +61,13 @@ class PJXConfig(BaseSettings):
     cors_methods: list[str] = ["GET"]
     cors_headers: list[str] = []
     cors_credentials: bool = False
+    cache_max_size: int = 1000
+    cache_default_ttl: int = 0
+    cache_etag: bool = False
+    seo_base_url: str = ""
+    seo_sitemap_url: str = "/sitemap.xml"
+    seo_robots_disallow: list[str] = []
+    seo_robots_allow: list[str] = []
 
     def __init__(self, toml_path: Path | str = "pjx.toml", **kwargs: Any) -> None:
         toml = Path(toml_path)

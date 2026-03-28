@@ -36,6 +36,7 @@ class TokenKind(StrEnum):
     CSS = "css"
     JS = "js"
     MIDDLEWARE = "middleware"
+    ACTION = "action"
 
     # Literals / identifiers
     IDENT = "IDENT"
@@ -79,6 +80,7 @@ _KEYWORDS.update(
         "css": TokenKind.CSS,
         "js": TokenKind.JS,
         "middleware": TokenKind.MIDDLEWARE,
+        "action": TokenKind.ACTION,
     }
 )
 

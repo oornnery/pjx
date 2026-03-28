@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-PJX is a Python DSL for reactive `.jinja` components, inspired by JSX, Svelte
-and SolidJS. It compiles a declarative component syntax (props, state, slots,
-imports, control flow) down to Jinja2 + HTMX + Alpine.js. The full DSL
-specification lives in `docs/dev/IDEA.md`, technical spec in `docs/dev/SPEC.md`.
+PJX is a Python DSL for reactive `.jinja` components, inspired by JSX, Svelte,
+SolidJS, and the Next.js App Router. It compiles a declarative component syntax
+(props, state, slots, imports, control flow) down to Jinja2 + HTMX + Alpine.js,
+with server actions, HTTP caching, SSG, streaming HTML, and SEO helpers. The full
+DSL specification lives in `docs/dev/IDEA.md`, technical spec in `docs/dev/SPEC.md`.
 
 ## Stack
 
@@ -31,6 +32,9 @@ rtk uv run task test                 # Run all tests
 rtk uv run task cov                  # Tests with coverage report
 rtk uv run task ci                   # Full CI: check + typecheck + test
 rtk uv run pytest tests/test_foo.py::test_bar -v  # Single test
+rtk uv run pjx analyze examples/demo    # Route and bundle analysis
+rtk uv run pjx sitemap examples/demo    # Generate sitemap.xml
+rtk uv run pjx robots examples/demo     # Generate robots.txt
 ```
 
 ## Validation (run in order, fail fast)
@@ -49,17 +53,12 @@ rtk uv run task test
 
 ## Skills
 
-On-demand knowledge modules in `.agents/skills/`. Load the relevant skill
+On-demand knowledge modules in `skills/`. Load the relevant skill
 when working in its domain.
 
-| Skill               | When to use                                       |
-| ------------------- | ------------------------------------------------- |
-| `python/SKILL.md`   | Python code, conventions, async, uv toolchain     |
-| `fastapi/SKILL.md`  | FastAPI routes, dependencies, middleware          |
-| `jx/SKILL.md`       | Jinja server-rendered components (JX patterns)    |
-| `frontend/SKILL.md` | JS/CSS tooling, Tailwind, Alpine.js, HTMX         |
-| `commit/SKILL.md`   | Small logical commits with conventional messages  |
-| `refactor/SKILL.md` | Code audit, clean code, SOLID, security review    |
+| Skill             | When to use                                          |
+| ----------------- | ---------------------------------------------------- |
+| `pjx/SKILL.md`   | PJX DSL, components, routing, FastAPI integration    |
 
 Each skill has a `references/` folder with detailed submodules. Load on demand.
 

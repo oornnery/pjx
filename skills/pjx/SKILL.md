@@ -713,9 +713,13 @@ pjx init my-app           # Scaffold new project
 pjx dev .                  # Dev server with auto-reload
 pjx run .                  # Production server
 pjx build .                # Compile templates + bundle CSS
+pjx build --output dist/   # Static site generation
 pjx check .                # Parse and validate all components
 pjx add alpinejs           # Install npm package to vendor/
 pjx remove alpinejs        # Remove npm package
+pjx analyze                # Route and bundle analysis
+pjx sitemap                # Generate sitemap.xml
+pjx robots                 # Generate robots.txt
 ```
 
 ---
@@ -740,6 +744,122 @@ props { name: str }
   {{ props.name }}
 </div>
 ```
+
+---
+
+## Server Actions
+
+Declare actions in frontmatter:
+
+```text
+action add_todo(text: str)
+```
+
+Reference in templates with `@action_name`:
+
+```html
+<form action:post="@add_todo" target="#list" swap="beforeend">
+```
+
+Compiles to `hx-post="/_pjx/actions/add_todo"`.
+
+Register via decorator:
+
+```python
+@pjx.action("name")
+async def handler(request): ...
+```
+
+Or in colocated handler:
+
+```python
+@handler.action("name")
+async def handler(request): ...
+```
+
+Returns: `str` -> HTMLResponse, `dict` -> JSONResponse.
+
+---
+
+## HTTP Caching
+
+```python
+from pjx import cache, memo
+
+@cache(ttl=3600, revalidate=60)  # Route-level with ISR
+async def page(): ...
+
+@memo  # Request-scoped memoization
+async def get_user(id): ...
+```
+
+Config: `cache_max_size`, `cache_default_ttl`, `cache_etag` in `pjx.toml`.
+
+---
+
+## Static Site Generation
+
+```bash
+pjx build --output dist/
+```
+
+Colocated handler with static params:
+
+```python
+@handler.static_params
+async def get_params():
+    return [{"slug": "hello"}, {"slug": "about"}]
+```
+
+---
+
+## Streaming HTML
+
+```python
+from pjx.streaming import StreamingRenderer, AwaitBlock, streaming_placeholder
+
+renderer = StreamingRenderer(shell_html, blocks=[
+    AwaitBlock(block_id="stats", resolve=fetch_stats),
+])
+return renderer.response()
+```
+
+Shell renders immediately, blocks stream via HTMX OOB swaps.
+
+---
+
+## SEO Helpers
+
+```python
+from pjx import SEO
+from pjx.seo import generate_sitemap, generate_robots, metadata, dict_to_seo
+```
+
+```bash
+pjx sitemap --base-url https://example.com
+pjx robots
+pjx analyze --routes
+```
+
+Config: `seo_base_url`, `seo_sitemap_url`, `seo_robots_disallow` in `pjx.toml`.
+
+---
+
+## Pattern Middleware
+
+```python
+@pjx.middleware(pattern="/admin/*")
+async def guard(request):
+    if not request.session.get("is_admin"):
+        return RedirectResponse("/login")
+```
+
+---
+
+## Enhanced Routing
+
+Parallel routes: `@folder/page.jinja` renders in named slots.
+Custom 404: `not-found.jinja` walks up directory tree.
 
 ---
 

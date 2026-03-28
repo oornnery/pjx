@@ -3,15 +3,18 @@ import Layout from "../layouts/Base.jinja"
 ---
 
 <Layout>
-  <VStack gap="1.5rem" class="page" x-data="{ filter: 'all' }">
-    <h1>Todo List</h1>
+  <VStack gap="1rem" class="page" x-data="{ filter: 'all' }">
+    <div>
+      <h1>Todo List</h1>
+      <p>Full CRUD with HTMX — add, toggle, edit, delete, and filter todos.</p>
+    </div>
     <input type="hidden" id="todo-filter" name="status" bind:value="filter" />
     <form class="todo-add" action:post="/htmx/todos/add" into="#todo-list"
       hx-include="#todo-filter">
       <input type="text" name="text" placeholder="What needs to be done?" required />
       <button type="submit" class="btn btn-primary">Add</button>
     </form>
-    <HStack gap="0.5rem" class="todo-filters">
+    <div class="todo-filters">
       <button class="btn btn-filter"
         bind:class="filter === 'all' && 'active'"
         on:click="filter = 'all'"
@@ -33,7 +36,7 @@ import Layout from "../layouts/Base.jinja"
         into="#todo-list">
         Done
       </button>
-    </HStack>
+    </div>
     <div id="todo-list" class="todo-list">
       {{ todo_list }}
     </div>

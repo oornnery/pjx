@@ -27,7 +27,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger("pjx")
 
 # Special files that are NOT routes
-_SPECIAL_FILES = frozenset({"layout.jinja", "loading.jinja", "error.jinja"})
+_SPECIAL_FILES = frozenset(
+    {"layout.jinja", "loading.jinja", "error.jinja", "not-found.jinja"}
+)
+
+# Parallel route prefix (e.g. @stats, @activity)
+_PARALLEL_RE = re.compile(r"^@(\w+)$")
 
 # Pattern for dynamic segments: [param] or [...param]
 _DYNAMIC_RE = re.compile(r"^\[(?:\.\.\.)?(\w+)\]$")
@@ -45,6 +50,8 @@ class RouteEntry:
     layout_chain: tuple[str, ...] = ()
     loading: str | None = None
     error: str | None = None
+    not_found: str | None = None
+    parallel_slots: dict[str, str] | None = None
     methods: tuple[str, ...] = ("GET",)
     middleware: tuple[str, ...] = ()
     is_api: bool = False
@@ -76,6 +83,11 @@ class FileRouter:
             if path.name in _SPECIAL_FILES:
                 continue
             if path.name.startswith("_"):
+                continue
+            # Skip files inside @parallel route directories
+            if any(
+                part.startswith("@") for part in path.relative_to(self._pages_dir).parts
+            ):
                 continue
             entry = self._build_route(path, is_api=False)
             if entry:
@@ -119,10 +131,14 @@ class FileRouter:
             if py_file.exists():
                 handler_path = py_file
 
-        # Resolve layout chain, loading, error
+        # Resolve layout chain, loading, error, not-found
         layout_chain = self._find_layout_chain(path.parent)
         loading = self._find_special(path.parent, "loading.jinja")
         error = self._find_special(path.parent, "error.jinja")
+        not_found = self._find_special(path.parent, "not-found.jinja")
+
+        # Detect parallel route slots (@folder/page.jinja)
+        parallel_slots = self._find_parallel_slots(path.parent)
 
         # Determine methods from handler
         methods: tuple[str, ...] = ("GET",)
@@ -138,6 +154,8 @@ class FileRouter:
             layout_chain=layout_chain,
             loading=loading,
             error=error,
+            not_found=not_found,
+            parallel_slots=parallel_slots if parallel_slots else None,
             methods=methods,
             is_api=is_api,
         )
@@ -192,6 +210,29 @@ class FileRouter:
 
         return None
 
+    def _find_parallel_slots(self, directory: Path) -> dict[str, str]:
+        """Find @folder parallel route slots in a directory.
+
+        Parallel routes use ``@name/page.jinja`` convention. Each
+        ``@folder`` renders independently into a named slot.
+
+        Returns:
+            Dict mapping slot name to template path.
+        """
+        slots: dict[str, str] = {}
+        resolved = directory.resolve()
+        if not resolved.is_dir():
+            return slots
+        for child in resolved.iterdir():
+            if child.is_dir():
+                m = _PARALLEL_RE.match(child.name)
+                if m:
+                    slot_name = m.group(1)
+                    page = child / "page.jinja"
+                    if page.exists():
+                        slots[slot_name] = self._relative_template(page)
+        return slots
+
     def _register_page_route(self, pjx: PJX, entry: RouteEntry) -> None:
         """Register a page route on the PJX app."""
         # Determine layout — use innermost layout from chain
@@ -211,7 +252,7 @@ class FileRouter:
             try:
                 from pjx.parser import parse_file as _parse
 
-                tpl_path = pjx._find_template(template)
+                tpl_path = pjx.pipeline.find_template(template)
                 component = _parse(tpl_path)
                 for mw_decl in component.middleware:
                     tpl_middleware.extend(mw_decl.names)
@@ -242,6 +283,13 @@ class FileRouter:
         page_wrapper.__name__ = Path(entry.template).stem
         pjx.app.add_api_route(entry.url_pattern, page_wrapper, methods=methods)
         logger.info("route  %s → %s", entry.url_pattern, entry.template)
+
+        # Register server action routes from colocated handler
+        handler_obj = (
+            _load_handler_object(entry.handler_path) if entry.handler_path else None
+        )
+        if handler_obj is not None and hasattr(handler_obj, "_actions"):
+            _register_action_routes(pjx, handler_obj._actions)
 
     def _register_api_route(self, pjx: PJX, entry: RouteEntry) -> None:
         """Register an API route from a .py file."""
@@ -404,3 +452,36 @@ def _load_route_object(path: Path) -> Any:
     except Exception:
         logger.warning("failed to load API route: %s", path, exc_info=True)
         return None
+
+
+def _register_action_routes(pjx: PJX, actions: dict[str, Callable]) -> None:
+    """Register server action handlers as POST routes.
+
+    Each action ``name`` is mounted at ``/_pjx/actions/{name}`` as a POST
+    endpoint.  The handler receives the ``Request`` and returns an
+    ``HTMLResponse`` (for HTMX swap) or a ``JSONResponse``.
+    """
+    import inspect
+
+    for action_name, fn in actions.items():
+        action_path = f"/_pjx/actions/{action_name}"
+
+        async def action_wrapper(
+            request: Request,
+            _fn: Callable = fn,
+        ) -> HTMLResponse:
+            if inspect.iscoroutinefunction(_fn):
+                result = await _fn(request=request)
+            else:
+                result = _fn(request=request)
+            if isinstance(result, str):
+                return HTMLResponse(result)
+            if isinstance(result, dict):
+                return JSONResponse(result)  # ty: ignore[invalid-return-type]
+            return HTMLResponse(str(result))
+
+        action_wrapper.__name__ = f"action_{action_name}"
+        pjx.app.add_api_route(
+            action_path, action_wrapper, methods=["POST"], response_model=None
+        )
+        logger.info("action %s → %s", action_path, action_name)

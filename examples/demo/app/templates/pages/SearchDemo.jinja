@@ -3,9 +3,11 @@ import Layout from "../layouts/Base.jinja"
 ---
 
 <Layout>
-  <VStack gap="1.5rem" class="page">
-    <h1>Search Users</h1>
-    <p>HTMX-powered search with debounce:</p>
+  <VStack gap="1rem" class="page" style="align-items: center; text-align: center;">
+    <div>
+      <h1>Search Users</h1>
+      <p>HTMX-powered search with 300ms debounce — results swap in without a page reload.</p>
+    </div>
     <div class="search">
       <input type="text" name="query"
         action:get="/htmx/search"

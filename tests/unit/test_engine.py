@@ -1,5 +1,7 @@
 """Tests for pjx.engine — template engine wrappers."""
 
+import pytest
+
 from pjx.engine import (
     EngineProtocol,
     HybridEngine,
@@ -92,3 +94,30 @@ class TestCreateEngine:
     def test_minijinja_explicit(self) -> None:
         engine = create_engine("minijinja")
         assert isinstance(engine, MiniJinjaEngine)
+
+
+class TestMinijinjaOptional:
+    def test_minijinja_raises_when_missing(self) -> None:
+        import pjx.engine as engine_mod
+
+        original = engine_mod._HAS_MINIJINJA
+        try:
+            engine_mod._HAS_MINIJINJA = False
+            with pytest.raises(ImportError, match="pjx\\[fast\\]"):
+                MiniJinjaEngine()
+        finally:
+            engine_mod._HAS_MINIJINJA = original
+
+    def test_hybrid_degrades_without_minijinja(self) -> None:
+        import pjx.engine as engine_mod
+
+        original = engine_mod._HAS_MINIJINJA
+        try:
+            engine_mod._HAS_MINIJINJA = False
+            engine = HybridEngine()
+            assert engine._minijinja is None
+            # Should still work using Jinja2 fallback
+            result = engine.render_string("{{ x }}", {"x": "ok"})
+            assert result == "ok"
+        finally:
+            engine_mod._HAS_MINIJINJA = original
