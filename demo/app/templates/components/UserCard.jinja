@@ -1,0 +1,36 @@
+---
+from ..icons import IconUser, IconTrash, IconEdit
+---
+
+<div class="card" id="user-{{ id }}">
+  <h3>
+    <IconUser size="18" />
+    <a href={"/users/" ~ id} style="text-decoration:none; color:inherit;">{{ name }}</a>
+    <Show when={role == "admin"}>
+      <span class="badge badge-admin">admin</span>
+      <Else>
+        <span class="badge badge-user">{{ role }}</span>
+      </Else>
+    </Show>
+  </h3>
+  <p>{{ email }}</p>
+  <div class="card-actions">
+    <button
+      class="btn btn-sm"
+      htmx:get={"/users/" ~ id ~ "/edit"}
+      htmx:target="#modal-container"
+      htmx:swap="innerHTML">
+      <IconEdit size="14" />
+      Editar
+    </button>
+    <button
+      class="btn btn-danger btn-sm"
+      htmx:delete={"/users/" ~ id}
+      htmx:target={"#user-" ~ id}
+      htmx:swap="outerHTML"
+      htmx:confirm="Remover este usuario?">
+      <IconTrash size="14" />
+      Remover
+    </button>
+  </div>
+</div>

@@ -1,0 +1,44 @@
+---
+from ...layouts import BaseLayout
+from ...icons import IconUser, IconEdit, IconTrash
+---
+
+<BaseLayout title={props.user.name}>
+  <div class="card" style="max-width: 500px;">
+    <h2>
+      <IconUser size="24" />
+      {{ props.user.name }}
+      <Show when={props.user.role == "admin"}>
+        <span class="badge badge-admin">admin</span>
+        <Else>
+          <span class="badge badge-user">{{ props.user.role }}</span>
+        </Else>
+      </Show>
+    </h2>
+
+    <p style="margin: 1rem 0; color: #6b7280;">{{ props.user.email }}</p>
+    <p style="font-size: 0.85rem; color: #9ca3af;">ID: {{ props.user.id }}</p>
+
+    <div class="card-actions" style="margin-top: 1.5rem;">
+      <a href="/" class="btn btn-sm">Voltar</a>
+      <button
+        class="btn btn-sm"
+        htmx:get={"/users/" ~ props.user.id ~ "/edit"}
+        htmx:target="#modal-container"
+        htmx:swap="innerHTML">
+        <IconEdit size="14" />
+        Editar
+      </button>
+      <button
+        class="btn btn-danger btn-sm"
+        htmx:delete={"/users/" ~ props.user.id}
+        htmx:confirm="Remover este usuario?"
+        htmx:on="htmx:afterOnLoad: window.location='/'">
+        <IconTrash size="14" />
+        Remover
+      </button>
+    </div>
+  </div>
+
+  <div id="modal-container"></div>
+</BaseLayout>

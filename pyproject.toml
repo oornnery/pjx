@@ -1,0 +1,35 @@
+[project]
+name = "pjx"
+version = "0.1.0"
+description = "Jinja2 preprocessor with JSX-like syntax for FastAPI + HTMX + Stimulus"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.135.3",
+    "jinja2>=3.1.6",
+    "pydantic>=2.12.5",
+    "python-multipart>=0.0.22",
+    "uvicorn>=0.43.0",
+]
+
+[project.scripts]
+pjx = "pjx.cli:main"
+
+[dependency-groups]
+dev = [
+    "anyio>=4.13.0",
+    "fastapi[standard]>=0.135.3",
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "pytest-anyio>=0.0.0",
+    "pytest-cov>=7.1.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["pjx*"]
+
+[tool.uv.workspace]
+members = [
+    "demo",
+    ".",
+]
