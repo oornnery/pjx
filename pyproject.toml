@@ -19,6 +19,8 @@ dev = [
     "pjx-stimulus",
     "pjx-tailwind",
     "taskipy>=1.14.1",
+    "ruff>=0.15.9",
+    "ty>=0.0.28",
 ]
 
 [tool.ruff]
