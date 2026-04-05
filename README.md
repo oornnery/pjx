@@ -2,48 +2,38 @@
 
 Jinja2 preprocessor with JSX-like syntax for FastAPI + HTMX + Stimulus.
 
-PJX extends Jinja2 with declarative syntax — components, control flow tags, HTMX/Stimulus aliases — that compiles transparently to standard Jinja2 at template load time. No build step, no runtime overhead, no magic.
-
-## The Idea
-
-PJX brings the DX of modern component frameworks (React, Vue, Solid) to the Python SSR ecosystem, without abandoning the simplicity of Jinja2 + HTMX.
-
-Instead of inventing a client-side reactive runtime or a complex build system, PJX is a **preprocessor** that transforms declarative syntax into plain Jinja2. You write `<For>`, `<Show>`, `htmx:post`, `stimulus:controller` — PJX generates `{% for %}`, `{% if %}`, `hx-post`, `data-controller`. The generated Jinja2 is always inspectable.
-
-PJX is not a framework. It's a library with two layers:
-- **Preprocessor** — transforms syntax at template load time
-- **PJXRouter** — extends FastAPI's `APIRouter` with typed template decorators
-
-You bring your own FastAPI app, your own CSS strategy, your own deployment.
+PJX extends Jinja2 with declarative syntax — components, control flow,
+template variables, conditional attributes — that compiles transparently
+to standard Jinja2 at template load time. No build step, no runtime
+overhead.
 
 ## Installation
 
 ```bash
-pip install pjx
+pip install pjx                    # core only
+pip install pjx[htmx]             # + HTMX/SSE aliases
+pip install pjx[htmx,stimulus]    # + Stimulus aliases
+pip install pjx[all]              # + Tailwind utilities (cn)
 ```
 
-Or with `uv`:
+## Core (`pip install pjx`)
 
-```bash
-uv add pjx
-```
+The core package gives you: components, control flow tags,
+frontmatter (props, vars, computed), conditional attributes,
+spread attributes, Fragment, expressions, and the PJXRouter
+for FastAPI.
 
-## Quick Start
-
-### 1. Setup
+### Setup
 
 ```python
-# app.py
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from jinja2 import FileSystemLoader
 from pydantic import BaseModel
-
 from pjx import PJXEnvironment
 from pjx.router import PJXRouter
 
 app = FastAPI()
-
 templates = Jinja2Templates(
     env=PJXEnvironment(loader=FileSystemLoader("templates"))
 )
@@ -61,93 +51,148 @@ async def home(request: Request) -> HomeProps:
     return HomeProps(items=["Alice", "Bob", "Charlie"])
 ```
 
-### 2. Template
+### Template (core features only)
 
 ```html
-<!-- templates/home.jinja -->
-<!DOCTYPE html>
-<html>
-<body>
-  <h1>{{ props.title }}</h1>
-  <ul>
-    <For each={props.items} as="item">
-      <li>{{ item }}</li>
+---
+from ..layouts import BaseLayout
+from ..components import UserCard
+
+props:
+  title: str = "Dashboard"
+  users: list = []
+  show_header: bool = true
+
+vars:
+  card_class: "rounded shadow p-4"
+  roles:
+    admin: "badge-red"
+    user: "badge-gray"
+
+computed:
+  has_users: props.users | length > 0
+  greeting: "Welcome to " ~ props.title
+---
+
+<BaseLayout title={props.title}>
+  <h1>{{ greeting }}</h1>
+
+  <Show when={show_header}>
+    <Fragment>
+      <h2>User List</h2>
+      <p>Manage your users below.</p>
+    </Fragment>
+  </Show>
+
+  <div ?hidden={not has_users}>
+    <For each={props.users} as="user">
+      <UserCard
+        name={user.name}
+        role={user.role}
+        class={card_class}
+        ...{user.extra_attrs}
+      />
     </For>
-  </ul>
-</body>
-</html>
+  </div>
+
+  <Show when={not has_users}>
+    <p>No users yet.</p>
+  </Show>
+</BaseLayout>
 ```
 
-### 3. Run
+What the core gives you:
 
-```bash
-fastapi dev app.py
-```
+| Feature           | Syntax                        | Compiles to                                   |
+| ----------------- | ----------------------------- | --------------------------------------------- |
+| Control flow      | `<For>`, `<Show>`, `<Switch>` | `{% for %}`, `{% if %}`, `{% if/elif %}`      |
+| Fragment          | `<Fragment>...</Fragment>`    | children only (no wrapper)                    |
+| Components        | `<UserCard name={x} />`       | `{% include %}` + `{% with %}`                |
+| Expressions       | `href={"/users/" ~ id}`       | `href="{{ '/users/' ~ id }}"`                 |
+| Conditional attrs | `?hidden={not visible}`       | `{% if not visible %}hidden="..."{% endif %}` |
+| Spread attrs      | `...{extra_attrs}`            | `{{ extra_attrs \| xmlattr }}`                |
+| Vars              | `vars: color: "blue"`         | `{% set color = "blue" %}`                    |
+| Computed          | `computed: full: a ~ b`       | `{% set full = a ~ b %}`                      |
+| Props             | `props: title: str = "Hi"`    | metadata for type checking                    |
+| Slots             | `slot actions`                | named content slots                           |
 
-## Syntax
+---
 
-### Control Flow
+## Add HTMX (`pip install pjx[htmx]`)
+
+Installs `pjx-htmx`. Adds `htmx:*` and `sse:*` alias processors
+to the pipeline automatically via entry points.
 
 ```html
-<!-- Loop -->
-<For each={users} as="user">
-  <p>{{ user.name }}</p>
-</For>
+<!-- Before: raw hx- attributes -->
+<button hx-post="/users" hx-target="#list" hx-swap="innerHTML">Save</button>
 
-<!-- Conditional -->
-<Show when={user.active}>
-  <span>Active</span>
-  <Else>
-    <span>Inactive</span>
-  </Else>
-</Show>
-
-<!-- Switch -->
-<Switch expr={user.role}>
-  <Case value="admin"><span class="badge">Admin</span></Case>
-  <Case value="agent"><span class="badge">Agent</span></Case>
-  <Default><span class="badge">User</span></Default>
-</Switch>
-```
-
-### HTMX Aliases
-
-`htmx:{attr}` compiles to `hx-{attr}`:
-
-```html
-<button
-  htmx:post="/users"
-  htmx:target="#user-list"
-  htmx:swap="innerHTML"
-  htmx:confirm="Are you sure?">
+<!-- After: with pjx[htmx] -->
+<button htmx:post="/users" htmx:target="#list" htmx:swap="innerHTML">
   Save
 </button>
+```
 
+SSE aliases (bundled with htmx):
+
+```html
+<div sse:connect="/events" sse:swap="message"></div>
 <!-- compiles to: -->
-<button
-  hx-post="/users"
-  hx-target="#user-list"
-  hx-swap="innerHTML"
-  hx-confirm="Are you sure?">
-  Save
-</button>
+<div sse-connect="/events" sse-swap="message"></div>
 ```
 
-### Stimulus Aliases
+Combined with core features:
+
+```html
+---
+from ..components import UserCard
+
+props:
+  users: list = []
+
+computed:
+  has_users: props.users | length > 0
+---
+
+<form htmx:post="/users" htmx:target="#user-list" htmx:swap="beforeend">
+  <input type="text" name="name" ?required={true}>
+  <button type="submit">Add</button>
+</form>
+
+<div id="user-list" ?hidden={not has_users}>
+  <For each={props.users} as="user">
+    <UserCard name={user.name} />
+  </For>
+</div>
+```
+
+No Python code changes needed — just install the package and the aliases work.
+
+---
+
+## Add Stimulus (`pip install pjx[htmx,stimulus]`)
+
+Installs `pjx-stimulus`. Adds the `stimulus:*` alias processor
+with controller scope tracking.
 
 ```html
 <div stimulus:controller="dropdown">
   <button stimulus:action="click->dropdown#toggle">Menu</button>
-  <div stimulus:target="menu">
+  <div stimulus:target="menu" ?hidden={true}>
     <a href="/profile">Profile</a>
+    <a href="/logout">Logout</a>
   </div>
 </div>
+```
 
-<!-- compiles to: -->
+Compiles to:
+
+```html
 <div data-controller="dropdown">
   <button data-action="click->dropdown#toggle">Menu</button>
-  <div data-dropdown-target="menu">
+  <div data-dropdown-target="menu" {% if true %}hidden="..."{% endif %}>
     <a href="/profile">Profile</a>
+    <a href="/logout">Logout</a>
   </div>
 </div>
 ```
@@ -157,111 +202,71 @@ Multi-controller requires explicit selection:
 ```html
 <div stimulus:controller="dropdown modal">
   <button stimulus:target.dropdown="trigger">Open</button>
+  <button stimulus:action="click->modal#open">Show Modal</button>
 </div>
 ```
 
-### SSE Aliases
+Stimulus values, classes, and outlets:
 
 ```html
-<div sse:connect="/events" sse:swap="message"></div>
+<div stimulus:controller="editor">
+  <input stimulus:value-content="hello" />
+  <!-- compiles to: data-editor-content-value="hello" -->
+</div>
 ```
 
-### Attribute Expressions
+---
 
-`{expr}` compiles to `{{ expr }}`:
+## Add Tailwind (`pip install pjx[all]`)
 
-```html
-<a href={"/users/" ~ user.id}>{{ user.name }}</a>
-
-<!-- compiles to: -->
-<a href="{{ '/users/' ~ user.id }}">{{ user.name }}</a>
-```
-
-### Components
-
-Tags starting with uppercase are components. Imported via frontmatter:
+Installs `pjx-tailwind`. Registers `cn()` as a Jinja2 global function
+via entry points. Filters falsy values and deduplicates classes.
 
 ```html
 ---
-from ..layouts import BaseLayout
-from ..components import UserCard
-from ..icons import IconPlus
-
 props:
-  title: str = "Dashboard"
-  users: list = []
+  variant: str = "primary"
+  size: str = "md"
+  disabled: bool = false
+
+vars:
+  base: "inline-flex items-center rounded-md font-medium"
+  sizes:
+    sm: "h-8 px-3 text-xs"
+    md: "h-10 px-4 text-sm"
+    lg: "h-12 px-6 text-base"
+  variants:
+    primary: "bg-blue-600 text-white hover:bg-blue-700"
+    secondary: "bg-gray-200 text-gray-900 hover:bg-gray-300"
+    danger: "bg-red-600 text-white hover:bg-red-700"
+
+computed:
+  btn_class: cn(base, sizes[props.size], variants[props.variant],
+    props.disabled and "opacity-50 pointer-events-none")
 ---
 
-<BaseLayout title={props.title}>
-  <h1>{{ props.title }}</h1>
-
-  <For each={props.users} as="user">
-    <UserCard id={user.id} name={user.name} email={user.email} />
-  </For>
-</BaseLayout>
-```
-
-#### Layout Components
-
-Components with children receive `{{ content }}`:
-
-```html
-<!-- layouts/BaseLayout.jinja -->
-<!DOCTYPE html>
-<html>
-<head><title>{{ title }}</title></head>
-<body>
+<button class={btn_class} ?disabled={props.disabled}>
   {{ content }}
-</body>
-</html>
+</button>
 ```
 
-#### SVG Icons
+`cn()` in Jinja2:
 
-SVG icons are `.jinja` components — inline in HTML, no extra request:
-
-```html
-<!-- icons/IconEdit.jinja -->
-<svg width="{{ size | default('16') }}" height="{{ size | default('16') }}" viewBox="0 0 24 24" ...>
-  <path d="M11 4H4a2 2 0 0 0-2 2v14..."></path>
-</svg>
+```text
+cn("foo", "bar")                   -> "foo bar"
+cn("base", false, "extra")        -> "base extra"
+cn("base", cond and "active")     -> "base active" or "base"
+cn("a b", "b c")                   -> "a b c"  (deduped)
 ```
 
-```html
-<button><IconEdit size="14" /> Edit</button>
-```
-
-### Dynamic Pages with [slug]
-
-Next.js-like convention for dynamic routes:
-
-```python
-@ui.page("/users/{user_id}", "pages/users/[id].jinja")
-async def user_detail(request, user_id: int):
-    return UserDetailProps(user=get_user(user_id))
-```
-
-The template receives `params` automatically:
-
-```html
-<h1>User #{{ params.user_id }}</h1>
-<p>{{ props.user.name }}</p>
-```
+---
 
 ## PJXRouter
 
-`PJXRouter` extends `APIRouter` — accepted by `app.include_router()`:
+`PJXRouter` extends `APIRouter`. All decorators inject `props`,
+`params`, `request` into the template context.
 
-```python
-from pjx.router import PJXRouter
-
-ui = PJXRouter(templates)
-app.include_router(ui)
-```
-
-### Decorators
-
-#### @ui.page — full page
+### @ui.page
 
 ```python
 @ui.page("/", "pages/home.jinja")
@@ -269,7 +274,7 @@ async def home(request: Request) -> HomeProps:
     return HomeProps(title="Home")
 ```
 
-#### @ui.fragment — HTMX partial
+### @ui.fragment
 
 ```python
 @ui.fragment("/users/{id}/edit", "partials/edit.jinja")
@@ -277,24 +282,28 @@ async def edit_form(request: Request, id: int) -> EditProps:
     return EditProps(user=get_user(id))
 ```
 
-#### @ui.action — form with validation
+### @ui.action
 
 ```python
+from pjx.router import FormData
+
 @ui.action(
     "/users",
-    form=CreateUserForm,
-    success_template="partials/user_row.jinja",
+    success_template="partials/user_card.jinja",
     error_template="partials/form_error.jinja",
 )
-async def create_user(request: Request, data: CreateUserForm) -> UserProps:
-    user = service.create(data)
-    return UserProps(**user.model_dump())
+async def create_user(
+    request: Request,
+    data: CreateUserForm = FormData(CreateUserForm),
+    svc: UserService = Depends(get_user_service),
+) -> UserCardProps:
+    return UserCardProps(**svc.create(data).model_dump())
 ```
 
-- Success: renders `success_template` (200)
-- Validation error: renders `error_template` (422)
+`FormData(Model)` is a `Depends()` wrapper.
+Validation errors render `error_template` (422).
 
-#### @ui.stream — SSE
+### @ui.stream
 
 ```python
 from pjx.router import SSEEvent
@@ -305,13 +314,10 @@ async def notifications(request: Request):
         yield SSEEvent(
             props=NotificationProps(message=event.text),
             id=str(event.id),
-            event="notification",
         )
 ```
 
-#### ui.render — manual rendering
-
-For error pages or rendering outside decorators:
+### ui.render
 
 ```python
 @app.exception_handler(404)
@@ -319,94 +325,102 @@ async def not_found(request, exc):
     return HTMLResponse(ui.render("pages/404.jinja"), status_code=404)
 ```
 
-### Template Context
-
-All decorators automatically inject:
-
-| Variable | Content |
-|----------|---------|
-| `props` | BaseModel returned by the handler |
-| `params` | URL path params (`request.path_params`) |
-| `request` | Starlette Request object |
-
-### Dependency Injection
-
-FastAPI's `Depends()` works normally:
-
-```python
-@ui.page("/", "pages/home.jinja")
-async def home(
-    request: Request,
-    svc: UserService = Depends(get_user_service),
-) -> HomeProps:
-    return HomeProps(users=svc.list())
-```
-
-## Recommended Project Structure
-
-```
-app/
-├── main.py          # FastAPI app, mount static, include routers
-├── models.py        # Pydantic models
-├── service.py       # Business logic
-├── deps.py          # Depends providers
-├── api.py           # APIRouter — JSON (/api/*)
-├── views.py         # PJXRouter — HTML (templates)
-├── templates/
-│   ├── layouts/     # BaseLayout.jinja
-│   ├── components/  # UserCard.jinja
-│   ├── icons/       # IconEdit.jinja, IconTrash.jinja
-│   ├── pages/       # home.jinja, users/[id].jinja, 404.jinja
-│   └── partials/    # user_card.jinja, edit_modal.jinja
-└── static/
-    ├── css/
-    └── js/
-```
-
-API and Views share the same service via `Depends()`:
-
-```python
-# api.py
-router = APIRouter(prefix="/api", tags=["api"])
-
-@router.get("/users")
-async def list_users(svc: UserService = Depends(get_user_service)):
-    return svc.list()
-
-# views.py
-ui = PJXRouter(templates)
-
-@ui.page("/", "pages/home.jinja")
-async def home(request, svc: UserService = Depends(get_user_service)):
-    return HomeProps(users=svc.list())
-
-# main.py
-app.include_router(api_router)
-app.include_router(ui)
-```
+---
 
 ## CLI
 
-Validate PJX templates:
+### pjx check — Static Analysis
+
+Validates imports, computed cycles, undefined variables.
+Inspired by ruff/ty — fast, actionable diagnostics:
 
 ```bash
 pjx check templates/
-pjx check templates/ --verbose
+pjx check templates/ -v
+
+# Example output:
+# error[PJX301]: Cannot resolve import 'Ghost' from '..missing'
+#   --> pages/home.jinja:1:1
+# warning[PJX304]: Possibly undefined variable: 'unknown'
+#   --> pages/home.jinja:1:1
+#   = hint: Define in props:, vars:, or computed:
 ```
+
+### pjx format — Frontmatter Formatter
+
+Canonicalizes frontmatter section order
+(imports -> props -> vars -> computed -> slots):
+
+```bash
+pjx format templates/             # apply formatting
+pjx format templates/ --check     # CI mode (exit 1 if changes needed)
+```
+
+### pjx sitemap — SEO Generation
+
+Discovers pages and generates sitemap.xml + robots.txt:
+
+```bash
+pjx sitemap templates/ --base-url https://example.com
+pjx sitemap templates/ --base-url https://example.com -o static/
+pjx sitemap templates/ --base-url https://example.com --disallow /admin,/api
+```
+
+Skips error pages (404/500) and dynamic routes (`[slug]`).
+
+## Development
+
+```bash
+uv run task check      # lint + typecheck + test
+uv run task test       # pytest
+uv run task lint       # ruff
+uv run task typecheck  # ty
+uv run task demo       # run demo app
+uv run task fmt        # ruff format
+```
+
+## Monorepo
+
+```text
+src/
+  pjx/              # Core: preprocessor, router, CLI
+  pjx-htmx/         # HTMX + SSE alias processor (entry point)
+  pjx-stimulus/     # Stimulus alias processor (entry point)
+  pjx-tailwind/     # cn() function (jinja global entry point)
+demo/               # Demo CRUD app using all features
+docs/               # PRD, SDD
+```
+
+Pipeline (with all extras installed):
+
+```text
+Frontmatter -> Vars -> Component -> ControlFlow ->
+  [HTMX]* -> [Stimulus]* -> Attrs -> Expression
+```
+
+*Discovered via entry points — only loaded when installed.
+
+## Template Cache
+
+`PJXLoader` includes an mtime-based cache. Preprocessed templates
+are cached in memory and invalidated when the source file changes.
+No configuration needed — works automatically in dev and production.
 
 ## Security
 
 - **Autoescape ON** by default — XSS impossible without `| safe`
+- Import resolution validates paths to prevent directory traversal
+- HTTP method dispatch uses an explicit allowlist
+- Templates must be developer-controlled (not user-uploaded)
 - Form data preserves multi-values (checkboxes, multi-select)
-- SSE with correct framing (`data:` per line)
 - CSRF and auth are your middleware's responsibility
 
 ## Requirements
 
 - Python >= 3.13
-- jinja2 >= 3.1
-- fastapi >= 0.100
-- pydantic >= 2.0
+- jinja2 >= 3.1.6
+- fastapi >= 0.135.3
+- pydantic >= 2.12.5
 
 ## License
 
