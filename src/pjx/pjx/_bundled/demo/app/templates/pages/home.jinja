@@ -1,0 +1,53 @@
+---
+from ..layouts import BaseLayout
+from ..components import UserCard, ConfirmModal
+from ..icons import IconPlus
+
+props:
+  title: str = "PJX Demo"
+  users: list = []
+
+computed:
+  has_users: props.users | length > 0
+---
+
+<BaseLayout title={props.title}>
+  <h1>{{ props.title }}</h1>
+
+  <form
+    id="user-form"
+    class="form-row"
+    htmx:post="/users"
+    htmx:target="#user-list"
+    htmx:swap="beforeend">
+    <input type="text" name="name" placeholder="Nome" required>
+    <input type="text" name="email" placeholder="Email" required>
+    <select name="role">
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+      <option value="agent">Agent</option>
+    </select>
+    <button type="submit" class="btn btn-primary">
+      <IconPlus size="14" />
+      Adicionar
+      <span class="htmx-indicator">...</span>
+    </button>
+  </form>
+
+  <div id="form-errors"></div>
+
+  <div id="user-list">
+    <For each={props.users} as="user">
+      <UserCard id={user.id} name={user.name} email={user.email} role={user.role} />
+    </For>
+  </div>
+
+  <p class="empty" ?hidden={has_users}>Nenhum usuario cadastrado. Adicione um acima.</p>
+
+  <Fragment>
+    <div id="toast"></div>
+    <div id="modal-container"></div>
+  </Fragment>
+
+  <ConfirmModal />
+</BaseLayout>

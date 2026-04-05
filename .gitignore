@@ -15,3 +15,5 @@ wheels/
 .mcp.json
 .coverage
 .claude/
+node_modules/
+.pjx-build/

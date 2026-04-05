@@ -1,8 +1,20 @@
 from pjx.core.pipeline import PreprocessorPipeline
+from pjx.extension import ExtensionRegistry
+
+
+def _make_pipeline():
+    """Create a pipeline with all installed extension processors."""
+    pipeline = PreprocessorPipeline()
+    registry = ExtensionRegistry()
+    registry.discover()
+    for ext in registry.extensions:
+        for slot, processor in ext.get_processors():
+            pipeline.register_processor(slot, processor)
+    return pipeline
 
 
 def test_golden_files(golden_fixture):
-    pipeline = PreprocessorPipeline()
+    pipeline = _make_pipeline()
     result = pipeline.process(
         golden_fixture["input"],
         filename=str(golden_fixture["dir"] / "input.jinja"),

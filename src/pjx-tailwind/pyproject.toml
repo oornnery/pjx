@@ -4,13 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pjx-tailwind"
-version = "0.1.0"
+version = "0.1.1"
 description = "Tailwind CSS utilities for PJX (cn() class merging)"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["pjx>=0.2.0"]
 
-[project.entry-points."pjx.jinja_globals"]
-cn = "pjx_tailwind.cn:cn"
+[project.urls]
+Homepage = "https://github.com/oornnery/pjx"
+Repository = "https://github.com/oornnery/pjx"
+Issues = "https://github.com/oornnery/pjx/issues"
+
+[project.entry-points."pjx.extensions"]
+tailwind = "pjx_tailwind.extension:TailwindExtension"
 
 [tool.uv.sources]
 pjx = { workspace = true, editable = true }

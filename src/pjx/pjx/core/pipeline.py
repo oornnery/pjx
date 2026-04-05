@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import IntEnum
-from importlib.metadata import entry_points
 
 from pjx.core.attrs import AttrsProcessor
 from pjx.core.components import ComponentProcessor
@@ -36,14 +35,9 @@ class PreprocessorPipeline:
         self._register(ProcessorSlot.CONTROL_FLOW, ControlFlowProcessor())
         self._register(ProcessorSlot.ATTRS, AttrsProcessor())
         self._register(ProcessorSlot.EXPRESSION, ExpressionProcessor())
-        self._discover_extras()
 
-    def _discover_extras(self) -> None:
-        eps = entry_points(group="pjx.processors")
-        for ep in eps:
-            processor_cls = ep.load()
-            slot = getattr(processor_cls, "slot", ProcessorSlot.ALIAS)
-            self._register(int(slot), processor_cls())
+    def register_processor(self, slot: int, processor: Processor) -> None:
+        self._register(slot, processor)
 
     def _register(self, slot: int, processor: Processor) -> None:
         self._registry.append((slot, processor))

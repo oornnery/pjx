@@ -1,0 +1,44 @@
+---
+from ..icons import IconX
+
+computed:
+  put_url: "/users/" ~ props.id
+  card_target: "#user-" ~ props.id
+---
+
+<div class="modal-overlay" id="edit-modal" stimulus:controller="edit-modal">
+  <div class="modal-box modal-edit">
+    <div class="modal-header">
+      <h3>Editar usuario</h3>
+      <button class="btn-icon" stimulus:action="click->edit-modal#close">
+        <IconX size="18" />
+      </button>
+    </div>
+    <form
+      htmx:put={put_url}
+      htmx:target={card_target}
+      htmx:swap="outerHTML">
+      <div class="form-group">
+        <label for="edit-name">Nome</label>
+        <input type="text" id="edit-name" name="name" value="{{ props.name }}" required>
+      </div>
+      <div class="form-group">
+        <label for="edit-email">Email</label>
+        <input type="text" id="edit-email" name="email" value="{{ props.email }}" required>
+      </div>
+      <div class="form-group">
+        <label for="edit-role">Role</label>
+        <select id="edit-role" name="role">
+          <option value="user" ?selected={props.role == "user"}>User</option>
+          <option value="admin" ?selected={props.role == "admin"}>Admin</option>
+          <option value="agent" ?selected={props.role == "agent"}>Agent</option>
+        </select>
+      </div>
+      <div id="edit-errors"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-sm" stimulus:action="click->edit-modal#close">Cancelar</button>
+        <button type="submit" class="btn btn-primary btn-sm">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,39 @@
+---
+from ..icons import IconUser, IconTrash, IconEdit
+
+computed:
+  is_admin: props.role == "admin"
+  badge_class: cn("badge", "badge-admin" if is_admin else "badge-user")
+  user_url: "/users/" ~ props.id
+  card_id: "user-" ~ props.id
+---
+
+<div class="card" id={card_id}>
+  <h3>
+    <IconUser size="18" />
+    {{ props.name }}
+    <span class={badge_class}>
+      <Show when={is_admin}>admin<Else>{{ props.role }}</Else></Show>
+    </span>
+  </h3>
+  <p>{{ props.email }}</p>
+  <div class="card-actions">
+    <button
+      class="btn btn-sm"
+      htmx:get={user_url ~ "/edit"}
+      htmx:target="#modal-container"
+      htmx:swap="innerHTML">
+      <IconEdit size="14" />
+      Editar
+    </button>
+    <button
+      class="btn btn-danger btn-sm"
+      htmx:delete={user_url}
+      htmx:target={"#" ~ card_id}
+      htmx:swap="outerHTML"
+      htmx:confirm="Remover este usuario?">
+      <IconTrash size="14" />
+      Remover
+    </button>
+  </div>
+</div>

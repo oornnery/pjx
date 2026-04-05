@@ -4,13 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pjx-htmx"
-version = "0.1.0"
+version = "0.1.1"
 description = "HTMX and SSE alias processor for PJX"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["pjx>=0.2.0"]
 
-[project.entry-points."pjx.processors"]
-htmx = "pjx_htmx:HTMXAliasProcessor"
+[project.urls]
+Homepage = "https://github.com/oornnery/pjx"
+Repository = "https://github.com/oornnery/pjx"
+Issues = "https://github.com/oornnery/pjx/issues"
+
+[project.entry-points."pjx.extensions"]
+htmx = "pjx_htmx.extension:HTMXExtension"
 
 [tool.uv.sources]
 pjx = { workspace = true, editable = true }

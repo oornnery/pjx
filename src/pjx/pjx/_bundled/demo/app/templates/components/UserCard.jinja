@@ -1,0 +1,45 @@
+---
+from ..icons import IconUser, IconTrash, IconEdit
+
+vars:
+  badge_admin: "badge badge-admin"
+  badge_user: "badge badge-user"
+  btn_edit: "btn btn-sm"
+  btn_delete: "btn btn-danger btn-sm"
+
+computed:
+  is_admin: role == "admin"
+  badge_class: cn(badge_admin if is_admin else badge_user)
+  badge_label: "admin" if is_admin else role
+  user_url: "/users/" ~ id
+  edit_url: "/users/" ~ id ~ "/edit"
+  card_id: "user-" ~ id
+---
+
+<div class="card" id={card_id}>
+  <h3>
+    <IconUser size="18" />
+    <a href={user_url} style="text-decoration:none; color:inherit;">{{ name }}</a>
+    <span class={badge_class}>{{ badge_label }}</span>
+  </h3>
+  <p>{{ email }}</p>
+  <div class="card-actions">
+    <button
+      class={btn_edit}
+      htmx:get={edit_url}
+      htmx:target="#modal-container"
+      htmx:swap="innerHTML">
+      <IconEdit size="14" />
+      Editar
+    </button>
+    <button
+      class={btn_delete}
+      htmx:delete={user_url}
+      htmx:target={"#" ~ card_id}
+      htmx:swap="outerHTML"
+      htmx:confirm="Remover este usuario?">
+      <IconTrash size="14" />
+      Remover
+    </button>
+  </div>
+</div>
