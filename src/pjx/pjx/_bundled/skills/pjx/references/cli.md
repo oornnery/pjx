@@ -78,7 +78,10 @@ This copies the PJX skill into:
 
 ## `pjx assets build`
 
-Vendor browser assets exposed by installed PJX extras or third-party providers:
+Vendor browser assets exposed by installed PJX extensions and packages in the
+local `pjx-assets.json` manifest. Merges both sources, generates a
+`package.json`, runs `npm install`, and copies dist files into the output
+directory:
 
 ```bash
 pjx assets build static/vendor/pjx
@@ -86,10 +89,34 @@ pjx assets build static/vendor/pjx --provider htmx
 pjx assets build static/vendor/pjx --provider htmx --provider stimulus
 ```
 
-This works with the browser-asset registry used by `PJXEnvironment`. A package
-can contribute to it through the `pjx.assets` entry point.
 To use the vendored files at runtime, set `PJXEnvironment(asset_mode="vendor")`
 and point `asset_base_url` at your static mount when needed.
+
+## `pjx assets add`
+
+Add an npm package to the local asset manifest (`pjx-assets.json`). Use
+`--dist` to specify which file to copy from the package and `--out` for the
+output path relative to the vendor directory:
+
+```bash
+pjx assets add alpinejs@3 --dist alpinejs/dist/cdn.min.js --out js/alpine.min.js
+```
+
+## `pjx assets list`
+
+List all assets from installed extensions and the manifest:
+
+```bash
+pjx assets list
+```
+
+## `pjx assets remove`
+
+Remove a package from the manifest:
+
+```bash
+pjx assets remove alpinejs
+```
 
 ## Typical Workflow
 
@@ -97,7 +124,9 @@ and point `asset_base_url` at your static mount when needed.
 uvx pjx check templates/
 uvx pjx check templates/ --fix
 uvx pjx format templates/ --check
+uvx pjx assets add alpinejs@3 --dist alpinejs/dist/cdn.min.js --out js/alpine.min.js
 uvx pjx assets build static/vendor/pjx
+uvx pjx assets list
 uvx pjx skills --claude
 uvx pjx sitemap templates/ --base-url https://example.com
 ```

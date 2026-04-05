@@ -24,6 +24,8 @@ uvx pjx check templates/
 uvx pjx check templates/ --fix
 uvx pjx skills --claude
 uvx pjx assets build static/vendor/pjx
+uvx pjx assets add alpinejs@3 --dist alpinejs/dist/cdn.min.js --out js/alpine.min.js
+uvx pjx assets list
 ```
 
 ## Quick Example
@@ -120,7 +122,7 @@ env = PJXEnvironment(
 - `cn()` Tailwind class merging via `pjx-tailwind` (`TailwindExtension`)
 - Browser asset injection (CDN or vendor mode)
 - FastAPI helpers via `PJXRouter`
-- CLI: `check`, `check --fix`, `format`, `sitemap`, `skills`, `assets build`, `demo`
+- CLI: `check`, `check --fix`, `format`, `sitemap`, `skills`, `assets build`, `assets add`, `assets list`, `assets remove`, `demo`
 
 ## CLI
 
@@ -131,12 +133,18 @@ pjx format templates/
 pjx sitemap templates/ --base-url https://example.com
 pjx skills --claude
 pjx assets build static/vendor/pjx
+pjx assets add alpinejs@3 --dist alpinejs/dist/cdn.min.js --out js/alpine.min.js
+pjx assets list
+pjx assets remove alpinejs
 pjx demo
 ```
 
 `pjx check --fix` applies safe technical autofixes.
 `pjx format` handles formatting and frontmatter layout.
-`pjx assets build` vendors browser assets via npm (generates `package.json`, runs `npm install`, copies dist files).
+`pjx assets build` vendors browser assets via npm, merging extension and manifest packages.
+`pjx assets add` adds an npm package to the `pjx-assets.json` manifest.
+`pjx assets list` shows all assets from extensions and the manifest.
+`pjx assets remove` removes a package from the manifest.
 `pjx demo` launches the bundled demo application.
 
 ## Monorepo

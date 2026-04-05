@@ -9,7 +9,15 @@ import typer
 from rich.console import Console
 from rich.text import Text
 
-from pjx.assets import available_asset_provider_names, build_vendor_assets, discover_asset_providers
+from pjx.assets import (
+    ManifestEntry,
+    add_manifest_entry,
+    available_asset_provider_names,
+    build_vendor_assets,
+    discover_asset_providers,
+    load_manifest,
+    remove_manifest_entry,
+)
 from pjx.checker import apply_check_fixes, check_directory
 from pjx.errors import DiagnosticLevel
 
@@ -405,6 +413,87 @@ def demo_command(
     code = run_demo(host=host, port=port, reload=reload)
     if code:
         raise typer.Exit(code=code)
+
+
+@assets_app.command("add")
+def assets_add_command(
+    package: Annotated[str, typer.Argument(help="npm package spec, for example alpinejs@3")],
+    dist: Annotated[
+        str,
+        typer.Option("--dist", help="Path inside node_modules/ to the dist file"),
+    ],
+    output_path: Annotated[
+        str,
+        typer.Option("--out", "-o", help="Output path relative to vendor dir, for example js/alpine.min.js"),
+    ],
+    vendor_dir: Annotated[
+        Path,
+        typer.Option("--dir", "-d", help="Vendor directory containing pjx-assets.json"),
+    ] = Path("static/vendor/pjx"),
+    kind: Annotated[str, typer.Option("--kind", help="Asset kind: script or style")] = "script",
+    placement: Annotated[str, typer.Option("--placement", help="head or body")] = "head",
+) -> None:
+    """Add an npm package to the local asset manifest."""
+    from pjx.assets import _parse_npm_spec
+
+    pkg_name, _ = _parse_npm_spec(package)
+    entry = ManifestEntry(
+        npm_package=package,
+        npm_dist_path=dist,
+        output_path=output_path,
+        kind=kind,
+        placement=placement,
+    )
+    add_manifest_entry(vendor_dir, pkg_name, entry)
+    _print_message(f"Added {pkg_name} to {vendor_dir / 'pjx-assets.json'}", style="green")
+    _print_message("Run `pjx assets build` to install.", style="dim")
+
+
+@assets_app.command("remove")
+def assets_remove_command(
+    name: Annotated[str, typer.Argument(help="Package name to remove")],
+    vendor_dir: Annotated[
+        Path,
+        typer.Option("--dir", "-d", help="Vendor directory containing pjx-assets.json"),
+    ] = Path("static/vendor/pjx"),
+) -> None:
+    """Remove an npm package from the local asset manifest."""
+    if remove_manifest_entry(vendor_dir, name):
+        _print_message(f"Removed {name} from {vendor_dir / 'pjx-assets.json'}", style="green")
+    else:
+        _print_error(f"{name} not found in manifest")
+        raise typer.Exit(code=1)
+
+
+@assets_app.command("list")
+def assets_list_command(
+    vendor_dir: Annotated[
+        Path,
+        typer.Option("--dir", "-d", help="Vendor directory containing pjx-assets.json"),
+    ] = Path("static/vendor/pjx"),
+) -> None:
+    """List all assets (extensions + manifest)."""
+    console = _console()
+
+    discovered = discover_asset_providers()
+    if discovered:
+        console.print(Text("Extensions:", style="bold"))
+        for provider in discovered:
+            for asset in provider.get_assets():
+                vf = asset.vendor_file
+                npm = vf.npm_package if vf else "-"
+                console.print(Text(f"  {provider.name}/{asset.name}  npm:{npm}", style="cyan"))
+
+    manifest = load_manifest(vendor_dir)
+    if manifest:
+        console.print(Text("\nManifest:", style="bold"))
+        for name, entry in sorted(manifest.items()):
+            console.print(
+                Text(f"  {name}  npm:{entry.npm_package} -> {entry.output_path}", style="yellow")
+            )
+
+    if not discovered and not manifest:
+        _print_message("No assets found.", style="dim")
 
 
 @assets_app.command("build")
