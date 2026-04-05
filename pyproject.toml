@@ -43,7 +43,6 @@ testpaths = ["src/pjx/tests"]
 [tool.uv.workspace]
 members = [
     "src/*",
-    "demo",
 ]
 
 [tool.taskipy.tasks]

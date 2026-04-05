@@ -122,6 +122,32 @@ async def user_detail(request, user_id: int):
 
 Template receives `params.user_id` automatically.
 
+Common PJX convention is to use bracketed filenames for dynamic pages:
+
+```text
+pages/users/[id].jinja
+pages/blog/[slug].jinja
+pages/orgs/[org_slug]/repos/[repo_slug].jinja
+```
+
+The filename is for project organization and readability. The actual param names
+still come from the FastAPI route:
+
+```python
+@ui.page("/blog/{post_slug}", "pages/blog/[slug].jinja")
+async def post_detail(request, post_slug: str):
+    ...
+```
+
+Inside the template you access:
+
+```html
+<a href={"/blog/" ~ params.post_slug}>Open</a>
+```
+
+So `[slug]` in the filename does not create `params.slug` by itself. `params`
+always reflects `request.path_params`.
+
 ### Error Pages
 
 ```python

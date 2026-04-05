@@ -51,5 +51,6 @@ install the package and it just works.
 ## References
 
 - [Template Syntax](references/syntax.md) — DSL, frontmatter, components, aliases
+- [Template Structure](references/structure.md) — demo-based folder layout, route files, imports
 - [Router Patterns](references/router.md) — decorators, FormData, SSE, error pages
-- [Testing Guide](references/testing.md) — how to test PJX templates and routes
+- [CLI Guide](references/cli.md) — `pjx check`, `pjx format`, and `pjx sitemap`

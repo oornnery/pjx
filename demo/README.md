@@ -1,60 +1,59 @@
 # PJX Demo
 
-CRUD de usuarios com FastAPI + PJX + HTMX + Stimulus.
+Interactive demo application showcasing PJX features: components, control flow,
+frontmatter, HTMX aliases, Stimulus aliases, and `cn()` class merging.
 
-Demonstra todas as features do PJX v0.2:
+## Running
+
+The demo is bundled inside the `pjx` package and can be launched directly:
+
+```bash
+uvx pjx demo
+# or
+uv run pjx demo
+```
+
+Open <http://localhost:8000>
+
+Options:
+
+```bash
+pjx demo --host 0.0.0.0 --port 3000
+pjx demo --reload
+```
+
+## Source Location
+
+The demo application lives in the core package at:
+
+```text
+src/pjx/pjx/_bundled/demo/app/
+```
+
+## Vendor Mode
+
+The demo uses vendor mode by default. Browser assets (HTMX, Stimulus, Tailwind)
+are pre-built and served from `static/vendor/pjx/` instead of CDN URLs.
+
+```text
+static/vendor/pjx/
+  js/
+    htmx.min.js
+    stimulus.umd.js
+    tailwind.browser.js
+  package.json
+  package-lock.json
+```
+
+## Features Demonstrated
 
 - Components (`<UserCard>`, `<BaseLayout>`, `<ConfirmModal>`)
-- Control flow (`<For>`, `<Show>`, `<Switch>`)
-- `<Fragment>` (wrapper-less rendering)
+- Control flow (`<For>`, `<Show>`, `<Switch>`, `<Fragment>`)
 - Frontmatter (`props:`, `vars:`, `computed:`)
 - Conditional attributes (`?hidden`, `?selected`)
 - HTMX aliases (`htmx:post`, `htmx:target`, `htmx:swap`)
 - Stimulus aliases (`stimulus:controller`, `stimulus:action`)
 - `cn()` class-name merging (via pjx-tailwind)
-- SVG icon components (`<IconPlus>`, `<IconEdit>`, etc.)
 - PJXRouter decorators (`@ui.page`, `@ui.fragment`, `@ui.action`)
 - FormData validation with Pydantic
 - Error pages (404, 500)
-
-## Run
-
-```bash
-uv run task demo
-# or
-uv run uvicorn demo.app.main:app --reload
-```
-
-Open <http://localhost:8000>
-
-## Structure
-
-```text
-demo/
-  app/
-    main.py          # FastAPI app setup
-    models.py        # Pydantic models (User, Forms, Props)
-    service.py       # In-memory user service
-    deps.py          # Depends providers
-    api.py           # JSON API (/api/users)
-    views.py         # PJXRouter HTML routes
-    templates/
-      layouts/       # BaseLayout.jinja
-      components/    # UserCard.jinja, ConfirmModal.jinja
-      icons/         # IconPlus, IconUser, IconEdit, IconTrash, IconX
-      pages/         # home.jinja, users/[id].jinja, 404, 500
-      partials/      # user_card, edit_modal, form_error
-    static/
-      css/app.css
-      js/app.js
-```
-
-## Features Used Per Template
-
-| Template       | Features                                      |
-| -------------- | --------------------------------------------- |
-| home.jinja     | `computed:`, `?hidden`, `<Fragment>`, `<For>` |
-| UserCard.jinja | `vars:`, `computed:`, `cn()`, htmx aliases    |
-| user_card      | `computed:`, `cn()`, `<Show>`                 |
-| edit_modal     | `computed:`, `?selected`, stimulus aliases    |
-| [id].jinja     | `vars:`, `computed:`, `cn()`, htmx aliases    |

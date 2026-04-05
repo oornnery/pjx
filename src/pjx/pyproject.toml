@@ -4,16 +4,24 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pjx"
-version = "0.2.1"
+version = "0.2.2"
 description = "Jinja2 preprocessor with JSX-like syntax for FastAPI + HTMX + Stimulus"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.135.3",
     "jinja2>=3.1.6",
     "pydantic>=2.12.5",
     "python-multipart>=0.0.22",
+    "rich>=14.0.0",
+    "typer>=0.16.0",
     "uvicorn>=0.43.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/oornnery/pjx"
+Repository = "https://github.com/oornnery/pjx"
+Issues = "https://github.com/oornnery/pjx/issues"
 
 [project.scripts]
 pjx = "pjx.cli:main"
@@ -26,6 +34,9 @@ all = ["pjx[htmx,stimulus,tailwind]"]
 
 [tool.setuptools.packages.find]
 include = ["pjx*"]
+
+[tool.setuptools.package-data]
+pjx = ["_bundled/**/*"]
 
 [tool.uv.sources]
 pjx-htmx = { workspace = true, editable = true }

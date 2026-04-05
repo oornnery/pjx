@@ -4,13 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pjx-stimulus"
-version = "0.1.0"
+version = "0.1.1"
 description = "Stimulus alias processor for PJX"
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = ["pjx>=0.2.1"]
 
-[project.entry-points."pjx.processors"]
-stimulus = "pjx_stimulus:StimulusAliasProcessor"
+[project.urls]
+Homepage = "https://github.com/oornnery/pjx"
+Repository = "https://github.com/oornnery/pjx"
+Issues = "https://github.com/oornnery/pjx/issues"
+
+[project.entry-points."pjx.extensions"]
+stimulus = "pjx_stimulus.extension:StimulusExtension"
 
 [tool.uv.sources]
 pjx = { workspace = true, editable = true }

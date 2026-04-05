@@ -8,7 +8,12 @@
       "Bash(git submodule:*)",
       "Bash(rumdl check:*)",
       "Bash(rumdl fmt:*)",
-      "Bash(uv build:*)"
+      "Bash(uv build:*)",
+      "Bash(rtk gh:*)",
+      "Bash(rtk git:*)"
+    ],
+    "additionalDirectories": [
+      "/tmp/pjx-vendor-test"
     ]
   }
 }

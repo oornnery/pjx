@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from fastapi import Depends, Request
@@ -24,7 +25,13 @@ from .service import UserService
 
 _HERE = Path(__file__).parent
 
-templates = Jinja2Templates(env=PJXEnvironment(loader=FileSystemLoader(str(_HERE / "templates"))))
+templates = Jinja2Templates(
+    env=PJXEnvironment(
+        loader=FileSystemLoader(str(_HERE / "templates")),
+        asset_mode=os.getenv("PJX_ASSET_MODE", "vendor"),
+        asset_base_url=os.getenv("PJX_ASSET_BASE_URL", "/static/vendor/pjx"),
+    )
+)
 ui = PJXRouter(templates)
 
 
