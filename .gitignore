@@ -14,3 +14,4 @@ wheels/
 .codex
 .mcp.json
 .coverage
+.claude/
