@@ -1,19 +1,11 @@
 [project]
-name = "pjx"
-version = "0.1.0"
-description = "Jinja2 preprocessor with JSX-like syntax for FastAPI + HTMX + Stimulus"
-readme = "README.md"
-requires-python = ">=3.13"
+name = "pjx-workspace"
+version = "0.2.0"
+description = "PJX monorepo workspace"
+requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.135.3",
-    "jinja2>=3.1.6",
-    "pydantic>=2.12.5",
-    "python-multipart>=0.0.22",
-    "uvicorn>=0.43.0",
+    "pjx[all]",
 ]
-
-[project.scripts]
-pjx = "pjx.cli:main"
 
 [dependency-groups]
 dev = [
@@ -23,13 +15,46 @@ dev = [
     "pytest>=9.0.2",
     "pytest-anyio>=0.0.0",
     "pytest-cov>=7.1.0",
+    "pjx-htmx",
+    "pjx-stimulus",
+    "pjx-tailwind",
+    "taskipy>=1.14.1",
 ]
 
-[tool.setuptools.packages.find]
-include = ["pjx*"]
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "SIM"]
+ignore = [
+    "N802",  # FormData is a factory, intentionally PascalCase
+    "B008",  # FormData() in defaults is the intended FastAPI Depends pattern
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["pjx", "pjx_htmx", "pjx_stimulus", "pjx_tailwind"]
+
+[tool.pytest.ini_options]
+testpaths = ["src/pjx/tests"]
 
 [tool.uv.workspace]
 members = [
+    "src/*",
     "demo",
-    ".",
 ]
+
+[tool.taskipy.tasks]
+test = "pytest src/ -v"
+lint = "ruff check src/ && ruff format --check src/"
+typecheck = "ty check src/pjx/pjx/ src/pjx-htmx/ src/pjx-stimulus/ src/pjx-tailwind/ --extra-search-path src/pjx --extra-search-path src/pjx-htmx --extra-search-path src/pjx-stimulus --extra-search-path src/pjx-tailwind"
+mdlint = "rumdl check --check docs/ README.md"
+check = "task lint && task typecheck && task mdlint && task test"
+demo = "uvicorn demo.app.main:app --reload"
+fmt = "ruff format src/ && rumdl fmt docs/ README.md"
+
+[tool.uv.sources]
+pjx = { workspace = true, editable = true }
+pjx-htmx = { workspace = true, editable = true }
+pjx-stimulus = { workspace = true, editable = true }
+pjx-tailwind = { workspace = true, editable = true }
