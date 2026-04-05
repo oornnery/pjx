@@ -9,10 +9,12 @@ to normal Jinja2 at template load time.
 ## Installation
 
 ```bash
-pip install pjx
-pip install pjx[htmx]
-pip install pjx[htmx,stimulus]
-pip install pjx[all]
+pip install pjx                    # core only
+pip install pjx[htmx]             # + HTMX/SSE aliases
+pip install pjx[htmx,stimulus]    # + Stimulus aliases
+pip install pjx[tailwind]         # + cn() class merging
+pip install pjx[all]              # everything
+pip install pjx[demo]             # + demo app dependencies
 ```
 
 Run the CLI without a global install:
