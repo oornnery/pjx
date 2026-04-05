@@ -1,5 +1,9 @@
 ---
 from ..icons import IconX
+
+computed:
+  put_url: "/users/" ~ props.id
+  card_target: "#user-" ~ props.id
 ---
 
 <div class="modal-overlay" id="edit-modal" stimulus:controller="edit-modal">
@@ -11,8 +15,8 @@ from ..icons import IconX
       </button>
     </div>
     <form
-      htmx:put={"/users/" ~ props.id}
-      htmx:target={"#user-" ~ props.id}
+      htmx:put={put_url}
+      htmx:target={card_target}
       htmx:swap="outerHTML">
       <div class="form-group">
         <label for="edit-name">Nome</label>
@@ -25,9 +29,9 @@ from ..icons import IconX
       <div class="form-group">
         <label for="edit-role">Role</label>
         <select id="edit-role" name="role">
-          <Show when={props.role == "user"}><option value="user" selected>User</option><Else><option value="user">User</option></Else></Show>
-          <Show when={props.role == "admin"}><option value="admin" selected>Admin</option><Else><option value="admin">Admin</option></Else></Show>
-          <Show when={props.role == "agent"}><option value="agent" selected>Agent</option><Else><option value="agent">Agent</option></Else></Show>
+          <option value="user" ?selected={props.role == "user"}>User</option>
+          <option value="admin" ?selected={props.role == "admin"}>Admin</option>
+          <option value="agent" ?selected={props.role == "agent"}>Agent</option>
         </select>
       </div>
       <div id="edit-errors"></div>

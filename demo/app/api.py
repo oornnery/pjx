@@ -17,9 +17,7 @@ async def list_users(svc: UserService = Depends(get_user_service)) -> list[User]
 
 
 @router.post("/users", status_code=201)
-async def create_user(
-    data: CreateUserForm, svc: UserService = Depends(get_user_service)
-) -> User:
+async def create_user(data: CreateUserForm, svc: UserService = Depends(get_user_service)) -> User:
     return svc.create(data)
 
 
@@ -36,7 +34,5 @@ async def update_user(
 
 
 @router.delete("/users/{user_id}", status_code=204)
-async def delete_user(
-    user_id: int, svc: UserService = Depends(get_user_service)
-) -> None:
+async def delete_user(user_id: int, svc: UserService = Depends(get_user_service)) -> None:
     svc.delete(user_id)

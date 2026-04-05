@@ -1,6 +1,15 @@
 ---
 from ...layouts import BaseLayout
 from ...icons import IconUser, IconEdit, IconTrash
+
+vars:
+  meta_style: "font-size: 0.85rem; color: #9ca3af;"
+  email_style: "margin: 1rem 0; color: #6b7280;"
+
+computed:
+  is_admin: props.user.role == "admin"
+  badge_class: cn("badge", "badge-admin" if is_admin else "badge-user")
+  user_url: "/users/" ~ props.user.id
 ---
 
 <BaseLayout title={props.user.name}>
@@ -8,22 +17,19 @@ from ...icons import IconUser, IconEdit, IconTrash
     <h2>
       <IconUser size="24" />
       {{ props.user.name }}
-      <Show when={props.user.role == "admin"}>
-        <span class="badge badge-admin">admin</span>
-        <Else>
-          <span class="badge badge-user">{{ props.user.role }}</span>
-        </Else>
-      </Show>
+      <span class={badge_class}>
+        <Show when={is_admin}>admin<Else>{{ props.user.role }}</Else></Show>
+      </span>
     </h2>
 
-    <p style="margin: 1rem 0; color: #6b7280;">{{ props.user.email }}</p>
-    <p style="font-size: 0.85rem; color: #9ca3af;">ID: {{ props.user.id }}</p>
+    <p style={email_style}>{{ props.user.email }}</p>
+    <p style={meta_style}>ID: {{ props.user.id }}</p>
 
     <div class="card-actions" style="margin-top: 1.5rem;">
       <a href="/" class="btn btn-sm">Voltar</a>
       <button
         class="btn btn-sm"
-        htmx:get={"/users/" ~ props.user.id ~ "/edit"}
+        htmx:get={user_url ~ "/edit"}
         htmx:target="#modal-container"
         htmx:swap="innerHTML">
         <IconEdit size="14" />
@@ -31,7 +37,7 @@ from ...icons import IconUser, IconEdit, IconTrash
       </button>
       <button
         class="btn btn-danger btn-sm"
-        htmx:delete={"/users/" ~ props.user.id}
+        htmx:delete={user_url}
         htmx:confirm="Remover este usuario?"
         htmx:on="htmx:afterOnLoad: window.location='/'">
         <IconTrash size="14" />

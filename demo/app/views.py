@@ -9,6 +9,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from jinja2 import FileSystemLoader
 
+from pjx import PJXEnvironment
+from pjx.router import FormData, PJXRouter
+
 from .deps import get_user_service
 from .models import (
     CreateUserForm,
@@ -18,21 +21,15 @@ from .models import (
     UserDetailProps,
 )
 from .service import UserService
-from pjx import PJXEnvironment
-from pjx.router import FormData, PJXRouter
 
 _HERE = Path(__file__).parent
 
-templates = Jinja2Templates(
-    env=PJXEnvironment(loader=FileSystemLoader(str(_HERE / "templates")))
-)
+templates = Jinja2Templates(env=PJXEnvironment(loader=FileSystemLoader(str(_HERE / "templates"))))
 ui = PJXRouter(templates)
 
 
 @ui.page("/", "pages/home.jinja")
-async def home(
-    request: Request, svc: UserService = Depends(get_user_service)
-) -> HomeProps:
+async def home(request: Request, svc: UserService = Depends(get_user_service)) -> HomeProps:
     return HomeProps(users=svc.list_all())
 
 
@@ -82,8 +79,6 @@ async def user_detail(
 
 
 @ui.delete("/users/{user_id}")
-async def delete_user(
-    user_id: int, svc: UserService = Depends(get_user_service)
-) -> HTMLResponse:
+async def delete_user(user_id: int, svc: UserService = Depends(get_user_service)) -> HTMLResponse:
     svc.delete(user_id)
     return HTMLResponse("")

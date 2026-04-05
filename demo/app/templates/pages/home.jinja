@@ -6,6 +6,9 @@ from ..icons import IconPlus
 props:
   title: str = "PJX Demo"
   users: list = []
+
+computed:
+  has_users: props.users | length > 0
 ---
 
 <BaseLayout title={props.title}>
@@ -37,14 +40,14 @@ props:
     <For each={props.users} as="user">
       <UserCard id={user.id} name={user.name} email={user.email} role={user.role} />
     </For>
-
-    <Show when={not props.users}>
-      <p class="empty">Nenhum usuario cadastrado. Adicione um acima.</p>
-    </Show>
   </div>
 
-  <div id="toast"></div>
-  <div id="modal-container"></div>
+  <p class="empty" ?hidden={has_users}>Nenhum usuario cadastrado. Adicione um acima.</p>
+
+  <Fragment>
+    <div id="toast"></div>
+    <div id="modal-container"></div>
+  </Fragment>
 
   <ConfirmModal />
 </BaseLayout>
