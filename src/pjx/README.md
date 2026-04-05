@@ -23,6 +23,8 @@ uvx pjx check templates/
 uvx pjx check templates/ --fix
 uvx pjx skills --claude
 uvx pjx assets build static/vendor/pjx
+uvx pjx assets add alpinejs@3 --dist alpinejs/dist/cdn.min.js --out js/alpine.min.js
+uvx pjx assets list
 ```
 
 ## Quick Setup
@@ -194,6 +196,9 @@ pjx sitemap templates/ --base-url https://example.com
 pjx skills --claude
 pjx skills --agents
 pjx assets build static/vendor/pjx
+pjx assets add alpinejs@3 --dist alpinejs/dist/cdn.min.js --out js/alpine.min.js
+pjx assets list
+pjx assets remove alpinejs
 pjx demo
 
 # no global install needed
@@ -203,6 +208,10 @@ uvx pjx demo
 
 `pjx check --fix` is for safe technical autofixes.
 `pjx format` stays focused on formatting and frontmatter layout.
+`pjx assets build` vendors browser assets via npm, merging extension and manifest packages.
+`pjx assets add` adds an npm package to the local `pjx-assets.json` manifest.
+`pjx assets list` shows all assets from extensions and the manifest.
+`pjx assets remove` removes a package from the manifest.
 `pjx demo` launches the bundled demo application.
 
 ## Links
