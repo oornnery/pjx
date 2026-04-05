@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=75.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pjx"
+version = "0.2.0"
+description = "Jinja2 preprocessor with JSX-like syntax for FastAPI + HTMX + Stimulus"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.135.3",
+    "jinja2>=3.1.6",
+    "pydantic>=2.12.5",
+    "python-multipart>=0.0.22",
+    "uvicorn>=0.43.0",
+]
+
+[project.scripts]
+pjx = "pjx.cli:main"
+
+[project.optional-dependencies]
+htmx = ["pjx-htmx>=0.1.0"]
+stimulus = ["pjx-stimulus>=0.1.0"]
+tailwind = ["pjx-tailwind>=0.1.0"]
+all = ["pjx[htmx,stimulus,tailwind]"]
+
+[tool.setuptools.packages.find]
+include = ["pjx*"]
+
+[tool.uv.sources]
+pjx-htmx = { workspace = true, editable = true }
+pjx-stimulus = { workspace = true, editable = true }
+pjx-tailwind = { workspace = true, editable = true }

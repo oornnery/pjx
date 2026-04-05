@@ -1,0 +1,11 @@
+<Switch expr={user.role}>
+  <Case value="admin">
+    <AdminBadge />
+  </Case>
+  <Case value="agent">
+    <AgentBadge />
+  </Case>
+  <Default>
+    <UserBadge />
+  </Default>
+</Switch>
