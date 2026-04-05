@@ -151,10 +151,11 @@ def build_vendor_assets(
     import subprocess
 
     all_providers = list(providers or discover_asset_providers())
+    manifest = load_manifest(output_dir)
     writes: list[VendorAssetWrite] = []
 
     npm_deps: dict[str, str] = {}
-    npm_assets: list[tuple[BrowserAssetProvider, BrowserAsset]] = []
+    npm_copies: list[tuple[str, str, str, str]] = []  # (provider, asset, dist_path, output_rel)
     url_assets: list[tuple[BrowserAssetProvider, BrowserAsset]] = []
 
     for provider in all_providers:
@@ -164,11 +165,26 @@ def build_vendor_assets(
             if asset.vendor_file.npm_package:
                 pkg_name, pkg_version = _parse_npm_spec(asset.vendor_file.npm_package)
                 npm_deps[pkg_name] = pkg_version
-                npm_assets.append((provider, asset))
+                npm_copies.append((
+                    provider.name,
+                    asset.name,
+                    asset.vendor_file.npm_dist_path or "",
+                    asset.vendor_file.relative_path,
+                ))
             else:
                 url_assets.append((provider, asset))
 
-    if npm_assets:
+    for name, entry in manifest.items():
+        pkg_name, pkg_version = _parse_npm_spec(entry.npm_package)
+        npm_deps[pkg_name] = pkg_version
+        npm_copies.append((
+            "manifest",
+            name,
+            entry.npm_dist_path,
+            entry.output_path,
+        ))
+
+    if npm_copies:
         node_dir = output_dir / ".pjx-build"
         node_dir.mkdir(parents=True, exist_ok=True)
 
@@ -186,26 +202,23 @@ def build_vendor_assets(
             capture_output=True,
         )
 
-        for provider, asset in npm_assets:
-            vf = asset.vendor_file
-            assert vf is not None
-            src = node_dir / "node_modules" / (vf.npm_dist_path or "")
+        for prov_name, asset_name, dist_path, output_rel in npm_copies:
+            src = node_dir / "node_modules" / dist_path
             if not src.is_file():
                 raise OSError(f"npm installed but dist file not found: {src}")
 
-            output_path = output_dir / vf.relative_path
+            output_path = output_dir / output_rel
             output_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, output_path)
             writes.append(
                 VendorAssetWrite(
-                    provider=provider.name,
-                    asset=asset.name,
+                    provider=prov_name,
+                    asset=asset_name,
                     output_path=output_path,
-                    source_url=vf.npm_package or vf.source_url,
+                    source_url=dist_path,
                 )
             )
 
-        # Copy package.json and lock to output dir for reproducibility
         for name in ("package.json", "package-lock.json"):
             src_file = node_dir / name
             if src_file.exists():
@@ -255,6 +268,72 @@ def discover_asset_providers(
 
 def available_asset_provider_names() -> tuple[str, ...]:
     return tuple(p.name for p in discover_asset_providers())
+
+
+MANIFEST_FILE = "pjx-assets.json"
+
+
+@dataclass(frozen=True, slots=True)
+class ManifestEntry:
+    npm_package: str
+    npm_dist_path: str
+    output_path: str
+    kind: AssetKind = "script"
+    placement: AssetPlacement = "head"
+
+
+def load_manifest(directory: Path) -> dict[str, ManifestEntry]:
+    import json
+
+    manifest_path = directory / MANIFEST_FILE
+    if not manifest_path.exists():
+        return {}
+
+    data = json.loads(manifest_path.read_text())
+    entries: dict[str, ManifestEntry] = {}
+    for name, entry in data.get("assets", {}).items():
+        entries[name] = ManifestEntry(
+            npm_package=entry["npm_package"],
+            npm_dist_path=entry["npm_dist_path"],
+            output_path=entry["output_path"],
+            kind=entry.get("kind", "script"),
+            placement=entry.get("placement", "head"),
+        )
+    return entries
+
+
+def save_manifest(directory: Path, entries: dict[str, ManifestEntry]) -> None:
+    import json
+
+    directory.mkdir(parents=True, exist_ok=True)
+    data = {
+        "assets": {
+            name: {
+                "npm_package": e.npm_package,
+                "npm_dist_path": e.npm_dist_path,
+                "output_path": e.output_path,
+                "kind": e.kind,
+                "placement": e.placement,
+            }
+            for name, e in sorted(entries.items())
+        }
+    }
+    (directory / MANIFEST_FILE).write_text(json.dumps(data, indent=2) + "\n")
+
+
+def add_manifest_entry(directory: Path, name: str, entry: ManifestEntry) -> None:
+    entries = load_manifest(directory)
+    entries[name] = entry
+    save_manifest(directory, entries)
+
+
+def remove_manifest_entry(directory: Path, name: str) -> bool:
+    entries = load_manifest(directory)
+    if name not in entries:
+        return False
+    del entries[name]
+    save_manifest(directory, entries)
+    return True
 
 
 def _format_attrs(attrs: Iterable[tuple[str, str | None]]) -> str:
@@ -313,10 +392,14 @@ __all__ = [
     "BrowserAsset",
     "BrowserAssetFile",
     "BrowserAssetProvider",
+    "ManifestEntry",
     "VendorBuildResult",
     "VendorAssetWrite",
+    "add_manifest_entry",
     "available_asset_provider_names",
     "build_vendor_assets",
     "discover_asset_providers",
     "inject_browser_assets",
+    "load_manifest",
+    "remove_manifest_entry",
 ]
