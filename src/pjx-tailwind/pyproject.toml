@@ -7,7 +7,7 @@ name = "pjx-tailwind"
 version = "0.1.0"
 description = "Tailwind CSS utilities for PJX (cn() class merging)"
 requires-python = ">=3.12"
-dependencies = ["pjx>=0.2.0"]
+dependencies = ["pjx>=0.2.1"]
 
 [project.entry-points."pjx.jinja_globals"]
 cn = "pjx_tailwind.cn:cn"
