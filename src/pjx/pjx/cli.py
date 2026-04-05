@@ -443,8 +443,8 @@ def assets_add_command(
         npm_package=package,
         npm_dist_path=dist,
         output_path=output_path,
-        kind=kind,  # type: ignore[arg-type]
-        placement=placement,  # type: ignore[arg-type]
+        kind=kind,
+        placement=placement,
     )
     add_manifest_entry(vendor_dir, pkg_name, entry)
     _print_message(f"Added {pkg_name} to {vendor_dir / 'pjx-assets.json'}", style="green")

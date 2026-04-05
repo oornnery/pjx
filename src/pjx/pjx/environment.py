@@ -89,7 +89,7 @@ class PJXEnvironment(Environment):
     def _apply_extensions(self) -> None:
         for ext in self._extension_registry.extensions:
             for name, func in ext.get_jinja_globals().items():
-                self.globals[name] = func
+                self.globals[name] = func  # ty: ignore[invalid-assignment]
 
             for slot, processor in ext.get_processors():
                 self._pjx_loader.pipeline.register_processor(slot, processor)

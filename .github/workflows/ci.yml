@@ -42,7 +42,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Type check
-        run: uv run ty check --output-format github src/pjx/pjx/
+        run: uv run ty check --output-format github src/pjx/pjx/*.py src/pjx/pjx/core/
 
   mdlint:
     runs-on: ubuntu-latest

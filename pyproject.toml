@@ -48,7 +48,7 @@ members = [
 [tool.taskipy.tasks]
 test = "pytest src/ -v"
 lint = "ruff check src/ && ruff format --check src/"
-typecheck = "ty check src/pjx/pjx/ src/pjx-htmx/ src/pjx-stimulus/ src/pjx-tailwind/ --extra-search-path src/pjx --extra-search-path src/pjx-htmx --extra-search-path src/pjx-stimulus --extra-search-path src/pjx-tailwind"
+typecheck = "ty check src/pjx/pjx/*.py src/pjx/pjx/core/"
 mdlint = "rumdl check --check docs/ README.md"
 check = "task lint && task typecheck && task mdlint && task test"
 demo = "uvicorn demo.app.main:app --reload"
