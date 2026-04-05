@@ -239,7 +239,7 @@ class PJXRouter(APIRouter):
 
             # Override signature so FastAPI doesn't treat this as an async generator
             sig = inspect.signature(func)
-            wrapper.__signature__ = sig.replace(return_annotation=StreamingResponse)  # type: ignore[attr-defined]
+            wrapper.__signature__ = sig.replace(return_annotation=StreamingResponse)  # ty: ignore[unresolved-attribute]
             del wrapper.__wrapped__
             self.get(path, **route_kwargs)(wrapper)
             return wrapper
