@@ -42,7 +42,7 @@ def _err_console() -> Console:
     return Console(stderr=True)
 
 
-def _print_message(message: str, *, style: str | None = None) -> None:
+def _print_message(message: str, *, style: str = "") -> None:
     _console().print(Text(message, style=style))
 
 
@@ -424,7 +424,9 @@ def assets_add_command(
     ],
     output_path: Annotated[
         str,
-        typer.Option("--out", "-o", help="Output path relative to vendor dir, for example js/alpine.min.js"),
+        typer.Option(
+            "--out", "-o", help="Output path relative to vendor dir, for example js/alpine.min.js"
+        ),
     ],
     vendor_dir: Annotated[
         Path,
@@ -441,8 +443,8 @@ def assets_add_command(
         npm_package=package,
         npm_dist_path=dist,
         output_path=output_path,
-        kind=kind,
-        placement=placement,
+        kind=kind,  # type: ignore[arg-type]
+        placement=placement,  # type: ignore[arg-type]
     )
     add_manifest_entry(vendor_dir, pkg_name, entry)
     _print_message(f"Added {pkg_name} to {vendor_dir / 'pjx-assets.json'}", style="green")

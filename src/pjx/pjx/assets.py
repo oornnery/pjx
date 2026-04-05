@@ -63,7 +63,9 @@ class BrowserAsset:
             tokens.append(self.cdn_url)
         if self.vendor_file is not None:
             tokens.append(self.vendor_file.relative_path)
-            tokens.append(self._vendor_url(base_url))
+            vendor_url = self._vendor_url(base_url)
+            if vendor_url:
+                tokens.append(vendor_url)
         return tuple(token for token in tokens if token)
 
     def _vendor_url(self, base_url: str) -> str | None:
@@ -165,24 +167,28 @@ def build_vendor_assets(
             if asset.vendor_file.npm_package:
                 pkg_name, pkg_version = _parse_npm_spec(asset.vendor_file.npm_package)
                 npm_deps[pkg_name] = pkg_version
-                npm_copies.append((
-                    provider.name,
-                    asset.name,
-                    asset.vendor_file.npm_dist_path or "",
-                    asset.vendor_file.relative_path,
-                ))
+                npm_copies.append(
+                    (
+                        provider.name,
+                        asset.name,
+                        asset.vendor_file.npm_dist_path or "",
+                        asset.vendor_file.relative_path,
+                    )
+                )
             else:
                 url_assets.append((provider, asset))
 
     for name, entry in manifest.items():
         pkg_name, pkg_version = _parse_npm_spec(entry.npm_package)
         npm_deps[pkg_name] = pkg_version
-        npm_copies.append((
-            "manifest",
-            name,
-            entry.npm_dist_path,
-            entry.output_path,
-        ))
+        npm_copies.append(
+            (
+                "manifest",
+                name,
+                entry.npm_dist_path,
+                entry.output_path,
+            )
+        )
 
     if npm_copies:
         node_dir = output_dir / ".pjx-build"
@@ -246,7 +252,8 @@ def build_vendor_assets(
 
 
 def discover_asset_providers(
-    *, names: Iterable[str] | None = None,
+    *,
+    names: Iterable[str] | None = None,
 ) -> list[BrowserAssetProvider]:
     from pjx.extension import ExtensionRegistry
 

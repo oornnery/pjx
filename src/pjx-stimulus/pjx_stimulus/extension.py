@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from pjx.assets import BrowserAssetProvider
 from pjx.core.types import Processor
 from pjx.extension import PJXExtension
-
 from pjx_stimulus.assets import StimulusBrowserAssetProvider
 from pjx_stimulus.processor import StimulusAliasProcessor
 

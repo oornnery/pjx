@@ -5,7 +5,6 @@ from typing import Any
 
 from pjx.assets import BrowserAssetProvider
 from pjx.extension import PJXExtension
-
 from pjx_tailwind.assets import TailwindBrowserAssetProvider
 from pjx_tailwind.cn import cn
 

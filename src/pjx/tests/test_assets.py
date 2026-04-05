@@ -73,7 +73,7 @@ def test_existing_manual_asset_tag_is_not_duplicated():
                 "page.jinja": (
                     "<!DOCTYPE html><html><head>"
                     '<script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js"></script>'
-                    "</head><body><button hx-get=\"/users\">Load</button></body></html>"
+                    '</head><body><button hx-get="/users">Load</button></body></html>'
                 )
             }
         ),
