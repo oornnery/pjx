@@ -313,7 +313,15 @@ def run_assets_build(
 def run_demo(*, host: str = "127.0.0.1", port: int = 8000, reload: bool = False) -> int:
     import sys
 
-    import uvicorn
+    try:
+        import email_validator  # noqa: F401
+        import uvicorn
+    except ImportError:
+        _print_error(
+            "Demo requires extra dependencies. Install with:\n"
+            "  pip install pjx[demo]   or   uvx --with 'pjx[demo]' pjx demo"
+        )
+        return 1
 
     demo_dir = _resolve_bundled_dir("demo")
     if demo_dir is None:
