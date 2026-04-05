@@ -5,7 +5,6 @@ from collections.abc import Iterable
 from pjx.assets import BrowserAssetProvider
 from pjx.core.types import Processor
 from pjx.extension import PJXExtension
-
 from pjx_htmx.assets import HTMXBrowserAssetProvider
 from pjx_htmx.processor import HTMXAliasProcessor
 

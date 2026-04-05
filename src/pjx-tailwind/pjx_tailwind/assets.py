@@ -7,8 +7,8 @@ from pjx.assets import BrowserAsset, BrowserAssetFile
 _TAILWIND_ATTR_RE = re.compile(r'type=["\']text/tailwindcss["\']', re.IGNORECASE)
 _TAILWIND_CLASS_RE = re.compile(
     r'class\s*=\s*["\'][^"\']*\b(?:'
-    r'(?:sm|md|lg|xl|2xl|hover|focus|dark):'
-    r'|(?:text|bg|border|rounded|flex|grid|items|justify|gap|space|p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|w|h|min-w|max-w|min-h|max-h|font|tracking|leading|shadow|ring|opacity|z|top|right|bottom|left|inset)-'
+    r"(?:sm|md|lg|xl|2xl|hover|focus|dark):"
+    r"|(?:text|bg|border|rounded|flex|grid|items|justify|gap|space|p|px|py|pt|pr|pb|pl|m|mx|my|mt|mr|mb|ml|w|h|min-w|max-w|min-h|max-h|font|tracking|leading|shadow|ring|opacity|z|top|right|bottom|left|inset)-"
     r')[^"\']*["\']',
     re.IGNORECASE,
 )

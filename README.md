@@ -78,7 +78,7 @@ props:
 - HTMX aliases: [`pjx-htmx`](src/pjx-htmx/README.md)
 - Stimulus aliases: [`pjx-stimulus`](src/pjx-stimulus/README.md)
 - Tailwind helper: [`pjx-tailwind`](src/pjx-tailwind/README.md)
-- Demo app: [`demo`](demo/README.md)
+- Demo app: run `pjx demo` or `uvx pjx demo`
 
 ## Documentation
 

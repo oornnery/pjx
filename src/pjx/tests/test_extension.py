@@ -57,7 +57,7 @@ class MinimalExtension(PJXExtension):
 def test_extension_abc_requires_name():
     try:
         PJXExtension()  # type: ignore[abstract]
-        assert False, "Should raise TypeError"
+        raise AssertionError("Should raise TypeError")
     except TypeError:
         pass
 
@@ -107,8 +107,7 @@ def test_explicit_extension_provides_asset_injection():
         loader=DictLoader(
             {
                 "page.jinja": (
-                    "<!DOCTYPE html><html><head></head>"
-                    '<body><div data-dummy></div></body></html>'
+                    "<!DOCTYPE html><html><head></head><body><div data-dummy></div></body></html>"
                 )
             }
         ),
