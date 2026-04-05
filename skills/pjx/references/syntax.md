@@ -1,6 +1,8 @@
-# PJX Syntax Reference
+# PJX Template Syntax
 
 ## Frontmatter
+
+Every `.jinja` file can start with a `---` block declaring metadata:
 
 ```html
 ---
@@ -25,15 +27,8 @@ slot actions
 ---
 ```
 
-### Section Order (canonical)
-
-1. `from X import Y` — imports
-2. `props:` — typed properties with defaults
-3. `vars:` — template-scoped variables (scalar or map)
-4. `computed:` — derived values from props/vars
-5. `slot name` — named content slots
-
-Use `pjx format` to enforce this order.
+**Section order** (enforced by `pjx format`):
+imports -> props -> vars -> computed -> slots
 
 ## Control Flow
 
@@ -57,30 +52,42 @@ Use `pjx format` to enforce this order.
   <Default><span>User</span></Default>
 </Switch>
 
-<!-- Fragment (no wrapper element) -->
+<!-- Fragment: render children without wrapper -->
 <Fragment>
   <span>A</span>
   <span>B</span>
 </Fragment>
 ```
 
-## Attributes
+## Expressions
+
+`{expr}` in attributes compiles to `{{ expr }}`:
 
 ```html
-<!-- Expression: {expr} -> {{ expr }} -->
-<a href={"/users/" ~ user.id}>Link</a>
+<a href={"/users/" ~ user.id}>{{ user.name }}</a>
+```
 
-<!-- Conditional: include only when truthy -->
+## Conditional Attributes
+
+`?attr={expr}` — includes the attribute only when truthy:
+
+```html
 <div ?hidden={not visible}>content</div>
 <option value="admin" ?selected={role == "admin"}>Admin</option>
+<input ?required={is_required} ?disabled={is_disabled} />
+```
 
-<!-- Spread: expand dict as attributes -->
+## Spread Attributes
+
+`...{dict}` — expands a dict as HTML attributes:
+
+```html
 <div class="base" ...{extra_attrs}>content</div>
 ```
 
 ## Components
 
-Uppercase tags imported via frontmatter:
+Uppercase tags imported via frontmatter. Compiled to `{% include %}`:
 
 ```html
 ---
@@ -91,28 +98,56 @@ from ..icons import IconEdit
 <!-- Self-closing -->
 <UserCard id={user.id} name={user.name} />
 
-<!-- With children (receives {{ content }}) -->
+<!-- With children (template receives {{ content }}) -->
 <BaseLayout title={props.title}>
-  <h1>Body here</h1>
+  <h1>Page content</h1>
 </BaseLayout>
 
-<!-- SVG icons are components -->
+<!-- SVG icons are components too -->
 <button><IconEdit size="14" /> Edit</button>
 ```
 
-## HTMX Aliases (pjx-htmx)
+## Template Variables
+
+### vars: — static values
+
+```html
+---
+vars:
+  color: "blue"
+  sizes:
+    sm: "h-8 px-3"
+    md: "h-10 px-4"
+---
+<div class={sizes[props.size]}>...</div>
+```
+
+### computed: — derived values
+
+```html
+---
+props:
+  first: str
+  last: str
+
+computed:
+  full_name: first ~ " " ~ last
+  is_long: full_name | length > 20
+---
+<h1>{{ full_name }}</h1>
+```
+
+## HTMX Aliases (requires pjx[htmx])
 
 ```html
 <button htmx:post="/users" htmx:target="#list" htmx:swap="innerHTML">
   Save
 </button>
-<!-- -> hx-post, hx-target, hx-swap -->
 
 <div sse:connect="/events" sse:swap="message"></div>
-<!-- -> sse-connect, sse-swap -->
 ```
 
-## Stimulus Aliases (pjx-stimulus)
+## Stimulus Aliases (requires pjx[stimulus])
 
 ```html
 <div stimulus:controller="dropdown">
@@ -120,44 +155,38 @@ from ..icons import IconEdit
   <div stimulus:target="menu">Content</div>
 </div>
 
-<!-- Multi-controller: explicit selection -->
+<!-- Multi-controller: use explicit .controller selection -->
 <div stimulus:controller="dropdown modal">
   <button stimulus:target.dropdown="trigger">Open</button>
 </div>
-
-<!-- Values -->
-<div stimulus:controller="editor">
-  <input stimulus:value-content="hello" />
-  <!-- -> data-editor-content-value="hello" -->
-</div>
 ```
 
-## cn() (pjx-tailwind)
+## cn() (requires pjx[tailwind])
+
+Class-name merging — filters falsy, deduplicates:
 
 ```html
 ---
 computed:
-  btn: cn("btn", is_primary and "btn-primary", disabled and "opacity-50")
+  cls: cn("btn", is_primary and "btn-primary", disabled and "opacity-50")
 ---
-<button class={btn}>Click</button>
+<button class={cls}>Click</button>
 ```
 
-Filters falsy, joins with space, deduplicates.
+## Compilation Table
 
-## What Compiles to What
-
-| PJX | Jinja2 |
-|-----|--------|
-| `<For each={items} as="item">` | `{% for item in items %}` |
-| `<Show when={cond}>` | `{% if cond %}` |
-| `<Else>` | `{% else %}` |
-| `<Switch expr={x}><Case value="a">` | `{% if x == "a" %}` |
-| `<Fragment>` | (removed) |
-| `<UserCard name={x} />` | `{% with name=x %}{% include "..." %}{% endwith %}` |
-| `href={url}` | `href="{{ url }}"` |
-| `?hidden={expr}` | `{% if expr %}hidden="{{ expr }}"{% endif %}` |
-| `...{attrs}` | `{{ attrs \| xmlattr }}` |
-| `htmx:post="/url"` | `hx-post="/url"` |
-| `stimulus:controller="x"` | `data-controller="x"` |
-| `vars: color: "blue"` | `{% set color = "blue" %}` |
-| `computed: x: a ~ b` | `{% set x = a ~ b %}` |
+| PJX                            | Compiles to                                   |
+| ------------------------------ | --------------------------------------------- |
+| `<For each={items} as="item">` | `{% for item in items %}`                     |
+| `<Show when={cond}>`           | `{% if cond %}`                               |
+| `<Else>`                       | `{% else %}`                                  |
+| `<Switch>/<Case>/<Default>`    | `{% if %}/{% elif %}/{% else %}`              |
+| `<Fragment>`                   | (removed — children render directly)          |
+| `<Card name={x} />`            | `{% with name=x %}{% include %}{% endwith %}` |
+| `href={url}`                   | `href="{{ url }}"`                            |
+| `?hidden={expr}`               | `{% if expr %}hidden="{{ expr }}"{% endif %}` |
+| `...{attrs}`                   | `{{ attrs \| xmlattr }}`                      |
+| `htmx:post="/url"`             | `hx-post="/url"`                              |
+| `stimulus:controller="x"`      | `data-controller="x"`                         |
+| `vars: color: "blue"`          | `{% set color = "blue" %}`                    |
+| `computed: x: a ~ b`           | `{% set x = a ~ b %}`                         |

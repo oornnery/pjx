@@ -90,11 +90,11 @@ async def not_found(request, exc):
 
 All decorators inject:
 
-| Variable | Content |
-|----------|---------|
-| `props` | BaseModel returned by handler |
-| `params` | `request.path_params` dict |
-| `request` | Starlette Request |
+| Variable  | Content                       |
+| --------- | ----------------------------- |
+| `props`   | BaseModel returned by handler |
+| `params`  | `request.path_params` dict    |
+| `request` | Starlette Request             |
 
 ## Patterns
 

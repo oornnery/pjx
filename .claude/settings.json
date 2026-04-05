@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(rtk uv:*)",
-      "Read(//^name = /{gsub\\(/\"/**)"
+      "Read(//^name = /{gsub\\(/\"/**)",
+      "Bash(uv run:*)",
+      "Bash(gh api:*)",
+      "Bash(git submodule:*)",
+      "Bash(rumdl check:*)",
+      "Bash(rumdl fmt:*)",
+      "Bash(uv build:*)"
     ]
   }
 }
