@@ -285,8 +285,8 @@ class ManifestEntry:
     npm_package: str
     npm_dist_path: str
     output_path: str
-    kind: AssetKind = "script"
-    placement: AssetPlacement = "head"
+    kind: str = "script"
+    placement: str = "head"
 
 
 def load_manifest(directory: Path) -> dict[str, ManifestEntry]:
